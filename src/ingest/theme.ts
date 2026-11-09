@@ -136,6 +136,14 @@ export function resolveThemeTokens(
     // token source. Tenant CSS remains a separate, later cascade layer.
     if (config?.colors === null) return tokens
 
+    const invalidColor = (path: string): void => {
+        diagnostics.push({
+            code: "field_invalid",
+            severity: "warn",
+            message: `Invalid color at ${path}; expected #RGB or #RRGGBB.`,
+            path,
+        })
+    }
     const setColor = (
         cssVar: string,
         value: string | { light: string; dark: string } | undefined,
@@ -147,27 +155,15 @@ export function resolveThemeTokens(
                 ? HEX_COLOR.test(value)
                 : HEX_COLOR.test(value.light) && HEX_COLOR.test(value.dark)
         if (valid) tokens[cssVar] = value
-        else
-            diagnostics.push({
-                code: "field_invalid",
-                severity: "warn",
-                message: `Invalid color at ${path}; expected #RGB or #RRGGBB.`,
-                path,
-            })
+        else invalidColor(path)
         return valid
     }
     const hexAt = (
         value: string | undefined,
         path: string,
     ): string | undefined => {
-        if (value === undefined) return undefined
-        if (HEX_COLOR.test(value)) return value
-        diagnostics.push({
-            code: "field_invalid",
-            severity: "warn",
-            message: `Invalid color at ${path}; expected #RGB or #RRGGBB.`,
-            path,
-        })
+        if (value === undefined || HEX_COLOR.test(value)) return value
+        invalidColor(path)
         return undefined
     }
 

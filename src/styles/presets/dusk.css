@@ -41,7 +41,9 @@
     clip-path: inset(0 -100vmax);
 }
 [data-preset="dusk"] #nd-sidebar {
-    border-inline-end: 1px solid var(--color-fd-border);
+    /* An inset edge, not a border: a border shifts the tree off the
+       band's 36px text axis. */
+    box-shadow: inset -1px 0 0 var(--color-fd-border);
 }
 [data-preset="dusk"] #nd-sidebar [data-radix-scroll-area-viewport] p {
     font-size: 0.75rem;

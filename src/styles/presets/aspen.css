@@ -34,7 +34,9 @@
     border-color: var(--color-fd-border);
 }
 [data-preset="aspen"] #nd-sidebar {
-    border-inline-end: 1px solid var(--color-fd-border);
+    /* An inset edge, not a border: a border shifts the tree off the
+       band's 36px text axis. */
+    box-shadow: inset -1px 0 0 var(--color-fd-border);
 }
 [data-preset="aspen"] #nd-sidebar [data-radix-scroll-area-viewport] p {
     margin-top: 1rem;

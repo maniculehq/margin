@@ -26,7 +26,9 @@
     background-color: var(--color-fd-muted);
 }
 [data-preset="verdant"] #nd-sidebar {
-    border-inline-end: 1px solid var(--color-fd-border);
+    /* An inset edge, not a border: a border shifts the tree off the
+       band's 36px text axis. */
+    box-shadow: inset -1px 0 0 var(--color-fd-border);
 }
 [data-preset="verdant"] #nd-sidebar [data-radix-scroll-area-viewport] p {
     font-weight: 500;
@@ -48,7 +50,7 @@
 }
 [data-theme-name="willow"] #nd-sidebar {
     background-color: var(--color-fd-muted);
-    border-inline-end: none;
+    box-shadow: none;
 }
 [data-theme-name="willow"] #nd-sidebar [data-radix-scroll-area-viewport] p {
     font-size: 0.75rem;

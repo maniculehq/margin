@@ -509,49 +509,42 @@ describe.skipIf(!runnable)("browser acceptance harness", () => {
                             Math.abs(textLeft - logoLeft),
                             `at ${width}px: sidebar text starts at ${textLeft}, band nav at ${logoLeft}`,
                         ).toBeLessThanOrEqual(0.5)
-                        // Default pages keep an 88px sidebar-to-article gutter.
-                        // Only non-default modes and centered presets may skip;
-                        // missing sidebar or heading on a pinned page fails.
+                        // Default pages centre the reading column between
+                        // the sidebar and the TOC (app.css --margin-measure).
+                        // Only non-default modes may skip; a missing sidebar,
+                        // TOC or heading on a default page fails.
                         const article = await page.evaluate(() => {
                             const mode =
                                 document
                                     .querySelector("[data-page-mode]")
                                     ?.getAttribute("data-page-mode") ??
                                 "missing"
-                            const preset =
-                                document.documentElement.getAttribute(
-                                    "data-preset",
-                                )
-                            if (
-                                mode !== "default" ||
-                                preset === "warm" ||
-                                preset === "editorial"
-                            ) {
-                                return { pinned: false, gutter: null }
-                            }
+                            if (mode !== "default")
+                                return { centred: false, offset: null }
                             const aside = document.querySelector("#nd-sidebar")
-                            const heading =
-                                document.querySelector("#nd-page h1")
-                            return {
-                                pinned: true,
-                                gutter:
-                                    aside && heading
-                                        ? heading.getBoundingClientRect().left -
-                                          aside.getBoundingClientRect().right
-                                        : null,
-                            }
+                            const toc = document.querySelector("#nd-toc")
+                            const column = document.querySelector("#nd-page")
+                            if (!aside || !toc || !column)
+                                return { centred: true, offset: null }
+                            const left =
+                                column.getBoundingClientRect().left -
+                                aside.getBoundingClientRect().right
+                            const right =
+                                toc.getBoundingClientRect().left -
+                                column.getBoundingClientRect().right
+                            return { centred: true, offset: left - right }
                         })
-                        if (article.pinned) {
+                        if (article.centred) {
                             expect(
-                                article.gutter,
-                                `at ${width}px: default-mode page is missing #nd-sidebar or #nd-page h1`,
+                                article.offset,
+                                `at ${width}px: default-mode page is missing #nd-sidebar, #nd-toc or #nd-page`,
                             ).not.toBeNull()
-                            if (article.gutter === null)
+                            if (article.offset === null)
                                 throw new Error("unreachable")
                             expect(
-                                Math.abs(article.gutter - 88),
-                                `at ${width}px: article gutter is ${article.gutter}, expected 88`,
-                            ).toBeLessThanOrEqual(0.5)
+                                Math.abs(article.offset),
+                                `at ${width}px: article column is ${article.offset}px off centre`,
+                            ).toBeLessThanOrEqual(1)
                         }
                         await context.close()
                     }

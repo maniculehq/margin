@@ -232,12 +232,12 @@ body {
 /*
  * Band nav and sidebar tree text align 36px from the container edge.
  * Row/group inline depth padding must remain as the nesting indent, so adjust
- * only the scroll viewport: -1px border overhang + 29px + 8px = 36px.
+ * only the scroll viewport: 28px + the row's 8px = 36px.
  * Band chrome only: sidenav has no top bar and keeps fumadocs' geometry.
  */
 @media (min-width: 64rem) {
     :root:has(#docs-band) #nd-sidebar [data-radix-scroll-area-viewport] {
-        padding-inline-start: 29px;
+        padding-inline-start: 28px;
     }
 }
 
