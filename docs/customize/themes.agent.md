@@ -47,11 +47,13 @@ Merge these fields into the existing `docs.json` at the docs folder root, preser
 ## Facts
 
 - `theme` accepts `mint`, `maple`, `palm`, `willow`, `linden`, `almond`, `aspen`, `sequoia`, and `luma`.
-- Omitted `theme` uses the `neutral` layout and palette. Unknown `theme` falls back to `neutral` with a diagnostic.
+- Omitted `theme` uses the `neutral` layout with the `mint` palette. Unknown `theme` falls back to the same with a diagnostic.
 - Margin theme mappings approximate Mintlify layouts rather than reproducing Mintlify themes pixel for pixel.
-- `colors.primary` sets the base primary color for both page modes.
-- `colors.dark` sets the primary color in light mode. Omitted `colors.dark` falls back to the base primary color.
-- `colors.light` sets the primary color in dark mode. Omitted `colors.light` falls back to the base primary color.
+- `colors.primary` sets the light-mode accent and is the fallback for `colors.light` and `colors.dark`.
+- `colors.light` sets the dark-mode accent. Omitted `colors.light` falls back to `colors.primary`.
+- `colors.dark` sets the button fill in both modes. Omitted `colors.dark` falls back to `colors.primary`.
+- An accent from `colors` or a logo that falls below 4.5:1 contrast on the page and its panels is moved along lightness only until it reaches 4.5:1. Accents that pass are used as written. `x-margin.tokens` and site stylesheet values are never adjusted.
+- Every preset palette keeps body, muted, and accent text at 4.5:1 or more in light and dark mode.
 - Omitted `colors` permits logo-derived accent detection; otherwise the preset provides the starting colors.
 - `colors: null` retains the selected preset's tokens and disables derived and configured token overrides, including `x-margin.tokens` and `background.color`. `colors: null` does not disable a separate site stylesheet.
 - `appearance.default` accepts `system`, `light`, or `dark`; omission defaults to `system`.
@@ -64,21 +66,21 @@ Merge these fields into the existing `docs.json` at the docs folder root, preser
 - `colors` and direct color tokens accept only `#RGB` or `#RRGGBB` values.
 - Primary color precedence, highest first: matching site stylesheet rule, `x-margin.tokens.primary`, applicable `colors` value, detected logo accent, preset default.
 - Direct tokens override corresponding configuration such as `background.color`. Site stylesheets follow the token block and can override tokens through the CSS cascade.
-- A single primary color can receive automatic black or white primary foreground text. For primary color pairs, set `primary-foreground` explicitly if the preset text lacks contrast.
+- Margin sets black or white `primary-foreground` per mode, whichever reads better on the primary color, unless `x-margin.tokens.primary-foreground` is set.
 
 Theme mappings are:
 
-| `theme` | Margin layout | Palette |
+| `theme` | Margin layout | Variant |
 | --- | --- | --- |
-| `mint` | `neutral` | `neutral` |
-| `linden` | `neutral` | `neutral` |
-| `maple` | `warm` | `ruby` |
-| `almond` | `warm` | `solar` |
-| `palm` | `verdant` | `emerald` |
-| `willow` | `verdant` | `ocean` |
-| `aspen` | `aspen` | `aspen` |
-| `sequoia` | `dusk` | `dusk` |
-| `luma` | `contrast` | `black` |
+| `mint` | `neutral` | Default |
+| `linden` | `neutral` | Cream palette, monospace type |
+| `maple` | `warm` | Header in the sidebar, rail under each group |
+| `almond` | `warm` | Band header, tinted active rows |
+| `palm` | `verdant` | Tinted header, accent-only active rows |
+| `willow` | `verdant` | One-row header, tinted sidebar, serif headings |
+| `aspen` | `aspen` | Default |
+| `sequoia` | `dusk` | Default |
+| `luma` | `contrast` | Default |
 
 Supported `x-margin.tokens` names are:
 

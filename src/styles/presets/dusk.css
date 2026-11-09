@@ -1,47 +1,82 @@
 /*
- * Layout preset: DUSK (§4.2) — sequoia, dark-leaning. Denser and lower-contrast:
- * compact columns, a tight reading rhythm, and chrome that recedes. Borders are
- * softened toward the background and the sidebar takes the card tint so the
- * surface reads as layered dusk rather than stark panels — tuned for the darker
- * palette this preset ships with.
+ * Layout preset: DUSK (§4.2) — sequoia. A 48px top row with a compact
+ * search field on the muted fill, then the tab row on that same fill;
+ * hairline edges on the sidebar and the TOC column; small uppercase group
+ * labels at regular weight; the active page as the accent alone; headings
+ * at weight 500 under a small uppercase eyebrow.
  */
 
 [data-preset="dusk"] {
-    --fd-layout-width: 1360px;
+    --fd-layout-width: 92rem;
+    --margin-measure: 36rem;
+}
+:root[data-preset="dusk"] {
+    --docs-band-row: 3rem;
+    --docs-band-tabs: 3rem;
 }
 @media (min-width: 64rem) {
     [data-preset="dusk"] #nd-docs-layout {
-        --fd-sidebar-width: 252px;
+        --fd-sidebar-width: 18rem;
     }
 }
 @media (min-width: 1280px) {
     [data-preset="dusk"] #nd-docs-layout {
-        --fd-toc-width: 248px;
+        --fd-toc-width: 17rem;
     }
 }
 
-:where([data-preset="dusk"]) #nd-sidebar {
-    background-color: color-mix(
-        in oklab,
-        var(--color-fd-card) 60%,
-        var(--color-fd-background)
-    );
-    border-color: color-mix(in oklab, var(--color-fd-border) 55%, transparent);
+[data-preset="dusk"] [data-search-pill] {
+    height: 2rem;
+    border-color: transparent;
+    border-radius: 0.5rem;
+    background-color: var(--color-fd-muted);
 }
-:where([data-preset="dusk"]) #nd-sidebar a {
-    padding-block: 0.3125rem;
-    border-radius: 0.375rem;
+[data-preset="dusk"] [data-search-pill]:hover {
+    border-color: var(--color-fd-border);
 }
-:where([data-preset="dusk"]) #nd-toc {
+/* Full-bleed fill behind the layout-width tab row. */
+[data-preset="dusk"] #docs-band > nav {
+    background-color: var(--color-fd-muted);
+    box-shadow: 0 0 0 100vmax var(--color-fd-muted);
+    clip-path: inset(0 -100vmax);
+}
+[data-preset="dusk"] #nd-sidebar {
+    /* An inset edge, not a border: a border shifts the tree off the
+       band's 36px text axis. */
+    box-shadow: inset -1px 0 0 var(--color-fd-border);
+}
+[data-preset="dusk"] #nd-sidebar [data-radix-scroll-area-viewport] p {
+    font-size: 0.75rem;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+[data-preset="dusk"]
+    #nd-sidebar
+    [data-radix-scroll-area-viewport]
+    a[data-active="true"] {
+    background-color: transparent;
+}
+@media (min-width: 1280px) {
+    [data-preset="dusk"] #nd-toc {
+        border-inline-start: 1px solid var(--color-fd-border);
+    }
+}
+[data-preset="dusk"] #toc-title {
     color: var(--color-fd-muted-foreground);
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
+    font-weight: 400;
 }
-
-:where([data-preset="dusk"]) .prose {
-    line-height: 1.6;
+[data-preset="dusk"] [data-eyebrow] {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
-:where([data-preset="dusk"])
+[data-preset="dusk"] #nd-page article h1,
+[data-preset="dusk"]
+    :is(#nd-page, [data-rail])
     .prose
-    :is(h1, h2, h3):not(:where(.not-prose, .not-prose *)) {
-    font-weight: 600;
+    :is(h2, h3):not(:where(.not-prose, .not-prose *)) {
+    font-weight: 500;
 }

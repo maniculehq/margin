@@ -5,6 +5,18 @@ Semantic Versioning once a stable public API is published.
 
 ## Unreleased
 
+### Changed
+
+- The default theme and every layout preset now follow their Mintlify
+  counterparts: white pages with near-black dark mode, a framework palette
+  per `theme`, Mintlify's type scale, a 65–75 character reading measure, and
+  each theme's header, sidebar and table-of-contents treatment.
+- Text holds WCAG AA contrast in light and dark mode for every preset. An
+  accent from `colors` or a logo that would fall below 4.5:1 is darkened or
+  lightened until it passes; `colors.light` sets the dark-mode accent and
+  `colors.dark` the button fill, as in Mintlify.
+- The header omits its tab row when navigation has a single tab.
+
 ### Added
 
 - Standalone single-site TanStack Start application with Postgres-backed,

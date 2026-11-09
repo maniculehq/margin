@@ -1,6 +1,6 @@
 /*
  * Layout preset: CONTRAST (§4.2) — the luma theme: a 224px borderless
- * sidebar, a 648px article measure centred between sidebar and TOC, medium-
+ * sidebar, a 36rem article measure centred between sidebar and TOC, medium-
  * weight headings, 14px code, capitalised group labels, no active-row fill.
  * The header/footer/assistant chrome for this preset lives in the components
  * (docs-header.tsx data-variant="luma", docs-footer.tsx, ai/assistant-dock).
@@ -12,6 +12,12 @@
 
 [data-preset="contrast"] {
     --fd-layout-width: 1440px;
+    --margin-measure: 36rem;
+}
+/* One 48px row; past five tabs the pills wrap to a 40px second row. */
+:root[data-preset="contrast"] {
+    --docs-band-row: 3rem;
+    --docs-band-tabs: 2.5rem;
 }
 @media (min-width: 64rem) {
     [data-preset="contrast"] #nd-docs-layout {
@@ -24,12 +30,12 @@
     }
 }
 
-/* Article column: upstream centres a 648px measure (x 396–1044 at 1440)
-   with the H1 56px below the band; the framework's 88px pinned column is
-   exempted in app.css. */
+/* Article column: upstream centres its measure between sidebar and TOC
+   with the H1 56px below the band. Upstream's 648px runs ~84 characters;
+   this keeps the 36rem (~74) measure. */
 @media (min-width: 64rem) {
     [data-preset="contrast"] [data-page-mode="default"] #nd-page {
-        max-width: 648px;
+        max-width: var(--margin-measure);
         margin-inline: auto;
         padding-inline: 0;
         padding-top: 2rem;
@@ -65,6 +71,7 @@
     padding-inline: 0.5rem;
     gap: 0;
     border-top: none;
+    font-size: 0.75rem;
     text-transform: capitalize;
     color: var(--color-fd-foreground);
 }
@@ -158,12 +165,6 @@
     padding: 1rem 1.25rem;
 }
 
-/* Emphatic, visible focus ring on interactive chrome. */
-:where([data-preset="contrast"]) :is(a, button):focus-visible {
-    outline: 2px solid var(--color-fd-ring);
-    outline-offset: 2px;
-}
-
 /* TOC rows read the muted token directly instead of app.css's 72% mix. */
 [data-preset="contrast"] #nd-toc a[data-active="false"]:not([style*=":20px"]) {
     color: var(--color-fd-muted-foreground);
@@ -213,11 +214,15 @@
     padding-bottom: 0;
 }
 [data-preset="contrast"] .api-endpoint-bar [data-endpoint-try-it] {
-    background-color: var(--color-fd-primary);
-    color: var(--color-fd-primary-foreground);
+    background-color: var(--color-margin-button);
+    color: var(--color-margin-button-foreground);
 }
 [data-preset="contrast"] .api-endpoint-bar [data-endpoint-try-it]:hover {
-    background-color: color-mix(in oklab, var(--color-fd-primary) 88%, black);
+    background-color: color-mix(
+        in oklab,
+        var(--color-margin-button) 88%,
+        black
+    );
 }
 
 /* luma band: a hairline separates the header from the page on desktop;

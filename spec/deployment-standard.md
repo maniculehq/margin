@@ -206,7 +206,7 @@ Detected assets set the corresponding `docs.json` defaults.
 
 ### 1.9 Theme detection
 
-Zero-config theme is the `neutral` fumadocs palette. Two conventions enrich it without any `docs.json`:
+Zero-config theme is the `neutral` layout preset with the framework's `mint` palette (§4.2). Two conventions enrich it without any `docs.json`:
 
 - **Any `.css` file present** (conventionally `styles.css`/`theme.css`/`style.css`) → all admitted `.css` files are ingested, sanitized, and concatenated in lexicographic path order, then injected (§4.3). A site that wants only brand colors can ship a three-line stylesheet overriding `--color-fd-primary`.
 - **Accent from logo (SHOULD, best-effort):** when a logo asset is detected and **neither** `docs.json.colors` **nor** a `--color-fd-primary` override in the site stylesheet is present, the framework MAY derive a primary accent from the logo's dominant non-neutral color. This is a soft enhancement so a logo-only repo still gets brand color with zero config. It MUST be overridable and MUST NOT run when any explicit color source exists.
@@ -439,10 +439,10 @@ Tokens resolve at ingest into a **`theme_tokens`** blob — a flat, deterministi
 
 | Source | fumadocs var | Mode rule |
 |---|---|---|
-| `colors.primary` | `--color-fd-primary` | base for both modes if `light`/`dark` absent |
-| `colors.dark` | `--color-fd-primary` (`:root`) | Mintlify "dark" = light-mode buttons/hover |
-| `colors.light` | `--color-fd-primary` (`.dark`) | Mintlify "light" = dark-mode emphasis |
-| *(derived)* | `--color-fd-primary-foreground` and any other `-foreground` companion | computed contrast (relative luminance → `#fff`/`#000`) **when only the base token is supplied** |
+| `colors.primary` | `--color-fd-primary` (`:root`), `--color-fd-ring` | Mintlify "primary" = light-mode emphasis; base for `light`/`dark` when absent |
+| `colors.light` | `--color-fd-primary` (`.dark`), `--color-fd-ring` | Mintlify "light" = dark-mode emphasis |
+| `colors.dark` | `--margin-button` (both modes) | Mintlify "dark" = button and hover fill |
+| *(derived)* | `--color-fd-primary-foreground`, `--margin-button-foreground` | per mode, `#000`/`#fff` by WCAG contrast, unless `primary-foreground` is set explicitly |
 | `background.color.{light,dark}` | `--color-fd-background` | per mode |
 | `banner.type` | `--color-fd-info` / `--color-fd-warning` / `--color-fd-error` | static; **`critical`→`--color-fd-error`** (no `critical` token exists) |
 | `x-margin.tokens.{border,muted,card,accent,ring,popover,…}` | corresponding `--color-fd-*` | per mode; typed pass-through of the documented token set |
@@ -454,9 +454,11 @@ Tokens resolve at ingest into a **`theme_tokens`** blob — a flat, deterministi
 | `fonts.*` | `--font-sans` / `--font-mono` + `@font-face` + `body{font-family}` | fumadocs has no font token (§4.3) |
 | `theme` preset | expands to a **precomputed token map** (§4.2) merged into `theme_tokens` below any explicit `colors`/`x-margin.tokens` | overridden by any explicit token above |
 
-Injection order (MUST): (1) the **build-time-static** fumadocs base import (`neutral`, the base palette compiled into the bundle) → (2) the per-site `theme_tokens` block emitted server-side into `:root{}`/`.dark{}` (this is where the resolved *palette* lives, as data, since CSS `@import`s cannot be chosen per request in a static CSS bundle — see §4.2) → (3) the sanitized site stylesheet. CSS therefore always has the final cascade say; the per-site token block overrides the shared `neutral` base for everyone who sets a palette.
+**Readable accent (MUST).** An accent from `colors` or a detected logo is used as written when it reaches 4.5:1 (WCAG AA text) against every surface accent text is set on in that mode — `background`, `card`, `popover`, `muted`, `secondary`, and a 10% tint of the accent over `background` (the active sidebar row). Otherwise ingest moves it along OKLCH lightness only (darker in light mode, lighter in dark), keeping hue and as much chroma as sRGB allows, to the nearest lightness that clears 4.5:1. `x-margin.tokens` and site CSS are explicit and never adjusted. Every preset palette keeps its text tokens at 4.5:1 and its ring at 3:1 on its surfaces in both modes; `tests/theme-contrast.test.ts` enforces both for each preset and a range of primaries.
 
-> **Why the palette is data, not an import.** `app.css` statically `@import`s `fumadocs-ui/css/neutral.css` at build into the static CSS bundle. A deployment cannot conditionally `@import aspen.css` for one content version and `ruby.css` for another per request. Every non-`neutral` palette therefore takes effect **only** via the per-site `theme_tokens` block (2), never via a swapped import (1). The `neutral` import is the universal base; any `theme`/`colors`/token override wins over it through normal cascade because the token block is emitted after it.
+Injection order (MUST): (1) the **build-time-static** base palette (fumadocs' token registrations overridden by the framework's `mint` palette, compiled into the bundle) → (2) the per-site `theme_tokens` block emitted server-side into `:root{}`/`.dark{}` (this is where the resolved *palette* lives, as data, since CSS `@import`s cannot be chosen per request in a static CSS bundle — see §4.2) → (3) the sanitized site stylesheet. CSS therefore always has the final cascade say; the per-site token block overrides the shared `neutral` base for everyone who sets a palette.
+
+> **Why the palette is data, not an import.** `app.css` carries one base palette (`mint`) in the static CSS bundle. A deployment cannot conditionally import another palette per content version and request. Every palette therefore takes effect via the per-site `theme_tokens` block (2), never via a swapped import (1). The base palette only covers rendering without a token block; any `theme`/`colors`/token override wins over it through normal cascade because the token block is emitted after it.
 
 ### 4.2 `theme` → framework layout preset + palette (Adapted)
 
@@ -464,20 +466,20 @@ The customization **floor is everything Mintlify offers** (locked decision #5), 
 
 Each preset composes fumadocs primitives (the app's `DocsLayout` + slots) plus framework CSS; it does **not** require forking fumadocs. Building these preset implementations is **new framework build work** (§6, feasibility item 7) — the standard specifies the *mechanism* (data-selected presets), and the visual fidelity to Mintlify is approximate by design.
 
-**Palettes are reified into a static token table (MUST).** Because per-request CSS `@import` selection is impossible in a static CSS bundle (§4.1), the framework does **not** import per-site palette files. Instead, at **framework build time** a step extracts each preset's palette `--color-fd-*` / `--fd-*` declarations (seeded from the shipped `fumadocs-ui/css/*.css` palettes — `neutral, shadcn, ocean, aspen, black, catppuccin, dusk, emerald, purple, ruby, solar, vitepress` — plus the preset's own layout-dimension vars) into a static `PALETTE_TOKENS: Record<PresetName, ThemeTokens>` lookup shipped inside the framework (and mirrored to the ingest CLI for ingest). At **ingest**, resolving `theme` means selecting the `layout_preset` and **merging that preset's token map into the per-site `theme_tokens` blob** below any explicit `colors`/`x-margin.tokens` (which still win). Serving emits the merged blob in the per-site `:root{}`/`.dark{}` block and mounts the preset's component composition. The only palette that also exists as a real build-time import is `neutral` (the shared base, §4.1).
+**Palettes are a static token table (MUST).** Because per-request CSS `@import` selection is impossible in a static CSS bundle (§4.1), the framework does **not** import per-site palette files. It ships one framework-authored palette per Mintlify `theme` as data — `PALETTE_TOKENS: Record<ThemePreset, ThemeTokens>` (`src/types/docs-palettes.ts`) — each approximating that theme's colors in both modes, with neutral grays the ingest re-tints toward a site's primary hue. At **ingest**, resolving `theme` means selecting the `layout_preset` and **merging that theme's palette into the per-site `theme_tokens` blob** below any explicit `colors`/`x-margin.tokens` (which still win). Serving emits the merged blob in the per-site `:root{}`/`.dark{}` block and mounts the preset's component composition; the preset's CSS restyles per theme through a `data-theme-name` attribute where two themes share a preset. The `mint` palette also ships in `app.css` as the static base (§4.1).
 
-| Mintlify `theme` | framework `layout_preset` | palette seed | Notes |
+| Mintlify `theme` | framework `layout_preset` | palette | Notes |
 |---|---|---|---|
-| `mint`, `linden` | `neutral` | `neutral` | clean/default |
-| `maple`, `almond` | `warm` | `ruby` / `solar` | warm |
-| `palm`, `willow` | `verdant` | `emerald` / `ocean` | green / blue |
-| `aspen` | `aspen` | `aspen` | direct palette ships in fumadocs |
-| `sequoia` | `dusk` | `dusk` | dark-leaning |
-| `luma` | `contrast` | `black` | high-contrast |
-| *(docs-native, no Mintlify theme)* | `editorial` | `neutral` | wide-prose editorial preset |
-| unknown / absent | `neutral` | `neutral` | fallback + `theme_unmapped` diagnostic |
+| `mint`, `linden` | `neutral` | `mint` / `linden` | clean default; linden cream and monospace |
+| `maple`, `almond` | `warm` | `maple` / `almond` | maple's sidenav chrome with a group rail; almond's band |
+| `palm`, `willow` | `verdant` | `palm` / `willow` | tinted header; willow's tinted sidebar and serif headings |
+| `aspen` | `aspen` | `aspen` | rounded search, divided uppercase groups |
+| `sequoia` | `dusk` | `sequoia` | tinted tab row, edged columns |
+| `luma` | `contrast` | `luma` | single-row pill-tab header |
+| *(docs-native, no Mintlify theme)* | `editorial` | `mint` | wide-prose editorial preset |
+| unknown / absent | `neutral` | `mint` | fallback + `theme_unmapped` diagnostic |
 
-> This mapping is **inherently approximate**: the preset captures Mintlify's layout *intent* (density, palette, chrome arrangement), not a byte-exact reproduction of its engine. `colors`/`x-margin.tokens` always override the preset palette. Implementers MUST confirm each seed palette file still ships before relying on it (the set above was verified against `fumadocs-ui@16.11.1`).
+> This mapping is **inherently approximate**: the preset captures Mintlify's layout *intent* (density, palette, chrome arrangement), not a byte-exact reproduction of its engine. `colors`/`x-margin.tokens` always override the preset palette. Every preset keeps the reading measure near 65–75 characters, wherever its Mintlify counterpart runs wider.
 
 **Page layout modes (Adapted).** Mintlify's per-page `mode` (frontmatter) selects a page-level layout. This standard maps each `pageModes` value (§7) to a **framework CSS layout class** driven by the page's frontmatter (or a group/config default), within the active `layout_preset`: `default` (standard doc with sidebar + TOC), `center` (centered, no TOC), `wide` (full content width, TOC suppressed), `custom` (chrome minimized — nav only), `frame`. These are CSS classes toggled by data — no site code. Unknown mode → `default` + diagnostic.
 

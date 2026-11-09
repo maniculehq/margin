@@ -29,8 +29,8 @@ import type { TabNode } from "@/types/docs"
 import { isAllowedUrl } from "@/types/docs-shared"
 
 /**
- * Search pill: borderless tinted fill, "Search..." placeholder
- * and a plain ⌘K hint. fumadocs' FullSearchTrigger owns its label ("Search",
+ * Search field: a bordered field on the page color (presets restyle it
+ * through [data-search-pill]), "Search..." placeholder and a plain ⌘K hint. fumadocs' FullSearchTrigger owns its label ("Search",
  * i18n) and renders bordered <kbd> chips, so the pill is ours; opening still
  * goes through fumadocs' search context.
  */
@@ -47,7 +47,8 @@ function SearchPill(props: { prompt?: string }) {
         <button
             type="button"
             onClick={() => setOpenSearch(true)}
-            className="inline-flex h-9 w-full max-w-96 items-center gap-2 justify-self-center rounded-full bg-fd-foreground/[0.04] px-3.5 text-fd-muted-foreground text-sm transition-colors hover:bg-fd-foreground/[0.07] dark:bg-fd-secondary dark:hover:bg-fd-secondary/80"
+            data-search-pill=""
+            className="inline-flex h-9 w-full max-w-64 items-center gap-2 justify-self-center rounded-xl border border-fd-border bg-fd-background px-3.5 text-fd-muted-foreground text-sm transition-colors hover:border-fd-foreground/20"
         >
             {iconSpan(chromeIconSvg("search"))}
             {props.prompt ?? strings.search}
@@ -342,8 +343,8 @@ function MenuChevron() {
 }
 
 /**
- * Tab treatments. `underline` (default band): labels near-foreground in
- * both states, activity as the primary underline. `pill` (luma):
+ * Tab treatments. `underline` (default band): muted labels, the active
+ * one in the foreground over a 2px foreground underline. `pill` (luma):
  * centred 36px pills — muted label, active gets a 3% foreground fill.
  */
 function tabClass(
@@ -354,11 +355,11 @@ function tabClass(
     return cn(
         variant === "pill"
             ? "inline-flex h-9 items-center gap-2 rounded-full px-4 font-medium text-fd-muted-foreground text-sm text-nowrap transition-colors hover:bg-fd-foreground/[0.03] hover:text-fd-foreground"
-            : "inline-flex h-full items-center gap-2 border-b-2 border-transparent font-medium text-[0.8rem] text-fd-foreground/90 text-nowrap",
+            : "inline-flex h-full items-center gap-2 border-b-2 border-transparent font-medium text-fd-muted-foreground text-sm text-nowrap transition-colors hover:text-fd-foreground",
         active &&
             (variant === "pill"
                 ? "bg-fd-foreground/[0.03] text-fd-foreground"
-                : "border-fd-primary font-semibold text-fd-foreground"),
+                : "border-fd-foreground text-fd-foreground"),
         alignEnd && "ms-auto",
     )
 }
@@ -551,7 +552,7 @@ export function SidebarChrome(props: {
             {/* Link-only anchors join the tabs INSIDE the scroll viewport
                 (baseOptions custom items render above the page tree) — only
                 the nav tabs live in this pinned block. */}
-            {tabs.length > 0 ? (
+            {tabs.length > 1 ? (
                 <nav
                     aria-label="Documentation"
                     className="flex flex-col gap-0.5 border-b pb-3"
@@ -619,7 +620,10 @@ export function DocsHeader(props: {
     const tabVariant = luma ? "pill" : "underline"
     // luma with more than five tabs falls back to the two-row band (pills
     // in the second row) — upstream wraps the same way.
-    const pillRow = luma && tabs.length > 0 && tabs.length <= 5
+    // A lone tab names the only section there is: no tab row renders, and
+    // the band keeps its single-row height (app.css --docs-band-height).
+    const tabRow = tabs.length > 1
+    const pillRow = luma && tabRow && tabs.length <= 5
 
     const navbarLinks = navbarChromeLinks(props.config)
 
@@ -628,7 +632,7 @@ export function DocsHeader(props: {
         // 80%-alpha blur (dark mode made code text legible through the band).
         <header
             id="docs-band"
-            data-tabs={tabs.length > 0 && !pillRow ? "true" : undefined}
+            data-tabs={tabRow && !pillRow ? "true" : undefined}
             data-variant={luma ? "luma" : undefined}
             className={cn(
                 "sticky top-[var(--fd-banner-height,0px)] z-30 bg-fd-background max-md:hidden",
@@ -648,7 +652,7 @@ export function DocsHeader(props: {
                     pillRow
                         ? "grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)]"
                         : "grid-cols-[minmax(max-content,1fr)_minmax(0,26rem)_minmax(max-content,1fr)]",
-                    luma ? "h-12" : "h-14",
+                    "h-[var(--docs-band-row)]",
                 )}
             >
                 {/* Left cluster, in order: logo, version dropdown,
@@ -715,7 +719,7 @@ export function DocsHeader(props: {
                                                 : {})}
                                             className={
                                                 luma
-                                                    ? "inline-flex h-[34px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-fd-primary px-4 font-medium text-fd-primary-foreground text-sm transition-colors hover:bg-fd-primary/90"
+                                                    ? "inline-flex h-[34px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-margin-button px-4 font-medium text-margin-button-foreground text-sm transition-colors hover:bg-margin-button/90"
                                                     : "inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-fd-foreground/[0.04] px-3.5 font-medium text-fd-foreground text-sm transition-colors hover:bg-fd-foreground/[0.08] dark:bg-fd-secondary dark:hover:bg-fd-secondary/80"
                                             }
                                         >
@@ -770,11 +774,11 @@ export function DocsHeader(props: {
                     ) : null}
                 </div>
             </div>
-            {tabs.length > 0 && !pillRow ? (
+            {tabRow && !pillRow ? (
                 <nav
                     aria-label="Documentation tabs"
                     className={cn(
-                        "mx-auto flex h-10 w-full max-w-[var(--fd-layout-width,97rem)] overflow-x-auto px-9",
+                        "mx-auto flex h-[var(--docs-band-tabs)] w-full max-w-[var(--fd-layout-width,97rem)] overflow-x-auto px-9",
                         luma ? "items-center gap-1" : "gap-6",
                     )}
                 >

@@ -60,23 +60,23 @@ Supported. A string supplies one icon, or use `{"light":"/favicon-light.svg","da
 ## Configure appearance and layout
 
 <ParamField body="theme" type="string">
-Adapted. Selects a Margin-owned layout and palette that approximate the Mintlify theme rather than reproduce its layout exactly. Without a theme, Margin uses its `neutral` layout.
+Adapted. Selects a Margin-owned layout and palette that approximate the Mintlify theme rather than reproduce it exactly. Each theme has its own palette. Without a theme, Margin uses the `mint` palette and its `neutral` layout.
 
-| Value | Margin layout | Palette |
-| --- | --- | --- |
-| `mint` | `neutral` | `neutral` |
-| `linden` | `neutral` | `neutral` |
-| `maple` | `warm` | `ruby` |
-| `almond` | `warm` | `solar` |
-| `palm` | `verdant` | `emerald` |
-| `willow` | `verdant` | `ocean` |
-| `aspen` | `aspen` | `aspen` |
-| `sequoia` | `dusk` | `dusk` |
-| `luma` | `contrast` | `black` |
+| Value | Margin layout |
+| --- | --- |
+| `mint` | `neutral` |
+| `linden` | `neutral` |
+| `maple` | `warm` |
+| `almond` | `warm` |
+| `palm` | `verdant` |
+| `willow` | `verdant` |
+| `aspen` | `aspen` |
+| `sequoia` | `dusk` |
+| `luma` | `contrast` |
 </ParamField>
 
 <ParamField body="colors" type="object | null">
-Supported. `primary`, `light`, and `dark` are hex color strings. Example: `{"primary":"#2563EB","light":"#60A5FA","dark":"#1D4ED8"}`. Defaults to derived theme tokens, with an optional detected logo accent. `null` forces neutral colors and disables logo-accent derivation.
+Supported. `primary`, `light`, and `dark` are hex color strings: `primary` is the light-mode accent, `light` the dark-mode accent, and `dark` the button fill. Example: `{"primary":"#2563EB","light":"#60A5FA","dark":"#1D4ED8"}`. Margin darkens or lightens an accent that would fall below 4.5:1 contrast. Defaults to derived theme tokens, with an optional detected logo accent. `null` forces the theme's own colors and disables logo-accent derivation.
 </ParamField>
 
 <ParamField body="appearance" type="object">

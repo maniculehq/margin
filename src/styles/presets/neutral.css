@@ -1,34 +1,52 @@
-/* Neutral is the zero-config preset. Dimension vars override fumadocs defaults; --fd-layout-width stays on root so header and grid share one cap. :where keeps preset rules below site CSS; colors come from site tokens. */
+/*
+ * Layout preset: NEUTRAL (§4.2) — mint, linden and zero config. app.css
+ * carries the mint look (64px band, 18rem sidebar with tinted active rows,
+ * rail-less TOC, 35rem measure); this file sets the shell width and the
+ * linden variant. Colors come from the token block.
+ */
 
 [data-preset="neutral"] {
-    --fd-layout-width: 1400px;
+    --fd-layout-width: 92rem;
 }
 /* 64rem = the chrome switch (--breakpoint-md in app.css): below it the
    sidebar is a drawer and the layout zeroes --fd-sidebar-width — a lower
    gate here would re-reserve an empty grid column for the absent aside. */
 @media (min-width: 64rem) {
     [data-preset="neutral"] #nd-docs-layout {
-        --fd-sidebar-width: 268px;
+        --fd-sidebar-width: 18rem;
     }
 }
 @media (min-width: 1280px) {
     [data-preset="neutral"] #nd-docs-layout {
-        --fd-toc-width: 268px;
+        --fd-toc-width: 17rem;
     }
 }
 
-:where([data-preset="neutral"]) .prose {
-    line-height: 1.7;
-}
 /*
- * Contrast floor (WCAG AA): fumadocs' default muted foreground lands under
- * 4.5:1 on light backgrounds. 38% grey clears it on white and on the card
- * tint; the dark scheme's token already passes. TOC inactive rows and footer
- * links read the token directly instead of app.css's 72% mix.
+ * linden: a retro terminal. The palette sets monospace type throughout;
+ * corners square off and the active row drops its fill for the accent
+ * alone. Monospace runs wider, so the measure grows to keep ~70 characters.
  */
-[data-preset="neutral"]:not(.dark) {
-    --color-fd-muted-foreground: hsl(0 0% 38%);
+[data-theme-name="linden"] {
+    --margin-measure: 40rem;
 }
-[data-preset="neutral"] #nd-toc a[data-active="false"]:not([style*=":20px"]) {
-    color: var(--color-fd-muted-foreground);
+[data-theme-name="linden"]
+    #nd-sidebar
+    [data-radix-scroll-area-viewport]
+    :is(a[data-active], button[aria-expanded]) {
+    border-radius: 0.25rem;
+}
+[data-theme-name="linden"]
+    #nd-sidebar
+    [data-radix-scroll-area-viewport]
+    a[data-active="true"] {
+    background-color: transparent;
+}
+[data-theme-name="linden"] :is(#nd-page, [data-rail]) figure.shiki,
+[data-theme-name="linden"] #nd-page [data-card],
+[data-theme-name="linden"] #nd-page [data-callout] {
+    border-radius: 0.375rem;
+}
+[data-theme-name="linden"] #nd-page article h1 {
+    letter-spacing: -0.04em;
 }

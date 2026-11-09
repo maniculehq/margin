@@ -59,7 +59,7 @@ export function AssistantDock() {
                 type="submit"
                 aria-label="Send message"
                 disabled={value.trim().length === 0}
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-fd-primary text-fd-primary-foreground transition-opacity disabled:opacity-40"
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-margin-button text-margin-button-foreground transition-opacity disabled:opacity-40"
             >
                 <svg
                     viewBox="0 0 18 18"

@@ -38,7 +38,7 @@ For an existing file, edit only the intended fields and run the syntax check in 
 | Appearance field | Type, status, default, and behavior |
 | --- | --- |
 | `theme` | Adapted enum: `mint`, `linden`, `maple`, `almond`, `palm`, `willow`, `aspen`, `sequoia`, `luma`; omitted layout is `neutral`. |
-| Theme layout/palette mapping | `mint`=neutral/neutral; `linden`=neutral/neutral; `maple`=warm/ruby; `almond`=warm/solar; `palm`=verdant/emerald; `willow`=verdant/ocean; `aspen`=aspen/aspen; `sequoia`=dusk/dusk; `luma`=contrast/black. Layouts approximate Mintlify. |
+| Theme layout mapping | `mint`=neutral; `linden`=neutral; `maple`=warm; `almond`=warm; `palm`=verdant; `willow`=verdant; `aspen`=aspen; `sequoia`=dusk; `luma`=contrast. Each theme has its own palette. Layouts approximate Mintlify. |
 | `colors` | object or null; Supported; hex-string `primary`, `light`, `dark`; theme-derived tokens and optional logo accent by default; null forces neutral and disables accent derivation. |
 | `appearance` | Adapted object; `default`=`system` (default), `light`, or `dark`; boolean `strict` disables theme switching, pins light/dark defaults, and leaves system following the system theme. |
 | `background` | Adapted object; no override by default; `color`=hex string or pair; `image`=asset string or pair; `decoration`=`gradient`, `grid`, or `windows`. |
