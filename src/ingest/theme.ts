@@ -279,6 +279,7 @@ export function resolveThemeTokens(
                           readableAccent(
                               base,
                               {
+                                  page,
                                   surfaces: on(ACCENT_SURFACES),
                                   tintBases: on(ACCENT_TINT_BASES),
                                   tintAlpha: ACCENT_TINT_ALPHA,

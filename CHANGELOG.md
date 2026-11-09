@@ -15,7 +15,9 @@ Semantic Versioning once a stable public API is published.
   accent from `colors` or a logo that would fall below 4.5:1 is darkened or
   lightened until it passes; `colors.light` sets the dark-mode accent and
   `colors.dark` the button fill, as in Mintlify.
-- The header omits its tab row when navigation has a single tab.
+- The header omits its tab row when navigation has a single content tab.
+  A lone link-only or menu tab, such as a `navigation.global.tabs` link to
+  support, keeps the row.
 
 ### Fixed
 

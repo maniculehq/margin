@@ -519,6 +519,10 @@ export function SidebarChrome(props: {
     const activeTab = props.activeTabKey
         ? tabs.find((tab) => tab.key === props.activeTabKey)
         : tabs.find((tab) => tab.urls?.has(pathname))
+    // Same rule as the header band: only a lone content tab is redundant.
+    const tabList =
+        tabs.length > 1 ||
+        tabs.some((tab) => tab.urls === null || tab.menu !== undefined)
     return (
         <div
             data-sidebar-chrome=""
@@ -552,7 +556,7 @@ export function SidebarChrome(props: {
             {/* Link-only anchors join the tabs INSIDE the scroll viewport
                 (baseOptions custom items render above the page tree) — only
                 the nav tabs live in this pinned block. */}
-            {tabs.length > 1 ? (
+            {tabList ? (
                 <nav
                     aria-label="Documentation"
                     className="flex flex-col gap-0.5 border-b pb-3"
@@ -620,9 +624,13 @@ export function DocsHeader(props: {
     const tabVariant = luma ? "pill" : "underline"
     // luma with more than five tabs falls back to the two-row band (pills
     // in the second row) — upstream wraps the same way.
-    // A lone tab names the only section there is: no tab row renders, and
-    // the band keeps its single-row height (app.css --docs-band-height).
-    const tabRow = tabs.length > 1
+    // A lone content tab names the only section there is: no tab row
+    // renders, and the band keeps its single-row height (app.css
+    // --docs-band-height). A lone link-only or menu tab is the only way to
+    // its destination, so it keeps the row.
+    const tabRow =
+        tabs.length > 1 ||
+        tabs.some((tab) => tab.urls === null || tab.menu !== undefined)
     const pillRow = luma && tabRow && tabs.length <= 5
 
     const navbarLinks = navbarChromeLinks(props.config)

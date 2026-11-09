@@ -338,6 +338,43 @@ describe("site colors", () => {
         expect(tokens["--color-fd-primary"]).toBe("#FDE047")
     })
 
+    it("darkens a pale accent that fails the light page and panels", () => {
+        const tokens = resolve({ colors: { primary: "#FDE047" } })
+        // #7e6c00 is the fit c9e54b7 produced: the fallback for unfittable
+        // accents leaves accents that can be fitted exactly as they were.
+        expect(tokens["--color-fd-primary"]).toEqual({
+            light: "#7e6c00",
+            dark: "#fde047",
+        })
+    })
+
+    it("keeps a white accent on a black light-mode page that no colour can fit to the light panels too", () => {
+        const tokens = resolve({
+            colors: { primary: "#ffffff" },
+            background: { color: { light: "#000000", dark: "#000000" } },
+        })
+        expect(tokens["--color-fd-primary"]).toEqual({
+            light: "#ffffff",
+            dark: "#ffffff",
+        })
+    })
+
+    it("fits an accent unreadable everywhere to the page it sits on", () => {
+        const tokens = resolve({
+            colors: { primary: "#333333" },
+            background: { color: { light: "#000000", dark: "#000000" } },
+        })
+        const primary = tokens["--color-fd-primary"]
+        const light = parseColor(
+            typeof primary === "string" ? primary : (primary?.light ?? ""),
+        )
+        // The page is black: anything at 4.5:1 on it is a light colour,
+        // where the pre-fix fit to the light panels returned black (1:1).
+        expect(light && contrast(light, [0, 0, 0, 1])).toBeGreaterThanOrEqual(
+            4.5,
+        )
+    })
+
     it("fills buttons with colors.dark", () => {
         const tokens = resolve({
             colors: { primary: "#16A34A", dark: "#14532D" },
