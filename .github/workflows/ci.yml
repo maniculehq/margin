@@ -1,0 +1,238 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Builds off Vercel need a site origin (src/env.ts); nothing is served
+  # from it in CI.
+  SITE_ORIGIN: https://docs.test.invalid
+
+jobs:
+  # Lint, types, unit and DB-backed tests, and the supply-chain checks.
+  check:
+    name: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: docs
+        ports:
+          - 5440:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d docs"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5440/docs
+    steps:
+      # actions/checkout v7.0.1.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # oven-sh/setup-bun v2.2.0.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.3
+
+      # actions/setup-node v7.0.0 (the framework needs Node >= 24).
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 26
+
+      # The isolated linker resolves peers per package, as the monorepo does;
+      # bun.lock is derived from the monorepo's (see its out-of-tree job).
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --linker isolated
+
+      - name: Lint
+        run: bun run lint
+
+      # Typecheck and the Vite config both read the generated icon map.
+      - name: Build icon map (Hugeicons Free)
+        run: bun run icons:build
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Check every dependency is used
+        run: bun run check-deps
+
+      - name: Check dependency licenses
+        run: bun run check-licenses
+
+      # tests/bundle-budget.test.ts budgets the Vercel output and fails in CI
+      # when it is missing, so the deployable build comes first.
+      - name: Build (Vercel output)
+        run: bun run build
+        env:
+          NITRO_PRESET: vercel
+          NODE_ENV: production
+
+      # The DB-backed suites read the migrated schema.
+      - name: Migrate database
+        run: bun run db:migrate
+
+      - name: Tests
+        run: bun run test
+
+  # The node-server build with the MIT Hugeicons Free set: what a fork or a
+  # self-hosted deployment without a Pro license ships.
+  build-free:
+    name: build-free
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      # actions/checkout v7.0.1.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # oven-sh/setup-bun v2.2.0.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.3
+
+      # actions/setup-node v7.0.0.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 26
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --linker isolated
+
+      - name: Build (node-server, Hugeicons Free)
+        run: bun run build
+        env:
+          NITRO_PRESET: node-server
+          NODE_ENV: production
+
+      - name: Assert the build used the Free icon set
+        run: >-
+          bun -e 'import { ICON_MAP_SOURCE } from "./src/generated/icon-map.ts";
+          if (ICON_MAP_SOURCE !== "free") { console.error(`icon map source is ${ICON_MAP_SOURCE}, expected free`); process.exit(1) }'
+
+      - name: Bundle budget
+        run: bunx vitest run tests/bundle-budget.test.ts
+
+  # The same build with Hugeicons Pro glyphs. The license key is a repository
+  # secret, so forks and pull requests from forks skip every step (the job
+  # still reports success); the key reaches only the icon-map step.
+  build-pro:
+    name: build-pro
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      HAS_PRO_TOKEN: ${{ secrets.HUGEICONS_PRO_TOKEN != '' }}
+    steps:
+      - name: Skip without the Hugeicons Pro license key
+        if: env.HAS_PRO_TOKEN != 'true'
+        run: echo "::notice::HUGEICONS_PRO_TOKEN is not set; skipping the Pro build."
+
+      # actions/checkout v7.0.1.
+      - if: env.HAS_PRO_TOKEN == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # oven-sh/setup-bun v2.2.0.
+      - if: env.HAS_PRO_TOKEN == 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.3
+
+      # actions/setup-node v7.0.0.
+      - if: env.HAS_PRO_TOKEN == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 26
+
+      - name: Install dependencies
+        if: env.HAS_PRO_TOKEN == 'true'
+        run: bun install --frozen-lockfile --linker isolated
+
+      # Only this step sees the key; `vite build` below reuses the map
+      # instead of `bun run build`, which would regenerate it from Free.
+      - name: Build icon map (Hugeicons Pro)
+        if: env.HAS_PRO_TOKEN == 'true'
+        run: bun run icons:build
+        env:
+          HUGEICONS_PRO_TOKEN: ${{ secrets.HUGEICONS_PRO_TOKEN }}
+
+      - name: Assert the build used the Pro icon set
+        if: env.HAS_PRO_TOKEN == 'true'
+        run: >-
+          bun -e 'import { ICON_MAP_SOURCE } from "./src/generated/icon-map.ts";
+          if (ICON_MAP_SOURCE !== "pro") { console.error(`icon map source is ${ICON_MAP_SOURCE}, expected pro`); process.exit(1) }'
+
+      - name: Build (node-server, Hugeicons Pro)
+        if: env.HAS_PRO_TOKEN == 'true'
+        run: bunx vite build
+        env:
+          NITRO_PRESET: node-server
+          NODE_ENV: production
+
+      - name: Bundle budget
+        if: env.HAS_PRO_TOKEN == 'true'
+        run: bunx vitest run tests/bundle-budget.test.ts
+
+  # The built-server suites (zero-env boot, webmcp, loader cache,
+  # observability, bundle budget) through real Chromium. scripts/e2e.ts
+  # starts its own disposable Postgres with Docker, ingests the fixtures and
+  # builds the node-server output, so this job needs no service container
+  # and no secrets.
+  e2e:
+    name: e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      # actions/checkout v7.0.1.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # oven-sh/setup-bun v2.2.0.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.3
+
+      # actions/setup-node v7.0.0. The suites boot the built server with
+      # `node .output/server/index.mjs`.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 26
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --linker isolated
+
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Built-server suites
+        run: bun run test:e2e
+
+  # Secret scan of the full history with the repository's rules
+  # (.gitleaks.toml extends the defaults with PostHog, Hugeicons and Sentry).
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # actions/checkout v7.0.1.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      # gitleaks v8.30.1, pinned by image digest.
+      - name: Scan for secrets
+        run: >-
+          docker run --rm -v "$GITHUB_WORKSPACE:/repo"
+          ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git /repo --config /repo/.gitleaks.toml --redact --verbose --no-banner

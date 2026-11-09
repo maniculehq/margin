@@ -1,0 +1,78 @@
+---
+title: Enable the AI assistant
+description: Configure documentation answers in the assistant dock and AI search.
+---
+
+Enable Ask AI so readers can ask questions about your published documentation and follow links to the pages behind an answer. The assistant uses the site's documentation search index; it does not require a separate uploaded knowledge base.
+
+## Choose the assistant surface
+
+AI search mode adds an Assistant panel alongside ordinary documentation search. Readers can open the panel from an Assistant control or press `⌘I` on macOS (`Ctrl I` elsewhere). In the search dialog, selecting **Ask Assistant** copies the query into the panel; the reader then submits it.
+
+The assistant dock is another entry point to the same panel, not a separate answering service. The contrast layout preset, used by the `luma` theme, includes a desktop question bar at the bottom of the article. Submitting a question there opens the panel and sends it immediately. The dock is hidden on mobile, on frame/custom pages, and while the panel is open. Other layouts expose Assistant controls without that dock.
+
+## Enable documentation answers
+
+In the `docs.json` at the root of your documentation folder, merge this block into the existing configuration. Keep any other `x-margin` settings:
+
+```json title="docs.json"
+{
+  "x-margin": {
+    "search": {
+      "mode": "ai"
+    }
+  }
+}
+```
+
+Publish with [Manicule](/deploy/manicule), the primary deployment route. Hosting is free, with no limits, and uses the same repository and `docs.json`. Manicule includes the database and runs the latest release without servers or environment variables for you to manage. Pushes to the docs branch publish changes; pull requests get previews.
+
+`ai` is the default when the setting is absent. If you self-host, the runtime also needs access to Vercel AI Gateway. On Vercel, enable Gateway access for the deployment's OIDC identity. Outside Vercel, set `AI_GATEWAY_API_KEY` in the server environment. The key must be available to the running server, not just the build.
+
+For a self-hosted server, add the Gateway key to the existing server environment, replacing the placeholder with your credential:
+
+```dotenv title="Server environment"
+AI_GATEWAY_API_KEY=YOUR_AI_GATEWAY_KEY
+```
+
+Self-hosting assumes a working Margin deployment with its Postgres database and published documentation. The assistant uses that database for rate limits and the ingested content for search. Re-ingest and deploy the changed documentation configuration through your normal publishing workflow, then restart or redeploy the server after changing environment variables. See [self-hosted deployment setup](/deploy/self-host) for the underlying runtime requirements.
+
+Without a Gateway credential, `ai` mode falls back to ordinary search and hides Assistant controls. A visible Assistant control confirms availability detection, not that the selected model or Gateway account can complete a request; submit a question to check that too.
+
+## Check answers and citations
+
+The assistant searches the requesting site's published documentation in the locale and product version the reader is viewing. Its search results include pages, headings, and text entries with documentation URLs. The current page supplies context for that scope; answers are not limited to the current article.
+
+1. Open a published documentation page and open Assistant.
+2. Ask a question whose answer appears explicitly in that documentation, such as a question about a documented configuration setting.
+3. Confirm that an answer appears and includes a link to the relevant documentation. Open that link and check that the page supports the answer.
+4. Expand the search-details entry beneath the answer to inspect retrieved page links. If the site has multiple locales or versions, repeat the check from the intended locale/version.
+
+The model is instructed to cite documentation URLs as Markdown links. The search-details entry shows retrieved pages, not proof that every sentence in the answer is supported. Check the linked content before relying on an answer.
+
+## Configure assistant behavior
+
+Use search mode to control whether readers get AI answers, ordinary search, or neither. The setting also controls access to the chat route, rather than only hiding a button.
+
+| Setting | Default | Behavior |
+| --- | --- | --- |
+| `x-margin.search.mode` | `ai` | `ai` adds Assistant when Gateway access is available; `static` keeps ordinary search only; `off` also disables the search dialog. |
+| `DOCS_CHAT_MODEL` | `openai/gpt-5.6-terra` | Server environment variable selecting the AI Gateway model slug. |
+| `AI_GATEWAY_API_KEY` | Unset | Gateway credential outside Vercel; Vercel deployments use OIDC instead. |
+
+Choosing `static` or `off` also makes `POST /api/chat` return HTTP `404` when Gateway access is configured. There is no independent dock-enable setting: the layout determines whether the dock appears, and search mode controls whether Assistant is available.
+
+## Understand answer limits
+
+The built-in retrieval tool searches documentation, not the public web or your application's live data. The assistant is instructed to say it does not know and suggest a better search query when retrieved content does not answer the question. This is model guidance, not a guarantee that every answer is correct or cited. There is no `docs.json` setting for a custom assistant system prompt.
+
+The server keeps only the most recent 24 messages as model context. Requests larger than 512 KiB are rejected; starting a new chat removes the accumulated history. Rate limits normally permit 20 requests per visitor per 10 minutes, 150 per visitor per day, and 3,000 per site per day. Deployments that identify all visitors through a shared proxy address apply only the site ceiling.
+
+| Failure | Response | Reader action |
+| --- | --- | --- |
+| `assistant_not_configured` | HTTP `503` | Use documentation search; the operator must configure Gateway access. |
+| `conversation_too_long` | HTTP `413` | Start a new chat. |
+| `invalid_request` | HTTP `400` | Start a new chat and submit the question again. |
+| `rate_limited` | HTTP `429`, with `Retry-After` and `retryAfterSeconds` | Wait for the indicated retry interval. |
+
+Model or streaming failures display a retry message in the panel. They do not automatically switch the conversation to ordinary search; readers can use documentation search separately.

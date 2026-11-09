@@ -1,0 +1,12 @@
+# Bun never loads .env on its own, so tests and the processes they spawn see
+# only the environment they set. The local entry points (dev, start,
+# db:migrate, ingest, test:db) load .env explicitly with --env-file.
+env = false
+
+[install]
+# Each package resolves only its own declared dependencies, matching the
+# exported repository's CI install.
+linker = "isolated"
+# Supply-chain guard: never resolve a package version published less than
+# seven days ago.
+minimumReleaseAge = 604800

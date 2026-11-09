@@ -1,0 +1,154 @@
+---
+title: Configure SEO and metadata
+description: Control generated titles, metadata, indexing, and canonical page URLs.
+---
+
+Margin generates page titles, descriptions, Open Graph and Twitter tags, canonical links, and Schema.org structured data. Configure site-wide facts in `docs.json`; use page frontmatter for the page title, description, and source attribution.
+
+## Set site metadata
+
+Merge this example into `docs.json`, replacing the example identity and source URLs with your own. Omit `provenance` unless the site publishes documentation derived from that source.
+
+```json
+{
+  "name": "Acme Docs",
+  "description": "Build integrations with Acme.",
+  "x-margin": {
+    "seo": {
+      "titleTemplate": "{page} | {site}",
+      "language": "en",
+      "publisher": {
+        "type": "Organization",
+        "name": "Acme",
+        "url": "https://acme.com",
+        "logoUrl": "/logo.svg",
+        "sameAs": ["https://github.com/acme"]
+      },
+      "provenance": {
+        "name": "Upstream documentation",
+        "baseUrl": "https://upstream.example.com/docs",
+        "license": {
+          "name": "MIT",
+          "url": "https://opensource.org/license/mit"
+        }
+      }
+    }
+  }
+}
+```
+
+All fields in `x-margin.seo` are optional.
+
+| Field | Accepted value and behavior |
+| --- | --- |
+| `titleTemplate` | A string of 1–200 characters. Requires `{page}` exactly once, permits `{site}` at most once, and rejects other brace tokens. The default is `{page} – {site}`. |
+| `language` | A language tag such as `en` or `en-US`. Tags begin with 2–3 letters and may have hyphen-separated subtags of 2–8 letters or digits. The active locale takes precedence, followed by the configured default locale, this field, then `en`. |
+| `publisher` | An object with optional `type`, `name`, `legalName`, `url`, `logoUrl`, and `sameAs`. `type` is `Organization` (default) or `Person`; `sameAs` is an array of identity URLs. Names are 1–255 characters. |
+| `provenance` | An object requiring `name` and `baseUrl`, with an optional `license` object requiring `name` and `url`. Source and license names are 1–255 characters. `baseUrl` cannot contain a query or fragment. |
+
+Publisher and provenance identity URLs must be public absolute HTTP(S) URLs without credentials. `logoUrl` also accepts a safe relative asset path. Unspecified publisher name and URL fall back to the site name and site URL; the logo falls back to the site logo. Footer social URLs also contribute publisher identity links.
+
+For new organization identity configuration, prefer top-level `seo.organization`. It accepts `name`, `legalName`, `url`, `logo`, and `sameAs`; its populated identity overrides `x-margin.seo.publisher`. Use the extension's `publisher` when specifying a `Person`. The `id` field on `seo.organization` does not override generated structured-data identifiers.
+
+The `{page}` token uses the page title and `{site}` uses the site name. With the default template, a page whose title equals the site name does not repeat the name. Page frontmatter `description` takes precedence over the site description. Margin uses the resulting title and description for HTML and social metadata, and generates a social card when no image override is supplied.
+
+Invalid templates produce a `field_invalid` diagnostic and fall back to the default. Malformed nested SEO properties are dropped independently rather than discarding unrelated settings.
+
+### Attribute derived pages
+
+Site provenance does not assert that every page has an upstream source. Opt in on each derived page. With the example base URL, this frontmatter on `/guides/setup` attributes `https://upstream.example.com/docs/guides/setup`:
+
+```yaml
+---
+title: Set up Acme
+provenance: true
+---
+```
+
+Use an explicit source when the upstream path differs:
+
+```yaml
+---
+title: Set up Acme
+provenance:
+  sourceUrl: https://upstream.example.com/docs/install
+---
+```
+
+Both forms require valid site provenance. An opted-in page shows source attribution and emits `isBasedOn` in structured data, plus a license link when configured. Provenance never changes the page's canonical URL.
+
+## Add head metadata
+
+Use `x-margin.head.meta` for static meta tags such as site verification. Merge this entry into the existing `x-margin` object:
+
+```json
+{
+  "x-margin": {
+    "head": {
+      "meta": [
+        {
+          "name": "google-site-verification",
+          "content": "YOUR_VERIFICATION_TOKEN"
+        }
+      ]
+    }
+  }
+}
+```
+
+Each entry requires a string `content` and accepts optional string `name` and `property` fields. Use `name` for named metadata and `property` for property-based metadata such as Open Graph tags.
+
+These entries render before page-generated tags. A generated tag wins when both use the same name or property, so this setting is not a way to replace generated titles, descriptions, or canonical links. It accepts static meta data, not scripts, styles, or stylesheet links. Executable head markup is rejected with `head_rejected`.
+
+## Understand canonical URLs
+
+Each HTML page is self-canonical. Margin combines the public site URL, including a deployment base path such as `/docs`, with the page's served path. Version and locale prefixes stay in the URL. For example, `/guides/setup` served at `https://acme.com/docs` has canonical URL `https://acme.com/docs/guides/setup`.
+
+Top-level `seo.trailingSlash` controls trailing slashes on page URLs and defaults to `false`. To use trailing slashes, merge this configuration into `docs.json`:
+
+```json
+{
+  "seo": {
+    "trailingSlash": true
+  }
+}
+```
+
+There is no per-page canonical URL override. A site-wide `seo.metatags.canonical` value is ignored with `head_rejected`; source attribution is not a canonical override either. Markdown representations point back to the HTML canonical through a `Link` header and send `X-Robots-Tag: noindex` to avoid indexing duplicates.
+
+## Control indexing
+
+Top-level `seo.indexing` decides which pages enter discovery indexes. Use the default `navigable` mode to keep hidden pages out, or `all` to include hidden pages too.
+
+| `seo.indexing` | Indexable pages |
+| --- | --- |
+| `navigable` (default) | Non-hidden pages, plus hidden pages with frontmatter `searchable: true`. |
+| `all` | All authored pages, including hidden pages. |
+
+To exclude an authored page under `navigable`, set this frontmatter and ensure `searchable: true` is not present:
+
+```yaml
+---
+title: Internal migration notes
+hidden: true
+searchable: false
+---
+```
+
+The page remains reachable and crawlable, but emits `noindex,follow` and stays out of the XML sitemap, site search, and LLM indexes. `searchable: false` alone does not exclude a visible page. Under `all`, hiding a page does not make it non-indexable. Automatically synthesized landing pages remain non-indexable in either mode.
+
+Margin generates `/sitemap.xml` with absolute HTML URLs and modification timestamps, including indexable pages across versions and locales. External-link pages that redirect elsewhere are excluded. With multiple visible locales, the sitemap includes served language alternates. `/robots.txt` permits crawling and advertises the sitemap: crawlers need to fetch a page to read its `noindex` directive.
+
+Do not use a custom robots meta tag as an index-exclusion setting. Static head tags do not determine sitemap, search, or LLM-index membership. Preview responses separately use `noindex,nofollow` and `no-store`.
+
+After deploying, set `SITE_URL` to your public docs root, including any base path, and set `PAGE_PATH` to the page to inspect. Fetch the HTML and discovery files:
+
+```bash
+SITE_URL='https://docs.example.com'
+PAGE_PATH='/guides/setup'
+curl --fail --silent --show-error "$SITE_URL$PAGE_PATH"
+curl --fail --silent --show-error "$SITE_URL/sitemap.xml"
+curl --fail --silent --show-error "$SITE_URL/robots.txt"
+```
+
+Confirm the HTML contains the configured title, verification meta tag, and self-canonical link. For an excluded page, confirm `noindex,follow` appears in the HTML and the page URL is absent from the XML sitemap.

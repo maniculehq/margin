@@ -1,0 +1,52 @@
+---
+title: Configure documentation search
+description: Choose the search interface and predict which versions and languages appear in results.
+---
+
+Set `x-margin.search.mode` in `docs.json` to choose documentation search with an AI assistant, plain text search, or no search interface.
+
+## Choose a search mode
+
+Choose `static` when readers need matching pages without generated answers. Choose `ai` when readers should also be able to ask questions and receive answers with source links.
+
+| Mode | Reader experience | Prerequisites |
+| --- | --- | --- |
+| `ai` | Documentation search plus an AI assistant that cites source pages. This is the default mode. | AI Gateway access for the assistant. Without deployment credentials, the interface falls back to `static`. |
+| `static` | Text search over indexed page titles, headings, and content. No assistant controls. | No AI credentials. |
+| `off` | No search dialog or assistant controls. | No AI credentials. |
+
+On self-hosted deployments outside Vercel, set `AI_GATEWAY_API_KEY` in the server environment to use the assistant. On Vercel, enable AI Gateway access for the deployment; the assistant can use Vercel OIDC authentication. Do not put the credential in `docs.json`.
+
+The credential fallback applies when the deployment has no assistant credentials. It is not a guarantee that failed model requests automatically become text-search results. Set `static` explicitly if the site should never offer AI answers.
+
+## Set the search configuration
+
+Merge this fragment into the site's existing `docs.json` to select static search. Preserve the other configuration fields.
+
+```json title="docs.json"
+{
+  "x-margin": {
+    "search": {
+      "mode": "static"
+    }
+  }
+}
+```
+
+The `search` field is an object with an optional `mode` field. Accepted values are exactly `ai`, `static`, and `off`. Omitting `mode`, `search`, or the entire `x-margin` block selects `ai`, subject to the credential fallback above.
+
+Publish the configuration change through the site's normal deployment process. On the deployed site, open search and query a known page title. With `static`, matching pages should appear without assistant controls. With `ai` and working AI Gateway access, the assistant should also be available. With `off`, the search dialog should be unavailable.
+
+`off` removes the reader-facing search interface; it does not disable the `/api/search` endpoint. Do not use this setting as a content-access restriction.
+
+## Understand version and locale scope
+
+Search follows the version and locale of the page the reader is viewing. The assistant's documentation search uses the same scope as text search, so enabling AI does not broaden results to all versions or languages.
+
+A recognized non-default locale prefix selects that locale. Without a locale prefix, search uses the default locale. Within that locale, a recognized version prefix selects that product version; an unprefixed path uses the locale's default version. If no version is marked as default, Margin selects the first local version, when one exists.
+
+The index includes pages assigned to the selected version and shared pages that have no product-version assignment, all within the selected locale. Other product versions and locales are excluded. Search does not fill missing translations with pages from the default locale or retry an empty result across other versions. Readers must switch version or language to search another scope.
+
+Search also applies page-indexing rules. Hidden pages remain searchable when marked `searchable`; the site-wide `seo.indexing: "all"` setting also includes hidden pages. Synthesized pages are excluded. Hiding a page from navigation alone does not necessarily remove it from search.
+
+To check scope after deployment, search for a term unique to one version or locale, then repeat after switching the version or language. Shared pages may appear in more than one version's results.

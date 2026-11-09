@@ -1,0 +1,116 @@
+---
+title: Redirect moved pages
+description: Map exact paths or path patterns to new destinations, with ingest checks for invalid rules.
+---
+
+Preserve existing links after moving a page by adding a redirect to `docs.json`. Publish the destination page and remove the old page before deploying the rule: Margin drops redirects that would replace a published page.
+
+## Add a redirect rule
+
+Add a `redirects` array at the top level of `docs.json`. Each rule requires string fields `source` and `destination`; the optional boolean `permanent` selects the redirect status.
+
+For a page moved from `/getting-started` to `/quickstart`, merge this field into your existing configuration:
+
+```json title="docs.json"
+{
+  "redirects": [
+    {
+      "source": "/getting-started",
+      "destination": "/quickstart"
+    }
+  ]
+}
+```
+
+Use site-root paths without file extensions. Internal paths gain a leading slash and lose a trailing slash during ingest, except for `/`. Internal destinations ending in `/index` normalize to the parent route.
+
+Sources cannot include a URL scheme, query string, or fragment. Destinations can be internal paths or external `http://` and `https://` URLs, and can include queries and fragments. Other destination schemes, such as `mailto:` or `javascript:`, are rejected.
+
+An incoming query string carries through unless the destination already has a query. For example, `/getting-started?ref=email` redirects to `/quickstart?ref=email`, but a destination of `/quickstart?tab=api` replaces the incoming query with `?tab=api`.
+
+## Choose permanent or temporary redirects
+
+Use a permanent redirect for a completed page move. Use a temporary redirect when you intend to restore the original URL.
+
+| `permanent` setting | HTTP status | Use |
+| --- | --- | --- |
+| Omitted or `true` | `308` | Permanent move |
+| `false` | `307` | Temporary move |
+
+To make the previous rule temporary, add `"permanent": false`:
+
+```json title="docs.json"
+{
+  "redirects": [
+    {
+      "source": "/getting-started",
+      "destination": "/quickstart",
+      "permanent": false
+    }
+  ]
+}
+```
+
+Set the field to `true`, or remove it, to return to a permanent redirect. A string such as `"false"` is not a valid boolean.
+
+## Match paths with wildcards
+
+Use a pattern when a group of pages moves while retaining part of each path. Matching is case-sensitive, and destination tokens substitute captured path text.
+
+| Source form | Captures | Destination example |
+| --- | --- | --- |
+| `/old/:page` | One nonempty path segment | `/new/:page` |
+| `/old/:slug*` | The remaining path, including multiple segments or an empty remainder | `/new/:slug*` |
+| `/old/*` | The remaining path, including an empty remainder | `/new/*` |
+| `/old/article-*` | The part of the final segment after `article-` | `/new/article-*` |
+
+Named captures start with a letter or underscore; remaining characters can include letters, digits, underscores, and hyphens. Rest captures and partial wildcards must be in the final source segment. `:splat` is also a rest capture, and rest captures can be substituted with their own token, `*`, or `:splat`.
+
+For a directory move, place an exact exception alongside the broader pattern:
+
+```json title="docs.json"
+{
+  "redirects": [
+    {
+      "source": "/legacy/:slug*",
+      "destination": "/guides/:slug*"
+    },
+    {
+      "source": "/legacy/install",
+      "destination": "/quickstart"
+    }
+  ]
+}
+```
+
+`/legacy/install` redirects to `/quickstart` because exact sources take precedence over patterns, regardless of array position. `/legacy/auth/setup` redirects to `/guides/auth/setup`. When several patterns match, the first matching pattern in the array wins; order narrower patterns before broader ones. For duplicate exact sources, the first rule wins.
+
+Destinations may reuse captures in a query or fragment, or omit captures to send every matching source to one destination. A destination path cannot reference a capture absent from the source.
+
+## Validate redirect rules
+
+Margin validates redirects during ingest. Invalid individual rules produce warnings and are dropped rather than stopping publication. Inspect the ingest output for the rule's source or its `redirects` array index.
+
+| Diagnostic code | Cause | Fix |
+| --- | --- | --- |
+| `field_invalid` | A rule lacks string `source` or `destination`, or uses a non-boolean `permanent` | Correct the field types |
+| `redirect_invalid` | Invalid scheme, source pattern, or destination capture mapping | Use a supported path and capture syntax |
+| `redirect_invalid` | An internal destination is missing | Publish the destination or point to a retained redirect |
+| `redirect_invalid` | A rule forms a loop, or its chain reaches the 32-rule traversal cap | Point directly to the final destination |
+| `redirect_shadows_page` | The source matches a published page | Remove or move the old page before publishing the rule |
+
+For example, `/old/*/details` is invalid because a rest wildcard must be last. Mapping `/old/:page` to `/new/:missing` is invalid because the source does not capture `:missing`.
+
+An internal exact destination must resolve to a published page or a retained redirect. A destination pattern is admitted when at least one published page matches it, or it resolves through a retained redirect. This does not prove that every possible wildcard substitution exists. External destinations are not checked for a published internal page; test their availability separately.
+
+After deployment, request the old path without following redirects. Set `DOCS_ORIGIN` to your deployed site's origin, then run:
+
+```sh title="Check the redirect"
+export DOCS_ORIGIN="https://docs.example.com"
+curl --silent --show-error \
+  --dump-header - \
+  --output /dev/null \
+  "$DOCS_ORIGIN/getting-started"
+```
+
+Expect status `308` for the permanent rule, or `307` for the temporary rule, with a `Location` header pointing to `/quickstart` on your site. Test a representative nested path for each wildcard rule, and open the destination to confirm the page exists.

@@ -1,0 +1,31 @@
+node_modules
+
+.DS_Store
+.cache
+.vercel
+.output
+.nitro
+/build/
+/api/
+/server/build
+/public/build
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+.tanstack
+
+.source
+.env*
+
+# pdf-build.test.ts scratch Nitro builds (left behind if a run is killed)
+tests/.pdf-build-*
+
+# Icon map written by `bun run icons:build`
+src/generated/*
+!src/generated/.gitkeep
+
+# The fake Hugeicons Pro package keeps the real package's dist/ layout
+!tests/fixtures/hugeicons-pro-fake/dist/
+.env
+!.env.example

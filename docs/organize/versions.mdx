@@ -1,0 +1,110 @@
+---
+title: Configure product documentation versions
+description: Set the default release and check navigation and links for each documentation version.
+---
+
+Publish separate documentation for `v1` and `v2` by assigning each release a source directory in `docs.json`. Keep matching page paths inside those directories so relative links stay within the release.
+
+## Distinguish product versions from content versions
+
+A product version identifies the release a reader is using, such as `v1` or `v2`. It controls the documentation tree and published URL prefix. Both releases can exist in the same site at the same time.
+
+A content version is an immutable snapshot of the documentation, associated with a deployment. Updating a paragraph creates new content in a later snapshot; it does not create a new product release. One content snapshot can contain both `v1` and `v2`.
+
+## Configure releases and the default version
+
+1. Create a directory for each release inside your docs folder. For this example, create `v1/index.mdx`, `v1/guide.mdx`, `v2/index.mdx`, and `v2/guide.mdx`. Give each file release-appropriate content.
+2. Declare the release directories and navigation in `docs.json`.
+3. Set `x-margin.versions.default` to a declared version label.
+
+This minimal `docs.json` declares two releases and selects `v2` as the default. Page references are source paths relative to the docs folder, without extensions; they are not paths relative to each version directory.
+
+```json title="docs.json"
+{
+  "name": "Acme",
+  "navigation": {
+    "versions": [
+      {
+        "version": "v1",
+        "directory": "v1",
+        "pages": ["v1/index", "v1/guide"]
+      },
+      {
+        "version": "v2",
+        "directory": "v2",
+        "pages": ["v2/index", "v2/guide"]
+      }
+    ]
+  },
+  "x-margin": {
+    "versions": {
+      "default": "v2"
+    }
+  }
+}
+```
+
+`version` is the required label and becomes the URL segment. `directory` assigns the files under that source directory to the release. Navigation controls which pages appear in the sidebar; an unlisted page can still be reached by URL.
+
+The version declaration also supports these optional fields:
+
+| Field | Purpose |
+| --- | --- |
+| `default` | Mark this release as the default instead of selecting it through `x-margin`. |
+| `hidden` | Omit the release from the switcher without disabling its URLs. |
+| `tag` | Display a badge beside the switcher entry. |
+| `href` | Link to an external documentation site instead of a local release when no local directory is assigned or discovered. |
+| `tabs`, `groups`, `pages`, `global` | Define navigation within the release. |
+| `languages` | Define language navigation. See [languages](/organize/languages). |
+| `openapi`, `asyncapi` | Declare API sources. See [API generation](/organize/openapi). |
+
+Margin can also discover directories under `versions/`, explicit version markers in `meta.json`, or sibling version directories such as `v1/` and `v2/`. Use explicit `directory` declarations when you need predictable file assignment rather than directory inference.
+
+The default selector does not declare a release or create its files. Its value must match a discovered version label to take effect. Default selection follows this precedence:
+
+1. A release directory's `meta.json` with `"x-margin-version-default": true`.
+2. A navigation version with `"default": true`.
+3. `x-margin.versions.default`.
+4. The highest label by natural version order.
+
+Remove higher-priority default flags if you want `x-margin.versions.default` to decide. If no explicit default matches, Margin infers one and records `version_no_default` at info severity. If multiple releases are flagged at the winning priority, the highest naturally sorted label wins and Margin records a `version_multiple_default` warning.
+
+## Check the version switcher and URLs
+
+With the example configuration, the version switcher offers `v1` and `v2`. Selecting a release opens that release's landing page, not the corresponding page from the current release. A missing counterpart page therefore does not change the switcher's destination: switching from `/v1/guide` to `v2` opens `/v2`.
+
+These URLs assume no language prefix and the example's directory-backed releases:
+
+| Source file | Published URL | Release |
+| --- | --- | --- |
+| `v1/index.mdx` | `/v1` | `v1` |
+| `v1/guide.mdx` | `/v1/guide` | `v1` |
+| `v2/index.mdx` | `/v2` | `v2`, default |
+| `v2/guide.mdx` | `/v2/guide` | `v2`, default |
+
+The default directory-backed release retains its prefix. Selecting `v2` as the default does not turn `/v2/guide` into `/guide`. Files outside version directories remain available at their unprefixed paths and are shared across version trees. A release that spans the docs root rather than a separate directory uses unprefixed URLs; that is a different file layout from this example.
+
+Open both release roots and confirm that each sidebar contains the intended release's pages. Check the URL after switching rather than relying on the switcher label: the switcher trigger uses the default release label, or the first visible release when the default is not visible.
+
+## Validate links within each version
+
+Use relative links between source files in the same release. For example, put this link in both `v1/index.mdx` and `v2/index.mdx`:
+
+```md title="index.mdx"
+[Read the guide](./guide)
+```
+
+Margin resolves the relative target against the source file's directory and rewrites it to the published URL. The link becomes `/v1/guide` from `v1/index.mdx` and `/v2/guide` from `v2/index.mdx`. A root-relative link such as `/v2/guide` explicitly selects that release; it does not follow the reader's selected version.
+
+During ingest, Margin checks internal links against the release's served URLs and shared pages, with fallback checks against the default release. Links to existing explicit release URLs are also valid. A successful fallback check does not establish that the target belongs to the original release, so test links in each release even when ingest reports no warning.
+
+On a self-hosted checkout with the database configured, re-ingest the docs folder after changing configuration or links:
+
+```sh title="Terminal"
+bun run ingest \
+  --dir ./docs
+```
+
+Inspect ingest warnings for `broken internal link: <link>`. The diagnostic code is `link_broken`, with severity `warn`, and the diagnostic identifies the source file. Broken internal links warn rather than fail ingest.
+
+For each warning, open the named source file and either add the missing page to that release or correct the link to an existing target. Use an explicit version-prefixed link only when sending the reader to another release is intentional. Re-ingest, then follow the corrected link from both release landing pages and confirm the destination's URL and content.

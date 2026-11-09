@@ -1,0 +1,114 @@
+Margin
+Copyright 2026 Margin contributors
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+Third-party assets retain their own licenses and notices below.
+
+Inter — Copyright (c) 2016 The Inter Project Authors (https://github.com/rsms/inter), SIL Open Font License 1.1
+Full license: scripts/fonts-source/InterVariable-OFL.txt.
+Source: https://github.com/rsms/inter. The shipped WOFF2 subsets are derived
+from InterVariable.woff2; see docs/fonts.md for the subset process.
+
+Geist Mono — Copyright (c) 2023 Vercel, in collaboration with basement.studio, SIL Open Font License 1.1
+Full license: scripts/fonts-source/GeistMonoVariable-OFL.txt.
+Source: https://github.com/vercel/geist-font. The shipped mono subset is
+derived from GeistMonoVariable.woff2. Geist Sans, loaded from the geist
+package for OG images, is under the same SIL Open Font License 1.1;
+its upstream notice and full license also ship with that package.
+
+Font Awesome Free — Copyright Fonticons, Inc.; icons licensed CC BY 4.0
+Source: https://fontawesome.com/ and https://github.com/FortAwesome/Font-Awesome.
+License: https://creativecommons.org/licenses/by/4.0/.
+Used brand glyphs in scripts/icon-fa-glyphs.json: github, python, square-js.
+These glyphs are embedded by the icon generator. No endorsement by the
+trademark owners is implied. The name-only Font Awesome compatibility
+mapping is separate from the embedded glyphs.
+
+Hugeicons Free — MIT License, Copyright (c) 2025 Hugeicons
+Source: https://github.com/hugeicons/hugeicons-free-icons.
+The @hugeicons/core-free-icons package supplies Free glyphs at build time;
+retain its upstream copyright notice and MIT license with distributions.
+Optional Hugeicons Pro glyphs are governed by the deployer's separate Pro
+license and are not included in this repository.
+
+fumadocs — MIT License, Copyright (c) 2023 Fuma
+Source: https://github.com/fuma-nama/fumadocs.
+This distribution modifies fumadocs-ui with
+patches/fumadocs-ui@16.16.2.patch to change the mobile drawer breakpoint
+from 768px to 1024px. The upstream MIT license remains applicable.
+
+Vendored shadcn code
+src/components/ui/toast.tsx adapts the Base UI toast from:
+https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/toast.tsx
+Changes include fd-* theme tokens, icons, and the local toast API composition.
+The original MIT copyright and permission notice follows in full:
+
+MIT License
+
+Copyright (c) 2023 shadcn
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Vendored fumadocs code and examples
+In addition to the package patch above, local adaptations include:
+- src/components/ui/button.tsx: buttonVariants implementation from
+  fumadocs-ui/components/ui/button (upstream source:
+  https://github.com/fuma-nama/fumadocs/blob/main/packages/radix-ui/src/components/ui/button.tsx).
+- src/components/mdx.tsx: card markup/classes and accordion composition from
+  fumadocs-ui/components/card and fumadocs-ui/components/accordion. Local
+  changes include non-heading labels, article styling, and accordion headers.
+- src/components/ai/search.tsx and src/components/ai/search-context.tsx:
+  assistant panel, input/list rendering, and provider/trigger patterns adapted
+  from the docs site's AI search example, split into local modules.
+- src/components/markdown.tsx: Markdown processing, word wrapping, and rendering
+  adapted from the docs site's AI Markdown example, with bounded local caching.
+- src/components/search-dialog.tsx: search-input styling adapted from
+  fumadocs-ui/components/dialog/search.
+- src/components/github-widget.tsx, src/components/page-feedback.tsx, and
+  src/components/view-options.tsx: inline brand-icon paths also used by
+  fumadocs-ui/components/github-info and layouts/shared/page-actions.
+The original assistant examples can be read at:
+https://github.com/fuma-nama/fumadocs/blob/f2261572d15eedda2ffbac2b3a63319a0ef56c4e/apps/docs/components/ai/search.tsx
+https://github.com/fuma-nama/fumadocs/blob/f2261572d15eedda2ffbac2b3a63319a0ef56c4e/apps/docs/components/ai/markdown.tsx
+The original MIT copyright and permission notice follows in full:
+
+MIT License
+
+Copyright (c) 2023 Fuma
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Run `bun run check-licenses` to list every dependency and the license it
+declares.

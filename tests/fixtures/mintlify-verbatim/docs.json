@@ -1,0 +1,88 @@
+{
+    "$schema": "https://mintlify.com/docs.json",
+    "theme": "maple",
+    "name": "Mintlify Verbatim",
+    "colors": {
+        "primary": "#7C3AED",
+        "light": "#A78BFA",
+        "dark": "#5B21B6"
+    },
+    "logo": {
+        "light": "/logo/light.svg",
+        "dark": "/logo/dark.svg"
+    },
+    "favicon": "/favicon.png",
+    "navigation": {
+        "tabs": [
+            {
+                "tab": "Guides",
+                "groups": [
+                    {
+                        "group": "Get Started",
+                        "pages": [
+                            "index",
+                            "guides/quickstart",
+                            "guides/hidden-listed"
+                        ]
+                    }
+                ]
+            }
+        ],
+        "anchors": [
+            {
+                "anchor": "Status",
+                "href": "https://status.example.com"
+            }
+        ],
+        "versions": [
+            {
+                "version": "v1",
+                "directory": "v1",
+                "groups": [
+                    {
+                        "group": "Version 1",
+                        "pages": ["v1/overview"]
+                    }
+                ]
+            },
+            {
+                "version": "v2",
+                "directory": "v2",
+                "default": true,
+                "groups": [
+                    {
+                        "group": "Version 2",
+                        "pages": ["v2/overview"]
+                    }
+                ]
+            }
+        ]
+    },
+    "redirects": [
+        {
+            "source": "/old-start",
+            "destination": "/",
+            "permanent": true
+        }
+    ],
+    "seo": {
+        "indexing": "all",
+        "metatags": {
+            "author": "Fixture Author"
+        }
+    },
+    "markdown": {
+        "schema": true
+    },
+    "integrations": {
+        "ga4": {
+            "measurementId": "G-VERBATIM"
+        },
+        "gtm": {
+            "tagId": "GTM-VERBATIM"
+        }
+    },
+    "api": {
+        "openapi": "openapi.yaml"
+    }
+}

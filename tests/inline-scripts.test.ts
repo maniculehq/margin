@@ -1,0 +1,81 @@
+import { execFileSync } from "node:child_process"
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { describe, expect, it } from "vitest"
+
+/**
+ * Every inline analytics snippet the root route emits must parse: a single
+ * syntax error (the PostHog stub once lost its `for(`) throws before any
+ * other inline script on the page runs and silently disables the vendor.
+ * The snippets are template literals in __root.tsx; interpolations are
+ * replaced with a string literal before `node --check`.
+ */
+describe("inline analytics snippets", () => {
+    const source = readFileSync(
+        new URL("../src/routes/__root.tsx", import.meta.url),
+        "utf8",
+    )
+    // Scan each template literal that starts with a known snippet opener,
+    // honouring nested `${…}` (which may contain their own template
+    // literals), and replace every interpolation with a string literal so
+    // the remainder is plain JavaScript.
+    const snippets: string[] = []
+    for (const opener of source.matchAll(
+        /`(?=!function|window\.dataLayer|\(function\()/g,
+    )) {
+        let out = ""
+        let depth = 0
+        let i = (opener.index ?? 0) + 1
+        for (; i < source.length; i++) {
+            const ch = source[i]
+            if (depth === 0) {
+                if (ch === "`") break
+                if (ch === "$" && source[i + 1] === "{") {
+                    depth = 1
+                    i += 1
+                    // A value position (after `(`, `,`, `:`, `=`, `+`, `[`)
+                    // gets a placeholder literal; a spliced fragment (e.g.
+                    // an optional `,api_host:…` tail) is simply dropped.
+                    out += /[(,:=+[]\s*$/.test(out) ? '"x"' : ""
+                    continue
+                }
+                out += ch
+            } else {
+                if (ch === "`") {
+                    // Nested template literal inside the interpolation.
+                    for (i += 1; i < source.length && source[i] !== "`"; i++)
+                        if (source[i] === "\\") i++
+                } else if (ch === "{") depth++
+                else if (ch === "}") depth--
+            }
+        }
+        snippets.push(out)
+    }
+
+    it("finds every vendor's snippet", () => {
+        // One opener per vendor, in source order: if the scanner stops
+        // matching a snippet, the parse rows below silently lose it.
+        expect(snippets.map((snippet) => snippet.slice(0, 40))).toEqual([
+            expect.stringMatching(/^!function\(t,e\)\{.*e\.__SV/), // PostHog
+            expect.stringContaining('var i="analytics"'), // Segment
+            expect.stringMatching(/^\(function\(h,o,t,j,a,r\)/), // Hotjar
+            expect.stringMatching(/^window\.dataLayer=/), // Google Analytics
+            expect.stringMatching(/^\(function\(f,b\)\{if\(!b\.__SV/), // Mixpanel
+        ])
+    })
+
+    it.each(snippets.map((s, i) => [i, s] as const))(
+        "snippet %i parses as JavaScript",
+        (_index, snippet) => {
+            const dir = mkdtempSync(join(tmpdir(), "inline-script-"))
+            const file = join(dir, "snippet.js")
+            writeFileSync(file, snippet)
+            expect(() =>
+                execFileSync(process.execPath, ["--check", file], {
+                    stdio: "pipe",
+                }),
+            ).not.toThrow()
+        },
+    )
+})

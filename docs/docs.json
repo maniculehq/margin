@@ -1,0 +1,96 @@
+{
+    "name": "Margin",
+    "description": "Agent-ready Markdown and MDX documentation, hosted free on Manicule or self-hosted.",
+    "colors": {
+        "primary": "#2563EB"
+    },
+    "navigation": {
+        "tabs": [
+            {
+                "tab": "Documentation",
+                "groups": [
+                    {
+                        "group": "Get started",
+                        "pages": [
+                            "index",
+                            "quickstart",
+                            "local-development",
+                            "migrate-from-mintlify"
+                        ]
+                    },
+                    {
+                        "group": "Create content",
+                        "pages": [
+                            "content/pages",
+                            "content/navigation",
+                            "content/formatting",
+                            "content/components",
+                            "content/components/layout",
+                            "content/components/steps-tabs",
+                            "content/components/api-fields",
+                            "content/components/diagrams-icons",
+                            "content/visibility",
+                            "content/media",
+                            "content/snippets",
+                            "content/changelogs"
+                        ]
+                    },
+                    {
+                        "group": "Customize your site",
+                        "pages": [
+                            "settings/docs-json",
+                            "customize/themes",
+                            "customize/fonts",
+                            "customize/css",
+                            "customize/branding",
+                            "customize/search",
+                            "customize/seo",
+                            "customize/redirects"
+                        ]
+                    },
+                    {
+                        "group": "Versions, languages, and APIs",
+                        "pages": [
+                            "organize/versions",
+                            "organize/languages",
+                            "organize/openapi"
+                        ]
+                    },
+                    {
+                        "group": "Deploy",
+                        "pages": [
+                            "deploy/manicule",
+                            "deploy/vercel",
+                            "deploy/self-host",
+                            "deploy/rollbacks",
+                            "deploy/environment-variables",
+                            "deploy/analytics"
+                        ]
+                    },
+                    {
+                        "group": "Agent-ready docs",
+                        "pages": [
+                            "agents/overview",
+                            "agents/markdown",
+                            "agents/llms-txt",
+                            "agents/mcp",
+                            "agents/skills",
+                            "agents/assistant",
+                            "agents/content-policy",
+                            "agents/link-relations"
+                        ]
+                    },
+                    {
+                        "group": "Extend Margin",
+                        "pages": ["extend/extensions", "extend/security"]
+                    }
+                ]
+            }
+        ]
+    },
+    "x-margin": {
+        "search": {
+            "mode": "static"
+        }
+    }
+}

@@ -1,0 +1,75 @@
+---
+title: "Target content to agents and humans"
+description: "Control which content appears in browser pages and agent Markdown."
+---
+
+Keep one MDX source for the browser page and its agent Markdown rendition. Use audience wrappers only where a reader needs different instructions or presentation.
+
+## Choose shared or audience-specific content
+
+Ordinary content outside an audience wrapper appears in both renditions. Keep API contracts, prerequisites, and required steps shared so either reader can complete the task without missing a dependency.
+
+Use human-only content for screenshots or browser navigation instructions that have a text equivalent elsewhere. Use agent-only content for machine-oriented instructions that would distract from the browser walkthrough. These wrappers select output content; they do not authenticate readers or protect secrets. Anyone who can fetch the Markdown rendition can read agent-only content.
+
+## Write human-only content
+
+Wrap human-only content in `<Human>...</Human>`. The browser renders the children without an extra visible wrapper. Agent Markdown omits the entire block, including its children.
+
+Keep any information required by both audiences outside the wrapper. For example, a screenshot can be human-only, but the configuration value shown in that screenshot should also appear as shared text.
+
+## Write agent-only content
+
+Wrap agent-only content in `<Agent>...</Agent>`. The browser omits the block, while agent Markdown includes its children without the audience tags.
+
+Use this for explicit machine instructions, such as how to extract a value from a shared example. An agent reading the HTML page does not receive agent-only content; the distinction is between renditions, not user-agent detection.
+
+## Configure visibility explicitly
+
+`Visibility` uses the `for` prop as an alternative to the shorthand components. Write literal, lowercase audience values.
+
+| Syntax | Browser page | Agent Markdown |
+| --- | --- | --- |
+| `<Visibility for="humans">...</Visibility>` | Includes children | Omits children |
+| `<Visibility for="agents">...</Visibility>` | Omits children | Includes children without the wrapper |
+| `<Human>...</Human>` | Includes children | Omits children |
+| `<Agent>...</Agent>` | Omits children | Includes children without the wrapper |
+| Content without a wrapper | Includes content | Includes content |
+
+Only `"humans"` and `"agents"` select an audience. A missing or unrecognized `for` value does not restrict the content to an audience. Leave shared content unwrapped rather than inventing a value such as `"both"`.
+
+Nested wrappers cannot restore content excluded by an outer wrapper. Nesting the same audience is redundant; nesting opposite audiences omits the inner content from both renditions. Use sibling blocks when providing separate instructions for each audience. Ordinary MDX components can sit inside an audience wrapper and remain subject to that wrapper's inclusion rule.
+
+## Check both renditions
+
+Add this source to a docs page. The shared instruction supplies the required value, and the sibling blocks give each rendition its own follow-up instruction.
+
+```mdx
+Set the project name to `demo`.
+
+<Human>
+  Compare the project name shown in the browser with `demo`.
+</Human>
+
+<Agent>
+  Read the project name as a string and confirm that it equals `demo`.
+</Agent>
+```
+
+Open the deployed page at its normal browser URL, then open the same page path with `.md` appended. For example, inspect `/content/visibility` in the browser and fetch `/content/visibility.md` for the Markdown rendition. These are page URLs, not the source file's `.mdx` path; the Markdown surface must be enabled on the site.
+
+Replace the example origin and page path with the site being checked, then fetch its Markdown rendition:
+
+```bash
+curl --fail --silent --show-error \
+  'https://docs.example.com/content/visibility.md'
+```
+
+For the example source, confirm this inclusion pattern:
+
+| Content | Browser page | Agent Markdown |
+| --- | --- | --- |
+| Shared project-name instruction | Present | Present |
+| Browser comparison instruction inside `Human` | Present | Absent |
+| String comparison instruction inside `Agent` | Absent | Present |
+
+The Markdown output should contain the included text without the `Human` or `Agent` wrapper tags. If content disappears from both outputs, check for conflicting nested audience wrappers before changing the instructions.

@@ -1,0 +1,124 @@
+---
+title: Replace deployment behavior with extensions
+description: Configure site resolution, request policy, and telemetry through Margin’s host integration module.
+---
+
+Replace Margin’s deployment module when one deployment must resolve several sites, apply host-specific request policy, or attach telemetry properties. Extensions are trusted server code selected at build time, not components that site authors add to MDX. See [the content execution boundary](/extend/security) before granting access to deployment code.
+
+## Start from the default extension
+
+The default module is `src/extensions/default.ts`. It exports a named `extensions` object with the `DocsExtensions` interface from `src/extensions/types.ts`. The required members are `resolveSite`, `requestPolicy`, and `telemetry`; `telemetry: {}` is valid because its individual hooks are optional.
+
+The default serves the `docs_site` row whose slug matches `SITE_SLUG` (default `docs`) for every hostname. It selects the exact commit in `DOCS_CONTENT_SHA` when set, or the site’s current version otherwise. `VERCEL_ENV=preview` marks requests as previews.
+
+Create `extensions.ts` at the Margin repository root. This complete replacement keeps the default site lookup, adds a request-policy probe, and attaches a `docsHost` telemetry property. The probe is an example-specific path, not a built-in Margin endpoint. Remove it after confirming that the deployment selected your module.
+
+```ts title="extensions.ts"
+import type { DocsExtensions } from "./src/extensions/types"
+import { extensions as defaults } from "./src/extensions/default"
+
+export const extensions: DocsExtensions = {
+    async resolveSite(request) {
+        return defaults.resolveSite(request)
+    },
+    requestPolicy(request) {
+        const policy = defaults.requestPolicy(request)
+        if (new URL(request.url).pathname !== "/_extension-health") {
+            return policy
+        }
+        return {
+            ...policy,
+            shortCircuit: new Response("Extension ready\n", {
+                headers: { "Cache-Control": "private, no-store" },
+            }),
+        }
+    },
+    telemetry: {
+        eventProperties(request) {
+            return { docsHost: new URL(request.url).host }
+        },
+    },
+}
+```
+
+The resolver delegates to the working single-site implementation. The policy returns that implementation’s headers and preview decision, except for the probe response. The telemetry object adds a property without replacing Margin’s event delivery.
+
+Select the file in the build environment and rebuild from the Margin repository root:
+
+```sh title="Build"
+DOCS_EXTENSIONS=./extensions.ts bun run build
+```
+
+Margin imports `#docs-extensions`. Both `vite.config.ts` and `vitest.config.ts` alias that import to the file named by `DOCS_EXTENSIONS`, or to `src/extensions/default.ts` when unset. Relative paths resolve against the Margin framework root, not the content directory. A runtime-only environment change does not replace the module in an existing build. TypeScript’s `#docs-extensions` path still points to the default; explicitly type your replacement as `DocsExtensions`.
+
+Once the rebuilt deployment is running, request the probe. If `SITE_ORIGIN` has a path such as `/docs`, include that path before `/_extension-health`:
+
+```sh title="Verify selection"
+curl -i 'https://YOUR_DOCS_HOST/_extension-health'
+```
+
+Expect status `200`, `Cache-Control: private, no-store`, and the body `Extension ready`. This confirms module selection and request-policy execution; it does not confirm that content ingestion or database access succeeded. With `DOCS_EXTENSIONS` set, tests importing `#docs-extensions` use your replacement. Tests that import the default file directly still test the default.
+
+## Resolve a site
+
+`resolveSite(request: Request): Promise<SiteResolution>` maps the incoming web request to an existing documentation site and a content-version selector. Replace the delegated resolver in the example when your deployment needs a hostname registry or another site-selection rule. The returned site must identify content already ingested into Margin; returning metadata does not create a site or ingest content.
+
+`DocsSite` contains `id`, `slug`, `name`, `description`, `repo`, `analyticsEnabled`, and `webmcpEnabled`. Use the database site ID for `id`; `slug` is the public identifier used in analytics, cache tags, and URLs. `repo` is either `{ owner, name, branch, subdir }` or `null`. Setting `analyticsEnabled: false` suppresses the site’s configured analytics integrations. Display branding is resolved separately from deployment settings and the selected docs configuration.
+
+Return every required field of `SiteResolution`:
+
+| Field | Contract |
+| --- | --- |
+| `site` | `DocsSite` or `null`. A missing site produces a 404 outside previews; a preview can render an empty, uncacheable page. |
+| `versionSelector` | `"current"`, `{ kind: "commit", sha: string }`, or `{ kind: "preview", shaPrefix: string }`. |
+| `preview` | Boolean indicating preview serving. Keep the request-policy preview decision consistent so all response surfaces receive preview headers. |
+| `canonicalHost` | Host for a 308 redirect when the request names a different non-local host; `null` disables this redirect. Set only where the deployment should redirect. |
+| `basePath` | `""` for root serving or a prefix such as `"/docs"`, without a trailing slash. Requests outside the prefix redirect with 308; routes receive the prefix-stripped path. |
+| `publicOrigin` | Origin such as `"https://acme.com"`, without a path, or `null` to use the request origin. |
+| `sharedClientAddress` | Optional boolean, default `false`. Set `true` when an owner’s proxy hides visitor addresses; public rate limiters then apply per-site limits only. |
+
+Margin checks the site’s live status before serving content, so a cached site lookup cannot bypass suspension. `"current"` follows the active site’s current ready version. Exact-commit selection accepts ready or superseded versions of the deployment’s kind (`preview` or `production`), so a pinned rollback can still serve its content. Preview-prefix selection requires a single ready preview match; invalid or ambiguous prefixes select no version. Prefixes must contain 1–64 lowercase hexadecimal characters.
+
+Do not assume `resolveSite` runs only once. The server resolves the base path before routing, content loaders resolve the site when building the shared per-request content context, and telemetry can resolve a reconstructed request after the response. Keep the resolver repeatable and cache expensive registry reads where appropriate.
+
+The default caches found and missing sites for 30 seconds and coalesces concurrent lookups. Database failures are cached for 5 seconds and rethrown, never replaced with stale site data. An invalid `SITE_SLUG` fails default-module initialization with `Invalid environment variables: SITE_SLUG (one DNS label: lowercase letters, digits and hyphens, at most 55 characters)`.
+
+The default derives `basePath` from `SITE_ORIGIN`. When that origin contains a path, `publicOrigin` is its origin and canonical-host redirection is disabled to avoid proxy redirect loops. Without a base path, production redirects to the `SITE_ORIGIN` host unless `DOCS_CANONICAL_REDIRECT=0`; development and previews do not set a canonical host.
+
+## Apply request policy
+
+`requestPolicy(request: Request): RequestPolicy` returns synchronous decisions derived from the request. Several middleware layers call it, so keep it cheap, database-free, and repeatable. The server resolves the base path before middleware runs: this hook is not a guarantee that no site lookup has occurred. A short-circuit response skips route handling, not the server’s initial site resolution.
+
+| Field | Effect |
+| --- | --- |
+| `hstsPreload` | `false` sends `Strict-Transport-Security: max-age=31536000`. `true` sends `max-age=63072000; includeSubDomains; preload`. Enable only for domains whose subdomains you control. |
+| `cacheTag` | Tag for eligible purgeable responses in `Vercel-Cache-Tag`, or `null` for none. Tags longer than 256 characters or containing commas are dropped, not truncated. |
+| `preview` | Applies `Cache-Control: private, no-store` and `X-Robots-Tag: noindex, nofollow` through preview middleware. |
+| `shortCircuit` | A `Response` returned instead of route handling, or `null` to continue. Middleware evaluates this against the path with `basePath` removed. |
+
+The default returns `hstsPreload: false`, `cacheTag: "site-<SITE_SLUG>"`, the deployment’s preview flag, and `shortCircuit: null`. The example changes only `shortCircuit` for the probe. When replacing site resolution, replace the default policy’s single-site cache tag as well if multiple sites need separate purge scopes.
+
+## Report telemetry
+
+The required `telemetry` object implements `TelemetryHooks`. The default is `{}`: Margin still performs its configured event delivery, but the extension contributes no extra properties, groups, or event tap. Telemetry hooks receive a reconstructed, bodiless request after the response, so do not depend on reading the original request body.
+
+| Hook | Signature and behavior |
+| --- | --- |
+| `eventProperties` | `(request: Request, resolution: SiteResolution \| null): Record<string, unknown>`. Adds event properties; extension properties take precedence on key collisions. The example adds `docsHost`. |
+| `groups` | `(resolution: SiteResolution \| null, request?: Request): { groupType: string; groupKey: string; properties?: Record<string, unknown> } \| null`. Supplies a PostHog group and its group-identify properties, or no group. |
+| `onEvent` | `(event: Record<string, unknown>): void`. Receives the emitted event with its type and properties. Replaces the `agentConfig.observability.onEvent` tap. A thrown error is caught so PostHog capture can continue. |
+| `visitorKey` | `(request: Request, resolution: SiteResolution \| null): string`. Supplies the stable site identity input for hashed visitor and session IDs. Defaults to the served site’s slug, or the request host when no site resolves. |
+
+Handle `resolution: null` because site lookup can fail. Returning a group does not configure a PostHog client; it changes grouping when configured PostHog delivery runs. Adding hooks also does not provision an analytics destination.
+
+## Configure optional hooks
+
+Use optional hooks only when the deployment needs behavior beyond the site row and default address handling. These members belong alongside `resolveSite`, `requestPolicy`, and `telemetry` on the exported object.
+
+| Hook | Contract | When to implement; behavior when omitted |
+| --- | --- | --- |
+| `webmcpRollout` | `(site: DocsSite, posthog: PostHog \| undefined): boolean`, where `PostHog` is from `posthog-node`. Synchronous; answer from cache without blocking. | Implement an operator-controlled WebMCP rollout. The result is ORed with `site.webmcpEnabled`, so `false` cannot disable a site’s own opt-in. When omitted, the site flag alone decides. |
+| `rateLimitScope` | `(site: DocsSite): string`. Identity used by public rate limiters and feedback signatures. | Override when the deployment needs a different stable grouping identity. Defaults to `site.id`. |
+| `clientIp` | `(request: Request): string \| undefined`. Client address for public chat and feedback rate limits and feedback keys. | Override for a trusted proxy with different address headers. An omitted hook or empty result falls back to the first `x-vercel-forwarded-for` address, then the first `x-forwarded-for` address. Trust custom proxy headers only when the request is known to come through that proxy. |
+
+The interface also accepts `headMeta?: readonly HeadMeta[]` for deployment-owned meta tags at the top of each document’s head. Each entry is `{ httpEquiv: string; content: string }` or `{ name: string; content: string }`. Omission adds no extension-owned tags.

@@ -1,0 +1,63 @@
+---
+title: Deploy to Vercel
+description: Connect Neon, publish your docs during the build, and confirm that a preview serves its branch commit.
+---
+
+Vercel with Neon is a self-hosting option for Margin. If you just want a live site, [deploy free on Manicule](/deploy/manicule), with no limits, no servers or environment variables to manage, an included database, and the latest release.
+
+Deploy Margin to Vercel to serve the `docs/` directory from your repository through a Neon Postgres database. A successful deployment serves the content version created by its build, including on branch previews.
+
+## Create the Vercel project
+
+1. Open [Deploy with Vercel](https://vercel.com/new/clone?repository-url=https://github.com/maniculehq/margin&project-name=my-docs&repository-name=my-docs&stores=%5B%7B%22type%22%3A%22integration%22%2C%22integrationSlug%22%3A%22neon%22%2C%22productSlug%22%3A%22neon%22%2C%22protocol%22%3A%22storage%22%7D%5D&env=SITE_NAME&envDescription=Display+name+of+your+documentation+site&envLink=https://github.com/maniculehq/margin/blob/main/docs/deploy/environment-variables.mdx) and follow the repository-creation prompts.
+
+   You need access to Vercel and permission to create the repository and project. The button copies `maniculehq/margin`, suggests `my-docs` for both names, and requests a Neon Postgres store through the Vercel Marketplace. If you already have a fork, import that repository into Vercel instead and connect Neon in the next step.
+
+   Keep the repository root as the project root. Margin requires Node.js 24 or newer; use a compatible Vercel Node.js runtime. Keep the supplied install command, `bun install`, and build command, `bun run vercel-build`.
+
+   Confirm that the Vercel project points to your new repository before continuing. Edit the `docs/` directory in that repository to replace the example documentation with your content.
+
+## Connect Neon and name the site
+
+2. Complete the Neon integration and connect the database to both Production and Preview environments.
+
+   The store supplies a pooled `DATABASE_URL` connection and a direct `DATABASE_URL_UNPOOLED` connection for migrations. Keep the integration's environment-variable prefix unchanged so Margin can read those variables. Confirm that both environments receive the connection settings before starting the build.
+
+   Enter `SITE_NAME` when the deployment flow asks for the display name. For example, set the environment variable to:
+
+   ```dotenv
+   SITE_NAME="Acme Docs"
+   ```
+
+   `SITE_NAME` overrides the name in `docs.json`. Without the override, Margin uses the configured name, then the site slug as a fallback. The value is read at build time, so redeploy after changing it in Vercel.
+
+   No Blob store is required for ordinary documentation. Vercel supplies the deployment URLs used to infer the public origin; set `SITE_ORIGIN` explicitly if you need a custom canonical origin. See [environment variables](/deploy/environment-variables) for the full configuration inventory.
+
+## Build and check the deployed site
+
+3. Start the deployment and inspect its build log before opening the site.
+
+   The build resolves one content key, builds icons, runs database migrations, builds the server, checks the bundle budget, and ingests the docs into Postgres last. The server and ingest use the same key. A validation failure stops the build instead of publishing invalid content.
+
+   Use these checks to distinguish a server build from a completed content ingest:
+
+   | Check | Expected result |
+   | --- | --- |
+   | Find `[vercel-build] content version` in the log. | The line records the content key used by the server and ingest. With no override, Vercel builds use `VERCEL_GIT_COMMIT_SHA`. |
+   | Find the final `[ingest]` result. | A successful fresh ingest reports the site, key, kind, page and asset counts, and version identifier. A repeat build can report `is already ingested` instead. |
+   | Check for an ingest skip. | `[ingest] DOCS_INGEST=off: skipping build-time ingest` means this build did not ingest content. Remove that override for this deployment workflow. |
+   | Open the completed deployment URL and navigate to a page you edited. | The page loads with the expected text and site name. Follow a navigation link and open a page containing an image if your docs include images. |
+
+   If ingest reports a validation failure, fix the reported content and push again. If the build cannot connect to Postgres, check the Neon connection and environment scope in Vercel. A successful server build alone does not confirm that the content was ingested.
+
+## Check a branch preview
+
+4. Create a branch in the connected repository, change a sentence on an existing docs page to a distinctive value such as `Preview content check`, and push the branch.
+
+   Open that branch's Vercel Preview deployment, confirm its source commit, and inspect its build log using the checks above. The ingest result should identify the kind as `preview`. Open the changed page on the preview URL and confirm that it contains the new sentence, then open the same page on the production URL and confirm that it still shows the production text.
+
+   Vercel previews use `VERCEL_ENV=preview`. Preview ingest does not advance the site's production content pointer, even when the deployments share a database. Each deployed server selects the content key baked into its own build, rather than reading whichever content was ingested most recently. Leave `DOCS_CONTENT_SHA` unset for ordinary branch previews so Vercel's commit SHA selects the branch content.
+
+   Production requests can redirect to the canonical host; preview requests do not, so the preview URL remains usable for this check. For the full content-selection model, see [the version-selection page](/deploy/rollbacks).
+
+   To run Margin outside Vercel, see [self-hosting](/deploy/self-host). To restore an earlier deployment, see [rollbacks](/deploy/rollbacks).

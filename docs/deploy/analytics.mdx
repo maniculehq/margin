@@ -1,0 +1,156 @@
+---
+title: Configure analytics integrations
+description: Supported provider identifiers, loader checks, and the limits of page-feedback acknowledgments.
+---
+
+Sites [hosted on Manicule](/deploy/manicule) also get agent traffic and AI-citation analytics in Manicule, free, with no limits and nothing to install, showing which crawlers and coding agents read pages, which ChatGPT, Claude, and Perplexity answers cite your docs, and how often assistants recommend them.
+
+Add your provider's browser identifier under `integrations` in `docs.json`. Margin loads the corresponding provider script; page feedback uses a separate endpoint and does not require an analytics integration.
+
+## Choose a supported integration
+
+Use the exact provider keys below. Each value is an object inside the top-level `integrations` object.
+
+| Provider | Key | Required fields | Optional fields and defaults |
+| --- | --- | --- | --- |
+| Google Analytics 4 | `ga4` | `measurementId`: string starting with `G` (normally `G-…`) | None |
+| PostHog | `posthog` | `apiKey`: string starting with `phc_` | `apiHost`: official cloud origin; defaults to `https://us.i.posthog.com` |
+| Plausible | `plausible` | `domain`: string identifying the tracked domain | None |
+| Fathom | `fathom` | `siteId`: string | None |
+| Microsoft Clarity | `clarity` | `projectId`: string | None |
+| Amplitude | `amplitude` | `apiKey`: nonempty string | None |
+| Mixpanel | `mixpanel` | `projectToken`: nonempty string | `region`: `us` (default), `eu`, or `in` |
+| Segment | `segment` | `key`: nonempty browser-source write key | None |
+| Hotjar | `hotjar` | `hjid`: numeric site ID, supplied as a number or digit string | `hjsv`: number or string; defaults to `6`; nondigit values fall back to `6` |
+
+Margin also loads Intercom through `integrations.intercom.appId`, a nonempty string. This initializes the messenger rather than adding a general analytics event API.
+
+Google Tag Manager (`gtm`) is parsed for compatibility but is not executed. Unknown integration keys are stored as ignored configuration and produce an `integration_unsupported` warning. They do not load a provider.
+
+## Configure analytics in docs.json
+
+Merge an `integrations` object into your existing `docs.json`, preserving navigation and other site settings. Replace the example identifiers with identifiers from the provider's browser project, not account-management secrets. Multiple providers can coexist; Margin loads each configured integration independently.
+
+For example, this configuration loads GA4 and Plausible:
+
+```json title="docs.json"
+{
+  "integrations": {
+    "ga4": {
+      "measurementId": "G-XXXXXXXXXX"
+    },
+    "plausible": {
+      "domain": "docs.example.com"
+    }
+  }
+}
+```
+
+For PostHog, choose the cloud region that contains your project. The supported `apiHost` values are `https://us.i.posthog.com`, `https://eu.i.posthog.com`, `https://us.posthog.com`, and `https://eu.posthog.com`. A custom host, path, query, or fragment is ignored with a warning; the API key remains enabled and the loader falls back to the default US host.
+
+For Mixpanel, match `region` to the project's data residency. `eu` selects `https://api-eu.mixpanel.com`; `in` selects `https://api-in.mixpanel.com`. Omit `region` for the provider's default US ingestion.
+
+This alternative configuration demonstrates the region-specific schemas and Hotjar's numeric identifier:
+
+```json title="docs.json"
+{
+  "integrations": {
+    "posthog": {
+      "apiKey": "phc_REPLACE_WITH_PROJECT_KEY",
+      "apiHost": "https://eu.i.posthog.com"
+    },
+    "mixpanel": {
+      "projectToken": "REPLACE_WITH_PROJECT_TOKEN",
+      "region": "eu"
+    },
+    "hotjar": {
+      "hjid": 1234567,
+      "hjsv": 6
+    }
+  }
+}
+```
+
+A nondigit Hotjar `hjid` disables that integration and produces an `integration_unsupported` warning. Plausible's `server` field is ignored with the same warning: only the official Plausible script origin is supported.
+
+Publish a new deployment containing the edited `docs.json`, then check the deployed site. The configuration is ingested into the deployment; editing a local file does not change a deployment that is already serving traffic. A host can also suppress all configured integrations through its site-level analytics setting. Adding keys does not override that suppression.
+
+## Check framework-loaded analytics
+
+Margin owns the bootstrap code and script origins. You supply identifiers, not script bodies. No custom-script integration or consent-management configuration is provided by these keys.
+
+Open the deployed page with browser developer tools, reload it, and inspect Network requests. These script requests identify the configured loader:
+
+| Provider | Expected script request |
+| --- | --- |
+| GA4 | `www.googletagmanager.com/gtag/js?id=…` |
+| PostHog | `us-assets.i.posthog.com/static/array.js` or `eu-assets.i.posthog.com/static/array.js` |
+| Plausible | `plausible.io/js/script.js` |
+| Fathom | `cdn.usefathom.com/script.js` |
+| Clarity | `www.clarity.ms/tag/…` |
+| Amplitude | `cdn.amplitude.com/script/….js` |
+| Mixpanel | `cdn.mxpnl.com/libs/mixpanel-2-latest.min.js` |
+| Segment | `cdn.segment.com/analytics.js/v1/…/analytics.min.js` |
+| Hotjar | `static.hotjar.com/c/hotjar-….js?sv=…` |
+| Intercom | `widget.intercom.io/widget/…` |
+
+For a quick GA4 loader check, run this expression in the browser console. A matching URL confirms that the script element exists, not that GA4 received an event:
+
+```javascript title="Browser console"
+Array.from(document.scripts, script => script.src)
+  .filter(src => src.startsWith("https://www.googletagmanager.com/gtag/js?id="))
+```
+
+After confirming the loader, inspect outgoing collection requests and the provider's own event tools. Navigate to another docs page without reloading to check client-side navigation separately. A script request alone does not prove event delivery; check for blocked requests and whether the identifier and region match the provider project.
+
+Event behavior is provider-specific:
+
+- GA4 receives its normal `gtag("config", measurementId)` initialization. Page-view behavior beyond initialization depends on the provider's settings.
+- Mixpanel initializes with `track_pageview: "url-with-path"`.
+- Segment sends `page()` on initial load and on subsequent resolved navigation when the pathname changes.
+- PostHog uses provider defaults with `capture_exceptions: false`. Amplitude initializes with element-interaction autocapture disabled.
+- Plausible, Fathom, Clarity, and Hotjar use their official scripts' behavior. Margin does not define a shared event schema for these providers.
+- Intercom boots on initial load and receives `update` with `last_request_at` on pathname changes.
+
+These integrations do not automatically forward page-feedback submissions, search events, or Assistant events into a common provider event stream. Server-side agent observability is separate from these browser integration keys.
+
+## Configure and check page feedback
+
+All three feedback flags default to off. Add the top-level `feedback` object to show the controls you want:
+
+```json title="docs.json"
+{
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true,
+    "raiseIssue": true
+  }
+}
+```
+
+Publish the change, then open a docs article. `thumbsRating` shows the page-helpfulness Yes/No buttons. `suggestEdit` and `raiseIssue` show links only when the site has a repository binding with an owner and repository name. The edit link opens the page's source file on GitHub at the bound branch and docs subdirectory. The issue link opens GitHub's new-issue form with the page title and URL prefilled; following the link does not submit an issue.
+
+To check a vote, open the browser's Network panel and click Yes or No. The widget sends a same-site `POST /api/agent/feedback` request, prefixed with the site's base path when applicable. The JSON contains the page URL, `kind: "helpful"` or `kind: "not_helpful"`, and `source: "page_widget"`; page votes contain no comment.
+
+The expected response is HTTP `202` with this body:
+
+```json title="Feedback acknowledgment"
+{
+  "ok": true,
+  "received": true
+}
+```
+
+The thank-you message appears optimistically, even if the request fails. The `202` confirms acceptance, not durable storage. Feedback is written asynchronously to the framework's `docs_agent_feedback` table with the site, served content version, page URL, page-existence result, vote kind, and source. Database failures and rate-limit drops can prevent storage without changing the acknowledgment.
+
+If you operate the database, check recent page-widget rows to confirm persistence:
+
+```sql title="Check stored page votes"
+SELECT site_id, page_url, kind, source, created_at
+FROM docs_agent_feedback
+WHERE source = 'page_widget'
+ORDER BY created_at DESC
+LIMIT 10;
+```
+
+Match the row's site, page URL, vote, and timestamp to your test. The `feedback` object does not configure a webhook destination, email recipient, or third-party analytics sink.

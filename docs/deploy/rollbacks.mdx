@@ -1,0 +1,99 @@
+---
+title: Select content versions and roll back
+description: Inspect the snapshot behind a deployment and check retention before restoring an earlier release.
+---
+
+The version selection, database inspection, retention settings, and Vercel rollback procedures below are your responsibility when self-hosting; [Manicule-hosted sites](/deploy/manicule) require no servers or environment variables and include the database and latest Margin release.
+
+Restore earlier documentation by directing production traffic to a deployment built with the desired content key. This procedure uses Vercel Instant Rollback: it restores the application deployment and its selected content together, not the database.
+
+## Understand immutable content versions
+
+Each ingested commit produces a content snapshot in Postgres. The snapshot contains compiled pages and the configuration they need, including navigation, theme data, redirects, assets, and search content. A content version is identified by the site, commit key, and kind (`production` or `preview`); the database row also has an `id` and a sequence number, `seq`, for ingest history.
+
+An application deployment contains the server bundle. Its build bakes in `DOCS_CONTENT_SHA`, the content key that the server reads at request time. Deployments and content versions are separate: rebuilding the same key normally reuses the existing snapshot rather than creating another one. Product versions such as `v1` and `v2` are partitions within a snapshot, not separate deployment-history entries.
+
+Normal publication uses a new key and leaves previous snapshots unchanged. Forced ingest is an explicit exception: `--force` or `DOCS_INGEST=force` replaces content under an existing key, so deployments pinned to that key can read different content afterward.
+
+## Determine which version a deployment serves
+
+With Margin's default extension, deployed servers select their baked content key rather than following the site's latest production pointer. Sharing a database between previews and production does not make previews replace production content.
+
+| Environment | Selected content | Effect of successful ingest |
+| --- | --- | --- |
+| Production deployment | Baked `DOCS_CONTENT_SHA`, kind `production`; status `ready` or `superseded` | Production ingest advances the site's current pointer, subject to ingest sequence ordering. |
+| Preview deployment (`VERCEL_ENV=preview`) | Baked `DOCS_CONTENT_SHA`, kind `preview`; status `ready` or `superseded` | Preview ingest never advances the production pointer. |
+| Local development without a baked key | Site's `current_version_id`, pointing to a `ready` version | Production ingest changes what the current selector reads. |
+
+A later production ingest can supersede a snapshot without preventing an older deployment from serving it. A missing snapshot does not fall back to the current pointer. The site must also remain `active` to serve content.
+
+The deployment build logs print `[vercel-build] content version` followed by the baked key. The build resolves that key from `DOCS_CONTENT_SHA`, then `VERCEL_GIT_COMMIT_SHA`, then local Git HEAD, then a generated `dev-<unix ms>` key. Check the log rather than assuming that the displayed Git commit is the key when an override was configured.
+
+To inspect the matching database row, export `DATABASE_URL` for the deployment's database, set `TARGET_SHA` to its logged content key, and set `CONTENT_KIND` to `production` or `preview`. Set `SITE_SLUG` if the site is not the default `docs`. Run this read-only query with `psql`:
+
+```bash
+psql "$DATABASE_URL" \
+  -v site_slug="${SITE_SLUG:-docs}" \
+  -v content_sha="$TARGET_SHA" \
+  -v content_kind="$CONTENT_KIND" <<'SQL'
+SELECT v.id, v.commit_sha, v.kind, v.status, v.seq, v.created_at,
+       (v.id = s.current_version_id) AS is_current
+FROM docs_content_version AS v
+JOIN docs_site AS s ON s.id = v.site_id
+WHERE s.slug = :'site_slug'
+  AND v.commit_sha = :'content_sha'
+  AND v.kind = :'content_kind'
+ORDER BY v.seq DESC;
+SQL
+```
+
+For a deployed server, look for a matching row with status `ready` or `superseded`. `is_current` identifies the database pointer, not whether production traffic reaches that deployment. Failed attempts may appear alongside a usable row; failed rows cannot serve content. No matching usable row means the deployment cannot serve that snapshot.
+
+Custom extensions can override selection. In particular, the preview-prefix selector requires exactly one matching ready preview commit; an ambiguous prefix serves nothing. Check the [extension configuration](/extend/extensions) before applying the default rules to a customized host.
+
+## Restore a previous content version
+
+Use a previously successful production deployment whose content row still exists. Vercel's Hobby plan permits rollback only to the immediately previous production deployment; Pro and Enterprise permit eligible earlier deployments. See [Vercel Instant Rollback](https://vercel.com/docs/instant-rollback) for eligibility and permissions.
+
+1. Choose the target production deployment in Vercel and record its deployment URL. Read its build log for the content key, then run the inspection query with that key and `CONTENT_KIND=production`. Confirm a `ready` or `superseded` row exists in the database that deployment uses. Check the retention conditions below before relying on it.
+2. Confirm that the older server can run against the current database schema and external services. Instant Rollback does not undo migrations or database writes, and it restores the old deployment's configuration rather than applying newly edited project environment variables.
+3. From a terminal with an authenticated Vercel CLI, set `TARGET_DEPLOYMENT_URL` to the eligible deployment URL and run the rollback command:
+
+   ```bash
+   vercel rollback "$TARGET_DEPLOYMENT_URL"
+   ```
+
+   Wait for completion and confirm in Vercel that production domains now point to the target deployment. Margin then selects that deployment's baked production key. This domain reassignment does not itself rewrite `docs_site.current_version_id`.
+4. Check a public documentation page through the production domain. Set `PAGE_URL` to its Markdown URL, such as `https://docs.example.com/getting-started.md`, and set `EXPECTED_TEXT` to an exact phrase present in the target snapshot but absent from the release being replaced. Confirm the response contains it:
+
+   ```bash
+   curl --fail --silent --show-error "$PAGE_URL" \
+     | grep -F -- "$EXPECTED_TEXT"
+   ```
+
+   Success prints the expected phrase. No match means the content check failed; confirm the production-domain assignment and the selected row before declaring recovery complete. HTML and Markdown use the same content selection.
+
+This operation restores both application code and its selected content. To change only authored content while keeping current application code, publish a new commit with the desired documentation instead of rolling back the application deployment.
+
+After Instant Rollback, Vercel disables automatic assignment of production domains to new pushes. When a corrected deployment is ready, use Vercel's [undo-rollback procedure](https://vercel.com/docs/instant-rollback#undo-a-rollback) to promote it and restore normal domain assignment.
+
+## Check retention before relying on an older version
+
+Successful ingest triggers cleanup. Cleanup protects the newly ingested version, the previous production pointer, and the current pointer. It also keeps the newest `DOCS_KEEP_VERSIONS` other production versions (default `20`, minimum `1`) and production versions younger than 30 days.
+
+Unprotected production versions outside both the count and age limits may be deleted. Unprotected previews and failed attempts older than 30 days may also be deleted; increasing `DOCS_KEEP_VERSIONS` does not extend preview retention. Watcher-created development versions can be collected sooner beyond the count. Versions with Blob references remain when their blobs cannot be deleted safely.
+
+Age is measured from the content row's `created_at`, not deployment creation. Reusing an already-ingested key leaves its age and sequence unchanged. A new deployment using an old row therefore does not receive a new 30-day retention window, and an old deployment's existence alone does not protect its content.
+
+If the snapshot was collected, redeploy its commit to ingest it again before assigning production traffic. To refresh a retained key deliberately, check out that commit and run the following from the repository with the target database credentials loaded. Substitute the actual docs directory and site slug when they differ from `docs`:
+
+```bash
+bun scripts/ingest.ts \
+  --dir docs \
+  --slug docs \
+  --sha "$TARGET_SHA" \
+  --kind production \
+  --force
+```
+
+Forced ingest atomically replaces the row with a fresh creation time and sequence and can advance the production pointer. It changes what every deployment pinned to that key reads; it is not an isolated change to one deployment. `DOCS_INGEST=force` during that commit's deployment build performs the same refresh. Back up Postgres and any Blob store separately; deployment rollback is not a data backup.

@@ -1,0 +1,36 @@
+---
+title: Globex Robotics
+description: Deploy and monitor robot fleets with the Globex SDK.
+icon: Bot
+---
+
+The Globex SDK connects your backend to every robot in your fleet: register
+units, dispatch missions, and stream telemetry — all through one TypeScript
+client.
+
+## How a fleet is organized
+
+- **Fleet** — a named group of robots sharing a deployment site and policy.
+- **Robot** — a single unit, identified by serial number. A robot belongs to
+  exactly one fleet and reports its own battery, pose, and mission state.
+- **Mission** — a queued unit of work (patrol, pick, dock). Missions are
+  executed in order per robot and report progress events until terminal.
+
+## Install
+
+```bash
+bun add @globex/sdk
+```
+
+The client authenticates with a fleet token from the Globex console:
+
+```ts
+import { Globex } from "@globex/sdk"
+
+const globex = new Globex({ token: process.env.GLOBEX_FLEET_TOKEN })
+```
+
+<Columns cols={2}>
+  <Card title="Quickstart" href="/docs/quickstart" description="Register a robot and dispatch its first mission." />
+  <Card title="Telemetry" href="/docs/telemetry" description="Stream battery, pose, and mission events in real time." />
+</Columns>

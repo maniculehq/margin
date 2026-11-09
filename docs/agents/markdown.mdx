@@ -1,0 +1,110 @@
+---
+title: Retrieve Markdown and PDF versions
+description: Choose explicit export URLs or HTTP negotiation, and set the Markdown preamble and metadata.
+---
+
+Retrieve a documentation page as Markdown for an agent or as a PDF for offline reading. Markdown contains the agent rendition; PDF contains the human rendition, so the two exports can contain different audience-specific content.
+
+## Request a Markdown page
+
+Append `.md` to the page path, before any query string. For a page at `https://docs.example.com/quickstart`, request `https://docs.example.com/quickstart.md`. Replace the example host and path with a published page on your site.
+
+Use this HTTP request to save the Markdown and inspect its response headers:
+
+```bash
+curl --fail --show-error --location \
+  --dump-header markdown.headers \
+  --output quickstart.md \
+  'https://docs.example.com/quickstart.md'
+```
+
+A successful response has status `200` and `Content-Type: text/markdown; charset=utf-8`. The body includes a title and page path, the agent text, and agent signals such as estimated token count and update date. An index preamble is included by default.
+
+The root page uses `/index.md`. Keep any site base path, locale, or version prefix when constructing export URLs. For example, `/fr/quickstart` becomes `/fr/quickstart.md`.
+
+Markdown responses include `Vary: Accept`, an `ETag`, and a canonical `Link` to the human page. Send the returned `ETag` in `If-None-Match` on later requests to receive `304` without a response body when it still matches.
+
+A missing Markdown page returns `404` with a Markdown body headed `Page not found`, similar-page suggestions, and a link to the documentation index when available.
+
+## Download a PDF
+
+Append `.pdf` to the human page path. The root page uses `/index.pdf`. This request saves the download locally:
+
+```bash
+curl --fail --show-error --location \
+  --output quickstart.pdf \
+  'https://docs.example.com/quickstart.pdf'
+```
+
+A successful response has `Content-Type: application/pdf` and `Content-Disposition: attachment` with a PDF filename. PDF responses also support `ETag` and `If-None-Match` conditional requests.
+
+The PDF is a document rendering of the human content, not a screenshot of the browser interface. Agent-only content is removed. PNG and JPEG images stored with the published docs can be embedded; external image URLs are not fetched. Unsupported or missing images fall back to alt text. Do not depend on the browser layout or interactive components surviving the export.
+
+A missing PDF page returns `404` with `Content-Type: text/plain; charset=utf-8` and closest-page suggestions, not PDF bytes.
+
+## Negotiate the response format
+
+Use `Accept` when the client already has the human page URL and needs Markdown without changing the path. Margin returns the Markdown inline, without a format-selection redirect, using the same body and headers as the `.md` URL.
+
+This HTTP request asks for Markdown at the human URL:
+
+```bash
+curl --fail --show-error --location \
+  --header 'Accept: text/markdown' \
+  --output quickstart.md \
+  'https://docs.example.com/quickstart'
+```
+
+The following rules apply to ordinary documentation URLs, separately from explicit `.md` and `.pdf` requests:
+
+| Request choice | Response behavior |
+| --- | --- |
+| `?format=markdown` or `?format=md` | Requests Markdown regardless of `Accept`. |
+| `Accept: text/markdown`, `text/plain`, or `text/x-markdown` | Requests Markdown when the highest positive Markdown quality is at least the highest HTML quality. The response type is still `text/markdown`. |
+| `Accept: text/html`, `text/*`, or `*/*` | Counts toward the HTML preference. A wildcard alone does not request Markdown. |
+| No `Accept` header | Does not explicitly request Markdown. |
+| `Accept: application/json` alone | Returns `406`; a docs page has no JSON representation. |
+| Explicit `.md` or `.pdf` suffix | Keeps the selected export format; `Accept` and `format` do not change it. |
+
+Quality values default to `1`; values of `0` are excluded. Equal positive Markdown and HTML quality values select Markdown. For example, `Accept: text/markdown;q=0.9, text/html;q=0.5` selects Markdown, while reversing those weights selects HTML. Both HTML and negotiated Markdown responses use `Vary: Accept` so caches can distinguish them.
+
+A `406` response includes a JSON body with `error` and `markdown` fields. The `markdown` field is the absolute Markdown URL; a `Link` header also advertises that URL with `rel="alternate"` and `type="text/markdown"`. Retry that URL or change `Accept` to `text/markdown`.
+
+PDF selection requires the `.pdf` URL. Sending `Accept: application/pdf` to the human page URL does not select a PDF.
+
+On Vercel deployments, recognized live-assistant fetchers can receive Markdown automatically. Use an explicit suffix or `Accept` header for predictable client behavior rather than depending on user-agent detection.
+
+## Configure Markdown output
+
+Set the Markdown controls under `x-margin.agents` in `docs.json`. All three fields are optional booleans.
+
+| Field | Default | Effect |
+| --- | --- | --- |
+| `indexPreamble` | `true` | Prepends documentation-discovery links. The index is scoped to the active locale and version; additional links appear when their surfaces are enabled. |
+| `markdownFrontmatter` | `false` | Prepends YAML with `title`, `url`, and `updated`, plus `description` when the page has one. `updated` uses `YYYY-MM-DD`. |
+| `assistantMarkdown` | `true` | Permits automatic Markdown responses for recognized live-assistant fetchers on Vercel. Setting this to `false` does not disable `.md`, explicit Markdown `Accept` headers, or `?format=markdown`. |
+
+Merge this fragment into your existing `docs.json` to remove the index preamble and include YAML frontmatter:
+
+```json
+{
+  "x-margin": {
+    "agents": {
+      "indexPreamble": false,
+      "markdownFrontmatter": true,
+      "assistantMarkdown": true
+    }
+  }
+}
+```
+
+These fields do not change PDF output. Other `x-margin.agents` fields, `contentSignals` and `mcpInstructions`, control content-use declarations and MCP instructions rather than the Markdown export wrapper. Per-page agent-signal switches are not `x-margin.agents` settings.
+
+After publishing the configuration change, fetch a page again and inspect the saved headers and first lines:
+
+```bash
+cat markdown.headers
+head -n 12 quickstart.md
+```
+
+With the fragment above, the Markdown begins with YAML frontmatter and has no documentation-index preamble. The body still includes the page title and agent text.

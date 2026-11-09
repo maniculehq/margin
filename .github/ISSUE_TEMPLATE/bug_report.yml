@@ -1,0 +1,40 @@
+name: Bug report
+description: Report a reproducible problem with documentation ingest or serving.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "For vulnerabilities, follow SECURITY.md instead of opening a public issue."
+  - type: input
+    id: revision
+    attributes:
+      label: Version or commit
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include commands and the smallest public docs tree that triggers the problem. Remove credentials and private content.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include relevant diagnostics, logs, or screenshots without secrets.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Bun and Node versions, operating system, browser, deployment preset, and Postgres provider.
+    validations:
+      required: true

@@ -1,0 +1,57 @@
+---
+title: Quickstart
+description: Register a robot and dispatch its first mission.
+icon: Zap
+---
+
+Five minutes from install to a robot executing its first mission.
+
+## 1. Register the robot
+
+Every unit ships with a serial number on the chassis. Registration binds it
+to your fleet and issues its device credentials:
+
+```ts title="register.ts"
+import { Globex } from "@globex/sdk"
+
+const globex = new Globex({ token: process.env.GLOBEX_FLEET_TOKEN })
+
+const robot = await globex.robots.register({
+    serial: "GX-7741-B",
+    fleet: "warehouse-east",
+    name: "Picker 12",
+})
+
+console.log(robot.id, robot.status) // rbt_… "idle"
+```
+
+## 2. Dispatch a mission
+
+```ts title="mission.ts"
+const mission = await globex.missions.dispatch(robot.id, {
+    kind: "patrol",
+    waypoints: [
+        { x: 0, y: 0 },
+        { x: 12.5, y: 4 },
+        { x: 12.5, y: 18 },
+    ],
+    loop: true,
+})
+
+console.log(mission.id, mission.state) // msn_… "queued"
+```
+
+Missions queue per robot: dispatching while another mission runs appends to
+the robot's queue rather than preempting it. Pass `{ preempt: true }` to
+cancel the active mission first.
+
+## 3. Watch it move
+
+```ts
+for await (const event of globex.missions.events(mission.id)) {
+    console.log(event.state, event.progress) // "active" 0.42 …
+    if (event.state === "completed") break
+}
+```
+
+Next: subscribe to the full sensor stream in [telemetry](/docs/telemetry).

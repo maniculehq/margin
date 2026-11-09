@@ -1,0 +1,84 @@
+{
+    "$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
+    "assist": {
+        "actions": {
+            "source": {
+                "organizeImports": "on"
+            }
+        },
+        "enabled": true
+    },
+    "files": {
+        "includes": [
+            "**",
+            "!**/node_modules",
+            "!**/dist",
+            "!**/build",
+            "!**/coverage",
+            "!**/.output",
+            "!**/.vercel",
+            "!**/.nitro",
+            "!**/.tanstack",
+            "!**/test-results",
+            "!**/playwright-report",
+            "!**/*.svg",
+            "!src/routeTree.gen.ts",
+            "!src/generated"
+        ]
+    },
+    "formatter": {
+        "enabled": true,
+        "indentStyle": "space",
+        "indentWidth": 4
+    },
+    "javascript": {
+        "formatter": {
+            "quoteStyle": "double",
+            "semicolons": "asNeeded"
+        }
+    },
+    "markdown": {
+        "formatter": {
+            "enabled": false
+        }
+    },
+    "yaml": {
+        "formatter": {
+            "enabled": false
+        }
+    },
+    "css": {
+        "parser": {
+            "tailwindDirectives": true
+        }
+    },
+    "plugins": ["./no-type-assertions.grit"],
+    "linter": {
+        "enabled": true,
+        "rules": {
+            "preset": "recommended",
+            "suspicious": {
+                "noUnknownAtRules": "off"
+            }
+        },
+        "domains": {
+            "next": "recommended",
+            "react": "recommended"
+        }
+    },
+    "overrides": [
+        {
+            "includes": ["src/styles/app.css"],
+            "linter": {
+                "rules": {
+                    "complexity": { "noImportantStyles": "off" }
+                }
+            }
+        }
+    ],
+    "vcs": {
+        "clientKind": "git",
+        "enabled": true,
+        "useIgnoreFile": true
+    }
+}

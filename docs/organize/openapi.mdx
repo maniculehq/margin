@@ -1,0 +1,108 @@
+---
+title: Generate an API reference from OpenAPI
+description: Add generated endpoint pages to navigation and diagnose specifications that are not connected.
+---
+
+Margin generates endpoint pages and an interactive playground from a local OpenAPI specification. Add the specification to your docs folder, then connect its operations to `docs.json` navigation; no endpoint MDX file is required.
+
+## Add a discoverable specification
+
+Place the specification anywhere under the configured docs root, the folder containing `docs.json`. Discovery recognizes `openapi.json`, `openapi.yaml`, `openapi.yml`, and the equivalent `swagger` filenames, case-insensitively. Dot-prefixed names such as `payments.openapi.yaml` also qualify. A filename such as `api-public.yml` needs an explicit configuration or navigation reference rather than convention discovery.
+
+The document must use OpenAPI 3.x, even if its filename contains `swagger`. Swagger 2.0 documents must be converted first. JSON and YAML are supported, with a maximum of 4 MiB (4,194,304 bytes) and 500 operations per specification. Bundle external `$ref` references into one file; local references such as `#/components/schemas/User` are supported.
+
+Save this minimal specification as `openapi.yaml` in the docs root. Replace the example server URL with your public API URL before executing a request; this file describes an API but does not implement one.
+
+```yaml title="openapi.yaml"
+openapi: 3.0.3
+info:
+  title: Users API
+  version: 1.0.0
+servers:
+  - url: https://api.example.com
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      summary: List users
+      description: Return the users visible to the caller.
+      responses:
+        '200':
+          description: A list of users.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+```
+
+## Add operations to navigation
+
+An operation reference is a string such as `GET /users` in a navigation node's `pages` array. Set `openapi` on that node, or an ancestor, to identify the specification. The method is case-insensitive; the operation path must match the specification.
+
+Merge this navigation into your existing `docs.json`, keeping the rest of your site configuration:
+
+```json title="docs.json"
+{
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "API Reference",
+        "openapi": "openapi.yaml",
+        "pages": ["GET /users"]
+      }
+    ]
+  }
+}
+```
+
+The `openapi` value scopes `GET /users` to this file. Without an OpenAPI context, an endpoint reference does not resolve. A navigation node can also name a document by its configured ID or generated base path, but the source path makes the intended file explicit. A node with `openapi` and no `pages` or `groups` lists the document's generated pages automatically.
+
+For multiple specifications, give each navigation node its own specification path. To control generated URLs, register each file in the top-level `openapi` array with a unique `id`, its `spec` path, a `label`, and a distinct `path` for the generated URL folder. Explicit registration takes precedence over convention discovery.
+
+A convention-discovered `openapi.yaml` receives the ID `api`; `payments.openapi.yaml` receives `payments`. Convention IDs must be unique. Two files called `openapi.yaml` in different folders can collide, so register those files explicitly rather than relying on their directory names to distinguish them.
+
+## Check the generated endpoint page
+
+Publish or rebuild the docs after saving both files. Margin generates one page per operation, using the operation's title and description, HTTP method and path, parameters, request body, and response definitions. Declared tags can group the generated pages; no tags are required for this example.
+
+With only this specification, the example generates `/api-reference/list-users`. The final slug comes from the generated title, not directly from `operationId`. Changing the summary can therefore change the URL. Convention-discovered specifications that share a root use `api-reference/<id>` folders when there is more than one specification; version-scoped specifications use their version directory as a prefix. An explicit `path` controls the base folder instead.
+
+Confirm the result before trying a request:
+
+- The API navigation contains the `List users` page and opens the generated route.
+- The endpoint is `GET /users`, not an operation from another specification.
+- The description is “Return the users visible to the caller.” and the `200` response documents an array of objects with a string `id`.
+- The page offers the playground when interactive display is enabled.
+
+If a generated operation is absent from navigation, check its `pages` reference and OpenAPI context before changing the specification. Discovery generates pages; configured navigation decides which pages are visible.
+
+## Use the endpoint playground
+
+Open the endpoint's playground, select the intended server, supply the operation's inputs and any required API credentials, then send the request and inspect the response. For the example, there are no parameters or request body; after replacing the server URL, the request targets `GET /users` on your API. The documented response schema is not a simulated response: the playground sends a real request.
+
+The default `api.playground` configuration is `display: "interactive"`, `proxy: true`, and `credentials: false`. Only `interactive` provides request execution. The `simple` and `none` display modes omit the interactive console; `auth` also omits it because Margin does not provide docs-visitor authentication. These modes do not remove the API reference or its request examples.
+
+Declare API authentication in the specification's security schemes and security requirements, and provide credentials for the target API when testing. Docs-visitor authentication is separate from API authentication; choosing `display: "auth"` does not create an API login flow.
+
+With the default proxy enabled, requests are limited to public HTTP(S) origins declared in the specification's server lists, including root, path, and operation-level servers. Relative server URLs, unresolved server templates, and private or loopback targets do not enter the proxy allowlist. Use an absolute public server URL for this workflow.
+
+Set `api.playground.proxy` to `false` only when requests should go directly from the browser to the API; the API must then accept the browser's CORS requests. `api.playground.credentials: true` includes browser cookies only for direct requests, not proxied requests.
+
+## Resolve orphaned specification diagnostics
+
+When navigation is configured, an ingested OpenAPI document that navigation never references produces an `openapi_orphaned` warning. Its generated pages remain reachable by URL but hidden from navigation. The warning is part of ingest diagnostics, identifies the source specification path, and is printed in the ingest CLI's warning output.
+
+For the example document label, the warning message is:
+
+```text title="Ingest diagnostic"
+OpenAPI document "API Reference" is not referenced by the configured navigation and remains URL-reachable but hidden.
+```
+
+Connect the document through a navigation `openapi` context and operation references, as in the configuration above, or reference its generated base folder to include the full reference. Rebuild and confirm that navigation opens the intended operation.
+
+The same diagnostic code can also report a discovered copy skipped because its inferred document ID is already registered. That condition does not mean the skipped copy has generated pages. If the copy should be served, add an explicit top-level `openapi` entry with a unique `id` and distinct `path`; otherwise remove the unused copy from the docs source.

@@ -1,0 +1,45 @@
+/*
+ * Layout preset: ASPEN (§4.2). Airy and light: the widest shell of the set,
+ * generous whitespace, and near-invisible borders that let content float. Light
+ * heading weights with a hint of tracking keep the chrome quiet; a taller top
+ * band gives the page room to breathe.
+ */
+
+[data-preset="aspen"] {
+    --fd-layout-width: 1500px;
+}
+@media (min-width: 64rem) {
+    [data-preset="aspen"] #nd-docs-layout {
+        --fd-sidebar-width: 284px;
+    }
+}
+@media (min-width: 1280px) {
+    [data-preset="aspen"] #nd-docs-layout {
+        --fd-toc-width: 284px;
+    }
+}
+
+/* Barely-there borders — dissolve them toward the background. */
+:where([data-preset="aspen"]) #nd-sidebar,
+:where([data-preset="aspen"]) #nd-toc {
+    border-color: color-mix(in oklab, var(--color-fd-border) 45%, transparent);
+}
+:where([data-preset="aspen"]) #nd-sidebar a {
+    padding-block: 0.5rem;
+    border-radius: 0.75rem;
+}
+
+:where([data-preset="aspen"]) .prose {
+    line-height: 1.82;
+}
+:where([data-preset="aspen"])
+    .prose
+    :is(h1, h2, h3):not(:where(.not-prose, .not-prose *)) {
+    font-weight: 500;
+    letter-spacing: 0.004em;
+}
+:where([data-preset="aspen"])
+    .prose
+    :is(h2, h3):not(:where(.not-prose, .not-prose *)) {
+    margin-top: 2.25em;
+}

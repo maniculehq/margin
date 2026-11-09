@@ -1,0 +1,120 @@
+---
+title: Quickstart
+description: Host the latest Margin release on Manicule, with an included database and no servers or environment variables to configure.
+---
+
+Publish your docs on a free `manicule.dev` address, then push an edit and confirm it is live. Manicule hosting is free, with no limits. Margin is Apache 2.0 whether you use Manicule or self-host.
+
+You need a GitHub account and a repository containing your docs. If you do not have one yet, start from the [Margin template](https://github.com/maniculehq/margin) and its `docs/` folder, or create a repository with a single `index.mdx`. For a single-page site, use this content:
+
+```mdx
+# Welcome
+
+This documentation is published from my repository.
+```
+
+## Deploy your docs site
+
+<Steps>
+<Step title="Sign up or sign in">
+Open [Manicule](https://app.manicule.com/onboard?product=margin) and sign up or sign in. New users create an organization with the docs product preselected.
+
+Confirm that you reach “Where are your docs?”.
+</Step>
+
+<Step title="Connect GitHub">
+At “Where are your docs?”, select “Connect GitHub” and install the Manicule GitHub app. Manicule reads only the repositories you choose during installation. Include the repository containing your docs.
+
+Confirm that your repository is available at “Deploy your docs from GitHub”.
+</Step>
+
+<Step title="Create docs site">
+At “Deploy your docs from GitHub”, choose your repository and deploy branch. This is the docs branch: every push to it publishes your site, and pull requests targeting it get previews.
+
+Choose the folder containing your docs if they are not at the repository root. The folder is optional and defaults to the repository root. For the Margin template's docs, choose `docs`.
+
+Select “Create docs site”. Confirm that the first deployment starts.
+</Step>
+
+<Step title="Open your published site">
+Wait until “Your docs site is up.” appears, then open the shown `manicule.dev` address. Confirm that your documentation landing page renders. Save this address for the final check.
+
+At “Want your own domain?”, you can connect a domain now or do it later from Domains. Your site can use `<site>.manicule.dev` or your own domain; Domains manages the domain.
+</Step>
+</Steps>
+
+## Publish your first edit
+
+<Steps>
+<Step title="Edit the landing page" stepNumber={5}>
+Clone the repository you connected. Replace the clone URL and branch below with your repository and the docs branch you selected:
+
+```bash
+git clone 'https://github.com/YOUR_ACCOUNT/YOUR_REPOSITORY.git' my-docs
+cd my-docs
+git switch 'YOUR_DOCS_BRANCH'
+```
+
+Open `index.mdx` in the selected docs folder (`docs/index.mdx` for the Margin template, or `index.mdx` for a repository-root site). Append this paragraph after the existing content, outside any code fence, unless it is already present:
+
+```markdown
+This documentation is published from my repository.
+```
+
+If the paragraph is already present, change it to `My first documentation edit is live.` instead, and use that sentence in the final check.
+
+Review the diff. Set `DOCS_PAGE` to your landing page's repository-relative path; this example uses the template's `docs/` folder:
+
+```bash
+DOCS_PAGE='docs/index.mdx'
+git diff -- "$DOCS_PAGE"
+```
+
+Confirm that the diff shows your changed paragraph.
+</Step>
+
+<Step title="Commit and push" stepNumber={6}>
+Commit the changed page and push the docs branch:
+
+```bash
+git add "$DOCS_PAGE"
+git commit \
+  -m "Update documentation landing page"
+git push
+```
+
+Confirm that a deployment starts for this commit. Push to the docs branch to update the live site; pull requests targeting that branch get previews.
+</Step>
+
+<Step title="Confirm the published edit" stepNumber={7}>
+Wait for the deployment to complete, then reload the site's landing page at `/`. Confirm that it contains your edited sentence.
+
+For a terminal check, replace the URL with your site's address and set the sentence to match your edit:
+
+```bash
+SITE_URL='https://YOUR_SITE.manicule.dev'
+EXPECTED='This documentation is published from my repository.'
+curl --fail --silent --show-error "$SITE_URL/" \
+  | grep -F "$EXPECTED"
+```
+
+A successful check prints a matching line from the HTML. If the sentence is missing, check that the deployment uses your edit's commit and that you pushed to the docs branch.
+</Step>
+</Steps>
+
+## Continue building
+
+<CardGroup cols="2">
+<Card title="Custom domain" href="/deploy/manicule">
+Connect your own domain from Domains.
+</Card>
+<Card title="Run locally" href="/local-development">
+Run Margin locally and preview edits before pushing.
+</Card>
+<Card title="Customize your site" href="/settings/docs-json">
+Configure navigation, colors, and page metadata.
+</Card>
+<Card title="Self-host instead" href="/deploy/self-host">
+Run Margin on your own infrastructure under Apache 2.0.
+</Card>
+</CardGroup>

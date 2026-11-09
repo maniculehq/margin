@@ -1,0 +1,24 @@
+# Local Postgres for development and DB-backed tests:
+#   docker compose up -d --wait postgres
+#   DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5440/docs
+# POSTGRES_PORT moves the host port (`bun run test:e2e` picks a free one and
+# its own `-p` project, so it never touches this database).
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: docs
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5440}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d docs"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  postgres-data:

@@ -1,0 +1,154 @@
+---
+title: Set colors and themes
+description: Choose a layout preset and control colors in light and dark mode.
+---
+
+Set `theme`, `colors`, and `appearance` in your docs folder's `docs.json` to apply your brand without writing CSS. Use `x-margin.tokens` when you need control over individual surfaces or text colors.
+
+The examples below are separate fragments to merge into your existing `docs.json`. Keep your other settings, including navigation, and deploy the changes before checking the published site.
+
+## Choose a theme preset
+
+The `theme` field selects a Margin layout preset and its starting palette. Margin approximates the Mintlify layout; it does not reproduce the Mintlify theme pixel for pixel.
+
+For example, select the `aspen` theme:
+
+```json
+{
+  "theme": "aspen"
+}
+```
+
+Use these mappings to choose a layout. Themes that share a layout can still have different starting palettes.
+
+| `theme` | Margin layout preset | Starting palette |
+| --- | --- | --- |
+| `mint` | `neutral` | `neutral` |
+| `linden` | `neutral` | `neutral` |
+| `maple` | `warm` | `ruby` |
+| `almond` | `warm` | `solar` |
+| `palm` | `verdant` | `emerald` |
+| `willow` | `verdant` | `ocean` |
+| `aspen` | `aspen` | `aspen` |
+| `sequoia` | `dusk` | `dusk` |
+| `luma` | `contrast` | `black` |
+
+Omitting `theme` uses the `neutral` layout and palette. An unknown theme falls back to `neutral` with a diagnostic. Use the names in the first column as configuration values, not the layout or palette names.
+
+## Set site colors
+
+The `colors` object controls the primary brand color. Set `primary` as a base for both modes, then optionally set `dark` and `light` for mode-specific emphasis.
+
+This configuration uses a darker green on light backgrounds and a lighter green on dark backgrounds:
+
+```json
+{
+  "colors": {
+    "primary": "#0F5A3C",
+    "dark": "#0F5A3C",
+    "light": "#6EE7B7"
+  }
+}
+```
+
+The `dark` and `light` names describe the color's brightness, not the page mode:
+
+| Field | Effect |
+| --- | --- |
+| `colors.primary` | Base primary color for both modes. |
+| `colors.dark` | Primary color in light mode; falls back to the base primary color when omitted. |
+| `colors.light` | Primary color in dark mode; falls back to the base primary color when omitted. |
+
+Color values must use `#RGB` or `#RRGGBB` hex notation. Named colors, `rgb()`, and alpha hex values are not supported in these fields. Invalid values produce a `field_invalid` diagnostic rather than applying the color.
+
+If `colors` is omitted, Margin can derive an accent from the logo; otherwise the preset supplies the starting colors. Setting `"colors": null` keeps the selected preset's tokens and disables derived and configured token overrides, including `x-margin.tokens` and `background.color`. It does not disable a separate site stylesheet. Omit `colors`, rather than setting it to `null`, if you want to configure tokens directly.
+
+## Configure light and dark mode
+
+The `appearance` object controls the initial mode and whether readers can switch modes. Its `default` accepts `system`, `light`, or `dark`; omission uses `system`.
+
+To start with the reader's system preference and keep the mode switch available, use:
+
+```json
+{
+  "appearance": {
+    "default": "system",
+    "strict": false
+  }
+}
+```
+
+With `strict` omitted or `false`, readers can change the mode, and a saved choice can take precedence over the initial default. To force light mode or dark mode, set `default` to that mode and `strict` to `true`. Strict mode hides the mode switch. With `default: "system"`, strict mode hides the switch but does not force a fixed light or dark mode.
+
+Mode selection is separate from mode-specific colors. The active mode selects the matching colors and token values; changing `appearance` does not replace the chosen theme.
+
+For an explicit background color in each mode, set `background.color` as a pair:
+
+```json
+{
+  "background": {
+    "color": {
+      "light": "#FFFFFF",
+      "dark": "#101814"
+    }
+  }
+}
+```
+
+## Override design tokens
+
+A design token names a reusable color, such as a card background or border. Set tokens in `x-margin.tokens` using the short names below, not CSS variable names. Each value is either a hex string shared by both modes or an object with both `light` and `dark` hex strings. Unlike `colors.light` and `colors.dark`, the keys in a token pair name the page mode directly.
+
+This example sets a shared border color and mode-specific card and primary colors. The explicit `primary-foreground` pair sets the text color used on primary-colored surfaces:
+
+```json
+{
+  "x-margin": {
+    "tokens": {
+      "border": "#64748B",
+      "card": {
+        "light": "#F0FDF4",
+        "dark": "#14251C"
+      },
+      "primary": {
+        "light": "#0F5A3C",
+        "dark": "#6EE7B7"
+      },
+      "primary-foreground": {
+        "light": "#FFFFFF",
+        "dark": "#052E16"
+      }
+    }
+  }
+}
+```
+
+The supported token names are:
+
+| Purpose | Token names |
+| --- | --- |
+| Page | `background`, `foreground` |
+| Primary surfaces | `primary`, `primary-foreground` |
+| Secondary surfaces | `secondary`, `secondary-foreground` |
+| Muted surfaces | `muted`, `muted-foreground` |
+| Accent surfaces | `accent`, `accent-foreground` |
+| Boundaries and focus | `border`, `ring` |
+| Cards | `card`, `card-foreground` |
+| Popovers | `popover`, `popover-foreground` |
+| Status colors | `info`, `warning`, `error` |
+
+Unknown token names are ignored. `radius`, font names, layout dimensions, and raw `--color-fd-*` names are not supported keys in `x-margin.tokens`. Token colors use the same hex formats as `colors`. Supply both members of a mode pair; a single-member object is not a supported override.
+
+For the primary color, precedence from highest to lowest is a matching site stylesheet rule, `x-margin.tokens.primary`, the applicable `colors` value, a detected logo accent, then the preset default. Direct token overrides also take precedence over corresponding settings such as `background.color`. A site stylesheet is applied after the token block and can override token values through the CSS cascade.
+
+When a single primary color is supplied, Margin can choose black or white primary foreground text automatically. When overriding primary colors as a light/dark pair, set `primary-foreground` explicitly if the preset's text color does not have enough contrast.
+
+After deployment, switch between light and dark mode and check cards, borders, and primary-colored surfaces. For the token example above, run this expression in the browser console to check the active primary token:
+
+```js
+getComputedStyle(document.documentElement)
+  .getPropertyValue("--color-fd-primary")
+  .trim()
+```
+
+Without a stylesheet overriding it, the expression returns `#0F5A3C` in light mode and `#6EE7B7` in dark mode. If the value differs, check for `colors: null`, an invalid hex value, or a site stylesheet rule overriding the token.

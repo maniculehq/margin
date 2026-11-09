@@ -1,0 +1,138 @@
+---
+title: Customize CSS and layout
+description: Control stylesheet loading and layout dimensions without replacing the docs shell.
+---
+
+Use custom CSS when theme settings do not cover the change you need. Set layout dimensions in `docs.json` rather than applying global positioning rules, because Margin sanitizes CSS that could disrupt the navigation shell.
+
+## Load a custom stylesheet
+
+Place `styles.css` in your docs root, beside `docs.json`. Margin discovers all admitted `.css` files, including files in subdirectories, not just files named `styles.css`.
+
+For example, this docs tree contains two stylesheets:
+
+```text
+docs/
+├── docs.json
+├── intro.mdx
+├── styles.css
+└── styles/
+    └── overrides.css
+```
+
+Omit `css` from the `x-margin` object to use discovery. These JSON examples show configuration fragments to merge into your existing `docs.json`.
+
+```json
+{
+  "x-margin": {}
+}
+```
+
+Discovered files load in lexicographic path order. Files excluded by `.mintignore` or `.docsignore` are not admitted. Local directory reads also skip hidden files and directories, apart from supported special files, and do not descend into `node_modules`.
+
+To apply a stylesheet again after the discovered files, set `x-margin.css` to its path:
+
+```json
+{
+  "x-margin": {
+    "css": "styles/overrides.css"
+  }
+}
+```
+
+Paths are relative to the docs root and use `/` separators. Use the exact admitted path, such as `styles/overrides.css`, rather than a URL or a path relative to the current page. A missing configured file produces a `field_invalid` warning and is skipped.
+
+An explicit path does not replace discovery. Margin appends the selected file after the discovered files, even if discovery already included it. To append several files in a chosen order, use an array of paths instead of a string.
+
+Use CSS custom properties for shared colors, and targeted selectors for article styles. For example, save this as `styles.css`:
+
+```css
+:root {
+  --color-fd-primary: #7c3aed;
+}
+
+.dark {
+  --color-fd-primary: #a78bfa;
+}
+
+.prose {
+  line-height: 1.75;
+}
+```
+
+The example sets a primary color for each appearance and adjusts article line spacing. Sanitized site CSS loads after the generated theme tokens, so site CSS can override those tokens through the CSS cascade.
+
+After rebuilding or deploying, inspect the page in both appearances. In the browser console, read the primary token to confirm the stylesheet loaded:
+
+```js
+getComputedStyle(document.documentElement)
+  .getPropertyValue("--color-fd-primary")
+  .trim()
+```
+
+With the example stylesheet, the result is `#7c3aed` in light appearance and `#a78bfa` in dark appearance.
+
+## Disable custom CSS
+
+Set `x-margin.css` to `null` to disable all site-stylesheet injection, including discovered files:
+
+```json
+{
+  "x-margin": {
+    "css": null
+  }
+}
+```
+
+Removing the `css` field restores discovery. An empty array does not disable discovery; it only appends no explicit paths. The `null` setting does not remove the framework stylesheet or generated theme tokens.
+
+## Adjust layout dimensions
+
+Configure dimensions through `x-margin.layout`. Each dimension is a string; the following values are examples, not defaults:
+
+```json
+{
+  "x-margin": {
+    "layout": {
+      "contentWidth": "1440px",
+      "sidebarWidth": "18rem",
+      "tocWidth": "16rem",
+      "headerHeight": "4rem",
+      "tabMode": "top"
+    }
+  }
+}
+```
+
+These keys emit layout custom properties:
+
+| Key | CSS custom property | Purpose |
+| --- | --- | --- |
+| `contentWidth` | `--fd-layout-width` | Overall layout width cap, not just the article text column |
+| `sidebarWidth` | `--fd-sidebar-width` | Sidebar column width |
+| `tocWidth` | `--fd-toc-width` | Table-of-contents column width |
+| `headerHeight` | `--fd-header-height` | Header-height token |
+
+Dimensions accept nonnegative numbers followed by `px`, `rem`, `em`, `vh`, `vw`, `%`, or `ch`, such as `1440px` or `18.5rem`. A `calc(...)` expression is also accepted if it contains no semicolons, braces, or angle brackets. Unitless numbers, negative values, and keywords such as `auto` are rejected with a `field_invalid` warning.
+
+Omitted dimensions do not emit an override. The active preset, page mode, and responsive layout supply the resulting dimensions; there is no single set of fixed dimension defaults across sites and viewports. Setting a column width does not force a hidden mobile sidebar or TOC to remain visible.
+
+`tabMode` accepts only `top` and `auto`. The resolved configuration currently defaults to `auto`.
+
+## Stay within styling restrictions
+
+Margin parses and sanitizes stylesheets before serving them. Inspect build diagnostics when a rule disappears rather than assuming the original stylesheet is served unchanged.
+
+| Restriction | Behavior |
+| --- | --- |
+| Total CSS size | Maximum 262,144 authored UTF-8 bytes per content version (256 KiB). A file that would exceed the remaining budget is skipped with `css_oversize`. Explicitly appended files count again. |
+| Imports | HTTPS imports from `fonts.googleapis.com` are extracted for font resolution. Other `@import` rules are removed. |
+| Asset URLs | Local asset references are rewritten to served assets when found. External asset URLs require an allowed HTTP or HTTPS host. Google Fonts hosts `fonts.googleapis.com` and `fonts.gstatic.com` are allowed by default; add other hosts through `x-margin.assets.allowExternal`. |
+| Executable or unsafe declarations | `behavior`, `-moz-binding`, `expression(...)`, disallowed URLs, and declarations containing a literal `<` are removed. |
+| Global layout rules | Layout-affecting declarations targeting a simple `:root`, `html`, or `body` selector are moved to `#nd-docs-layout`. More complex global layout rules that cannot be safely scoped are dropped. |
+| Custom properties | Custom properties remain on their original selectors, including `:root` and `.dark`, so portal-mounted controls can inherit the theme. |
+| Parse failures | Recoverable syntax problems produce `css_sanitized` warnings. CSS that cannot be parsed is skipped. |
+
+An `@font-face` rule with a disallowed source URL is removed. A local asset reference that cannot be found produces `asset_missing`; include the asset in the admitted docs files before rebuilding.
+
+CSS can change article typography, sidebar backgrounds, and component styling within these restrictions. CSS cannot install a site-authored layout engine, replace framework components with arbitrary executable variants, or load arbitrary external scripts. Theme presets and page modes select framework-provided layouts; they are not a mechanism for supplying host code.

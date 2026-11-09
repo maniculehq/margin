@@ -1,0 +1,107 @@
+/*
+ * Background decorations (§4.2). `background.decoration` is written to
+ * `data-decoration` on <html> (see routes/__root.tsx). `gradient` and `grid`
+ * paint into a pseudo-element behind the docs content; `windows` is a
+ * framework component (components/decoration-windows.tsx). All are aria-hidden,
+ * pointer-transparent, brand-tinted from the resolved palette, and fade out so
+ * body text stays fully legible in light and dark.
+ */
+
+/* gradient + grid share a back-plane: isolate a stacking context on the layout
+ * so the z-index:-1 pseudo paints above the layout background but below every
+ * content descendant (which sits at z-index auto/positive). */
+[data-decoration="gradient"] #nd-docs-layout,
+[data-decoration="grid"] #nd-docs-layout {
+    position: relative;
+    isolation: isolate;
+}
+[data-decoration="gradient"] #nd-docs-layout::before,
+[data-decoration="grid"] #nd-docs-layout::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* GRADIENT — a soft brand-tinted radial wash falling from the top. */
+[data-decoration="gradient"] #nd-docs-layout::before {
+    height: 520px;
+    background: radial-gradient(
+        120% 520px at 50% -12%,
+        color-mix(in oklab, var(--color-fd-primary) 14%, transparent),
+        transparent 72%
+    );
+}
+
+/* GRID — a faint square grid, masked to fade into the page. */
+[data-decoration="grid"] #nd-docs-layout::before {
+    height: 560px;
+    background-image:
+        linear-gradient(
+            to right,
+            color-mix(in oklab, var(--color-fd-border) 55%, transparent) 1px,
+            transparent 1px
+        ),
+        linear-gradient(
+            to bottom,
+            color-mix(in oklab, var(--color-fd-border) 55%, transparent) 1px,
+            transparent 1px
+        );
+    background-size: 44px 44px;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+}
+
+/* WINDOWS — floating window-chrome shapes behind the top of the page. The fixed
+ * layer sits at z-index:0; the docs layout is lifted to z-index:1 so content
+ * always paints in front. */
+[data-decoration="windows"] #nd-docs-layout {
+    position: relative;
+    z-index: 1;
+}
+.fd-decoration-windows {
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 560px;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+}
+.fd-decoration-window {
+    position: absolute;
+    border-radius: 1rem;
+    border: 1px solid
+        color-mix(in oklab, var(--color-fd-border) 70%, transparent);
+    background-color: color-mix(
+        in oklab,
+        var(--color-fd-primary) 6%,
+        var(--color-fd-card)
+    );
+    box-shadow: 0 24px 60px -32px
+        color-mix(in oklab, var(--color-fd-primary) 40%, transparent);
+}
+.fd-decoration-window:nth-child(1) {
+    width: 46%;
+    height: 300px;
+    inset-inline-start: -6%;
+    top: 40px;
+    transform: rotate(-4deg);
+}
+.fd-decoration-window:nth-child(2) {
+    width: 40%;
+    height: 260px;
+    inset-inline-end: -4%;
+    top: 20px;
+    transform: rotate(3deg);
+}
+.fd-decoration-window:nth-child(3) {
+    width: 30%;
+    height: 200px;
+    inset-inline-start: 36%;
+    top: 130px;
+    transform: rotate(-1.5deg);
+    opacity: 0.7;
+}

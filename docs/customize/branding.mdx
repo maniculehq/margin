@@ -1,0 +1,123 @@
+---
+title: Set logos, favicons, and icons
+description: Configure brand assets and choose icons for navigation and page content.
+---
+
+Set `logo` and `favicon` in `docs.json` to control the site header and browser tab. Leave either field out to use Margin's asset detection, or set it to `null` to opt out of detection.
+
+## Choose logo and favicon assets
+
+Keep brand images inside your docs directory and reference them from that directory's root. Repository image assets support SVG, PNG, JPEG (`.jpg` or `.jpeg`), WebP, GIF, and ICO. SVGs are sanitized during ingest; admitted local asset references become content-addressed URLs.
+
+Merge these fields into your existing `docs.json` after adding the referenced files:
+
+```json
+{
+  "logo": "/images/logo.svg",
+  "favicon": "/images/favicon.png"
+}
+```
+
+Explicit configuration takes precedence over conventional filenames. Without an explicit value, Margin uses the first available choice in each cascade:
+
+| Asset | Detection order, highest priority first |
+| --- | --- |
+| Logo | A complete `logo/light.svg` and `logo/dark.svg` pair; then `logo.svg`; then `logo.png`; then `logo/logo.svg`; then `logo/logo.png`; then `logo/logo.gif`, `logo/logo.jpeg`, `logo/logo.jpg`, or `logo/logo.webp` in filename order. |
+| Favicon | `favicon.ico`; then `favicon.svg`; then `favicon.png`; then a PNG derived from the resolved local light logo; then a generated monogram. |
+
+These paths are relative to the docs directory. Detection compares paths without case sensitivity. An incomplete `logo/light.svg` and `logo/dark.svg` pair is not selected as a pair.
+
+If several conventional logos exist, the highest-priority choice wins and ingest reports `logo_multiple`. If no logo is selected, the header displays the site name. The generated monogram favicon uses the first character of the site name and the primary color, with `#18181b` as the color fallback. If the light logo cannot be decoded for favicon generation, ingest reports `asset_missing` and uses the monogram.
+
+Set `"logo": null` to show the site name instead of detecting an image. Set `"favicon": null` to emit no favicon links instead of detecting or generating one. Use local files for predictable branding; a missing file reference reports `asset_missing`.
+
+## Set light and dark logos
+
+Use an object when the header needs different images for each theme. Both `light` and `dark` are required. The optional `href` is an absolute URL that changes the logo's click destination; without it, the logo links to `/`.
+
+Merge this object into `docs.json`, with both files present:
+
+```json
+{
+  "logo": {
+    "light": "/images/logo-light.svg",
+    "dark": "/images/logo-dark.svg",
+    "href": "https://example.com"
+  }
+}
+```
+
+A string logo uses the same image in both themes. For an automatically detected single logo, Margin also checks for a sibling with `-dark` before the extension, such as `logo-dark.svg` beside `logo.svg`. If the sibling does not exist, the selected image appears in both themes. An explicit light/dark object does not fill in a missing member automatically.
+
+Favicons also accept a light/dark object. The browser selects the icon through its `prefers-color-scheme` preference, which can differ from the theme selected in the docs site:
+
+```json
+{
+  "favicon": {
+    "light": "/images/favicon-light.svg",
+    "dark": "/images/favicon-dark.svg"
+  }
+}
+```
+
+After publishing, check the header in both site themes and the tab icon in both browser color preferences. Local image URLs should resolve under `/_assets/` rather than the original file paths.
+
+## Add navigation icons
+
+Set `icons.library` to choose an icon naming vocabulary. The default is `fontawesome`; `lucide` is also supported. Margin maps those names to its bundled Hugeicons glyphs, so the rendered artwork is not necessarily identical to the original library. `tabler` is accepted as best-effort compatibility, emits `icon_lib_unsupported`, and still resolves names through the available map.
+
+Add `icon` to navigation groups or tabs. Navigation icons accept a name, a local image path, or an HTTP(S) image URL. Use a leading `/` for local paths relative to the docs root.
+
+This example assigns a named icon to a tab and an SVG image to its group. Merge the structure with your existing navigation and replace the page paths with your own:
+
+```json
+{
+  "icons": { "library": "lucide" },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "Build",
+            "icon": "/images/build.svg",
+            "pages": ["quickstart"]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Icon names accept kebab-case or PascalCase, such as `book-open` or `BookOpen`. An unknown name reports `icon_unresolved` and renders the default glyph. A page's own navigation icon comes from the page's frontmatter, not an invented per-page object in the navigation list.
+
+## Add icons to pages
+
+Set `icon` in a page's frontmatter to give that page a navigation icon. The same name and image-reference forms apply.
+
+For example, start a page with this metadata:
+
+```mdx
+---
+title: Quickstart
+icon: rocket
+---
+```
+
+Use the `Icon` component for an inline icon, or the `icon` property on a `Card`. Write literal string attributes so ingest can resolve the icon names.
+
+This MDX adds an inline icon and a linked card:
+
+```mdx
+<Icon icon="rocket" size={20} color="#2563eb" /> Publish your first page.
+
+<Card title="Quickstart" icon="book-open" href="/quickstart">
+  Publish a documentation page.
+</Card>
+```
+
+`Icon` defaults to 16 pixels. Positive sizes up to 128 pixels are accepted; other sizes fall back to 16. The `color` property colors named glyphs, not image files. A local image can also appear inline with `<Icon icon="/images/build.svg" size={20} />`. Raw SVG markup is not a supported `icon` value.
+
+Publish the changed configuration, pages, and assets together. Confirm that the navigation shows the intended glyphs and that no `icon_unresolved` or `asset_missing` diagnostics refer to the new files.

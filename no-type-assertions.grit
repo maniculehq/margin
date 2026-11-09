@@ -1,0 +1,11 @@
+language js
+
+or {
+    TsAsExpression(ty=$type) where {
+        not $type <: r"const",
+        register_diagnostic(span=$type, message="Avoid `as` type assertions: derive or import the real type, or validate with Zod.")
+    },
+    TsTypeAssertionExpression(ty=$type) where {
+        register_diagnostic(span=$type, message="Avoid type assertions: derive or import the real type, or validate with Zod.")
+    }
+}

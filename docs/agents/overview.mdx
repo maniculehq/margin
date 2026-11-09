@@ -1,0 +1,57 @@
+---
+title: How Margin serves agents
+description: Choose how agents discover and retrieve your documentation.
+---
+
+Margin publishes documentation for two readers: people reading a rendered page and agents retrieving text or using tools. An agent can fetch one page, discover the documentation corpus, or connect an MCP client without first parsing the site's HTML navigation.
+
+## Choose a reading format
+
+Each page has a human rendition, rendered from MDX, and an agent Markdown rendition. The Markdown can include instructions that are absent from the human page and omit content intended only for people. It is not simply the visible HTML with its tags removed.
+
+A rendition determines the content a reader receives. A URL suffix or HTTP request determines how to retrieve it: `/<page>.md` returns agent Markdown, while the normal page URL returns the rendered human page. A request to the normal page URL with `Accept: text/markdown`, or with `?format=markdown`, returns the same Markdown as the `.md` route.
+
+PDF downloads use `/<page>.pdf` and contain the human rendition, with agent-only blocks excluded. The root page uses `/index.md` and `/index.pdf`.
+
+To retrieve this page as agent Markdown, set `DOCS_URL` to your documentation site's base URL and run:
+
+```sh
+export DOCS_URL="https://docs.example.com"
+curl --fail --silent --show-error \
+  --header 'Accept: text/markdown' \
+  "$DOCS_URL/agents/overview"
+```
+
+A successful request returns Markdown with a page heading, not an HTML document. The response content type is `text/markdown; charset=utf-8`. A missing Markdown page returns HTTP `404` with a `Page not found` heading, a Markdown explanation, and suggested pages; use the index to find a published path.
+
+| Reader intent | Interface | Reference |
+| --- | --- | --- |
+| Read a known page as text | Page `.md` route or `Accept: text/markdown` | [Markdown and PDF](/agents/markdown) |
+| Find the right page before fetching it | `/llms.txt`, `/sitemap.md`, or the corpus manifest | [llms.txt](/agents/llms-txt) and [link relations](/agents/link-relations) |
+| Retrieve the corpus in one request | `/llms-full.txt`, subject to its serving budget | [llms.txt](/agents/llms-txt) |
+| Search and read through an agent's tool connection | `/api/mcp` | [MCP](/agents/mcp) |
+| Load published task instructions and supporting files | `/skill.md` or the published skills manifest | [Skills](/agents/skills) |
+
+## Find documentation without crawling HTML
+
+Start with `/llms.txt` when an agent needs to select pages by title and description. Use `/sitemap.md` when navigation structure matters. Fetch `/llms-full.txt` when the agent needs the full documentation text together, but account for the configured serving budget rather than assuming every corpus fits in one response.
+
+For programmatic discovery, `/.well-known/llms-manifest.json` describes the available corpus surfaces. Follow the site's manifest and HTTP `Link` headers instead of constructing URLs from page titles. OpenAPI documents, when present, are discoverable through `/.well-known/api-catalog`.
+
+These surfaces expose documentation without requiring an HTML crawl. They do not promise that an external model will recommend the product or rank its pages. See [llms.txt](/agents/llms-txt) for index settings and scope, and [link relations](/agents/link-relations) for discovery identifiers.
+
+## Connect tools or publish instructions
+
+The built-in MCP server is on by default at `/api/mcp` and uses Streamable HTTP. Connect it when an agent needs documentation search and page retrieval as tools. Clients can discover the server through `/.well-known/mcp.json`; the [MCP reference](/agents/mcp) covers the connection and available operations.
+
+Skills supply instructions for an agent to follow rather than a retrieval protocol. `/skill.md` provides the site-level documentation skill, and `/AGENTS.md` provides site-level agent instructions. For authored skills, `/.well-known/agent-skills/index.json` lists published skill folders and links to their `SKILL.md` files and supporting files. Follow those links for exact paths. Publishing a skill does not install or execute a server-side plugin. See [Skills](/agents/skills) for publishing requirements.
+
+The optional reader-facing Ask AI assistant answers questions in the documentation site and cites the pages it uses. It serves a different interaction from an external agent's MCP connection. Agents can use Markdown and MCP retrieval without a reader starting an Ask AI conversation.
+
+## Control agent-facing content
+
+Unmarked content is available to both audiences. Use `<Agent>` or `<Visibility for="agents">` for content that belongs in agent Markdown but not the rendered human page. Use `<Human>` for content that belongs in the human page and PDF but not agent Markdown. These controls change the published renditions; they are not authorization checks. See [Visibility controls](/content/visibility) for authoring examples.
+
+Content policy metadata expresses preferences separately from rendition visibility. The `x-margin.agents.contentSignals` settings in `docs.json` describe preferences for search, AI input, and AI training. All three signals default to `true`. Margin publishes the signals in `robots.txt` and the `Content-Signal` response header; the signals do not prevent clients from copying public content.
+
+Hiding a page from navigation does not make it private either. Use the [content policy reference](/agents/content-policy) to configure published preferences, and keep material that must remain private out of public documentation.

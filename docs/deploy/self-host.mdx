@@ -1,0 +1,107 @@
+---
+title: Self-host Margin
+description: Run the built Node 24 server against Postgres and prepare a repeatable release process.
+---
+
+Self-host Margin to manage your own runtime, Postgres, releases, and analytics. If you just want a live documentation site, [deploy on Manicule](/deploy/manicule) free, with no limits, an included database, and the latest release, without servers or environment variables to configure.
+
+Deploy Margin outside Vercel by building its Node server, loading your docs into Postgres, and routing your public domain to the running process. The release build runs migrations and ingestion before the new server receives traffic.
+
+## Prepare Node 24 and Postgres
+
+Use Node.js 24 or newer on the runtime host and a reachable Postgres database. Install Bun on the build and release runner: the repository's build, migration, and ingest scripts use Bun even though the production server runs with Node.
+
+Run release commands from the Margin repository root, where `package.json`, `scripts/`, and `drizzle/` live. Keep your documentation in `docs/`, or set `DOCS_DIR` to the folder containing your docs. Without `DOCS_DIR`, ingest uses `docs/` if present, otherwise the repository root when it contains `docs.json`.
+
+Build with `NITRO_PRESET=node-server`. The default preset is `vercel`, which produces a different deployment artifact. Deploy the complete `.output` directory, including its server and public files, rather than copying only the server entry point. Build for the target runtime platform because the output includes native dependencies.
+
+## Configure the server environment
+
+Set `DATABASE_URL` to the Postgres connection string used by the server and ingest. Set `SITE_ORIGIN` to the site's public URL, not the internal upstream address. Off Vercel, Margin requires an explicit `SITE_ORIGIN`; it supplies public URLs such as canonicals, sitemaps, and Open Graph images and is also included in the browser build.
+
+Export these values in the build runner and the server's launch environment. This example binds the server to loopback for a reverse proxy on the same host; replace the database credentials and domain before running it.
+
+```bash
+export DATABASE_URL='postgres://margin:replace-me@db.example.com:5432/margin'
+export SITE_ORIGIN='https://docs.example.com'
+export NITRO_PRESET='node-server'
+export NODE_ENV='production'
+export NITRO_HOST='127.0.0.1'
+export PORT='3000'
+```
+
+Nitro accepts `NITRO_HOST` or `HOST` for the listening address, and `NITRO_PORT` or `PORT` for the port. Its default port is `3000`. If the proxy runs on another host, choose an address it can reach and restrict direct access to the upstream. See [Nitro's Node server settings](https://nitro.build/deploy/node) for the runtime controls.
+
+When the main database URL uses a transaction-mode pooler, also supply `DATABASE_URL_UNPOOLED` with a direct connection. Migrations prefer that URL, and ingest uses it for session-level locking. For a database signed by a private CA, export `NODE_EXTRA_CA_CERTS` with the CA bundle path before starting build, migration, ingest, and server processes; certificate verification remains enabled.
+
+Do not rely on a local `.env` file to configure the production Node process. Export the environment explicitly, including at build time. Keep the same `SITE_ORIGIN` at build and runtime; rebuild when the public address changes. See the [full environment variable reference](/deploy/environment-variables) for optional integrations and settings.
+
+## Build and start the server
+
+From the repository root, install dependencies and run the release build. Despite its name, `vercel-build` also builds the self-hosted server when `NITRO_PRESET=node-server` is set.
+
+```bash
+bun install --frozen-lockfile
+bun run vercel-build
+```
+
+The command must exit successfully before you deploy `.output`. It prints the resolved content version, runs migrations, builds the application, checks the bundle budget, and ingests the docs. Successful migrations print `[db:migrate] database is up to date`; ingest reports the page count and content version, or that the version is already ingested.
+
+Start the production server from the directory containing `.output`, with the environment configured above. Keep this process running while the proxy serves requests.
+
+```bash
+node .output/server/index.mjs
+```
+
+The repository's `bun run start` command runs `vite preview`; use the built Node entry point for this deployment. `bun run build` builds icons and the application only, without the migration and ingest release steps.
+
+In a second terminal on the server host, check that Margin can serve the ingested documentation index. The headers reproduce the public host and HTTPS scheme that the proxy will send.
+
+```bash
+curl --fail --silent --show-error \
+  --header 'Host: docs.example.com' \
+  --header 'X-Forwarded-Proto: https' \
+  'http://127.0.0.1:3000/llms.txt'
+```
+
+Expect HTTP `200` with a text documentation index. After connecting the proxy, open a documentation page on the public domain and confirm that its styles load and its links stay on that domain.
+
+## Run migrations and ingest in CI
+
+Run one release build per release, not once per server replica or incoming request. The wrapper executes these tasks in order:
+
+1. Build the icon map.
+2. Apply pending database migrations.
+3. Build the application with Vite.
+4. Run the bundle-budget test.
+5. Ingest the documentation into Postgres.
+
+The wrapper resolves `DOCS_CONTENT_SHA` once and passes the same key to the build and ingest. Its fallback order is explicit `DOCS_CONTENT_SHA`, `VERCEL_GIT_COMMIT_SHA`, Git HEAD, then a generated `dev-<milliseconds>` key. The built server selects that content version rather than following whichever release most recently moved the site's current pointer.
+
+Use this vendor-neutral CI sequence from the repository root, with the server environment already exported. `set -e` prevents later steps from running after a failure. Start the resulting server and pass the local check before routing traffic to it.
+
+```bash
+set -e
+export DOCS_CONTENT_SHA="$(git rev-parse HEAD)"
+bun install --frozen-lockfile
+bun run vercel-build
+# Deploy the complete .output directory to the runtime host.
+# Start node .output/server/index.mjs with the server environment.
+# Check /llms.txt, then route traffic to this release.
+```
+
+The standalone commands are `bun run db:migrate` and `bun run ingest`. They are already included in `vercel-build`; do not add duplicate migration or ingest jobs around the wrapper. Ingest must follow a successful application build because production ingest advances the current content pointer and collects old content versions. A ready version with the same key is reused; use a new content key for a normal release.
+
+The wrapper stops at the first failed step and returns a nonzero exit code. A migration failure stops the build before ingestion; pending migrations run in a transaction. An ingest validation failure also stops the release. Keep the existing server receiving traffic instead of promoting the failed artifact. Successful migrations are not undone if a later build or ingest step fails, so review schema compatibility with the server that remains live.
+
+Keep `DOCS_INGEST` at its default `on` for this sequence. `DOCS_INGEST=off` skips ingestion even when the build succeeds. Do not use it for a new content version unless that version is already available in the database. For selecting previous content, see [Rollbacks](/deploy/rollbacks).
+
+## Serve the site behind a reverse proxy
+
+Terminate HTTPS at your reverse proxy and forward requests to `http://127.0.0.1:3000` for the example environment. Route the whole site to Margin, including documentation, API routes, discovery files, and `/_margin/assets/`; the Node output serves its static assets too. Preserve request methods, bodies, query strings, and streaming responses.
+
+Set the upstream `Host` header to the public host (`docs.example.com`) and `X-Forwarded-Proto` to the visitor's scheme (`https` after TLS termination). Margin builds request-derived origins from `Host` and the first `X-Forwarded-Proto` value, not from `X-Forwarded-Host`. These values also affect server-function origin checks. Have the trusted proxy overwrite incoming forwarded headers rather than accepting arbitrary client values. If forwarding client addresses, send a trusted `X-Forwarded-For` value because rate-limit and feedback code use its first address off Vercel.
+
+Do not assume `NODE_ENV=production` turns on host redirects. The built-in extension enables canonical-host `308` redirects only when `VERCEL_ENV=production`, `DOCS_CANONICAL_REDIRECT` is not `0`, and the site has no base path. A plain Node deployment can enforce its canonical host at the reverse proxy. If intentionally setting `VERCEL_ENV=production`, preserve the public host upstream or set `DOCS_CANONICAL_REDIRECT=0` to avoid redirecting repeatedly through the proxy.
+
+To serve under a path such as `https://example.com/docs`, include `/docs` in `SITE_ORIGIN` at build and runtime. Forward that prefix unchanged: Margin removes it internally and adds it to generated links. Do not strip `/docs` in the proxy. Nitro maps prefixed asset paths for base paths up to four segments deep. Check the documentation page, its assets, and `/docs/llms.txt` at the public address before routing general traffic.

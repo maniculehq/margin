@@ -1,0 +1,105 @@
+---
+title: Discover pages with llms.txt
+description: Select a page index or full-text export for the documentation scope you need.
+---
+
+Fetch `/llms.txt` to find relevant documentation pages without crawling HTML. Fetch `/llms-full.txt` when the task needs the text of many pages and the agent has room for the larger response. Margin generates both files by default.
+
+## Choose an index or full-text export
+
+| Route | Contents | Choose it when |
+| --- | --- | --- |
+| `/llms.txt` | Page titles, links, and descriptions where available | The agent needs to select a few pages before reading them. |
+| `/llms-full.txt` | Aggregated agent-facing Markdown for the indexed pages | The agent needs to read across the documentation in one response. |
+
+Replace the example address with your documentation site's public URL, including its base path if configured. This request downloads the index for inspection:
+
+```sh
+DOCS_URL='https://docs.example.com'
+curl --fail --silent --show-error \
+  "$DOCS_URL/llms.txt" \
+  --output llms.txt
+```
+
+Follow the returned page links to read only the material the task needs. For a full-text export instead, request the companion file:
+
+```sh
+curl --fail --silent --show-error \
+  "$DOCS_URL/llms-full.txt" \
+  --output llms-full.txt
+```
+
+The full export has a 4,000,000-character budget. It stops between pages rather than cutting a page in half, and adds a truncation comment when the remaining pages do not fit. Release-history pages come last. If the file contains `llms-full.txt truncated`, fetch the missing pages individually through the index; a successful download does not guarantee that every page fit.
+
+## Read the generated contents
+
+The index starts with the site's name and, when configured, its description. Page entries use the page title as link text and append the page description when one exists. Local pages link to their `.md` routes; pages configured as external pointers link directly to their destinations.
+
+This illustrative excerpt shows the format, not a response from a production site:
+
+```text
+# Example Docs
+
+> Documentation for the example service.
+
+## Guides
+
+- [Quickstart](https://docs.example.com/quickstart.md): Send your first request.
+- [Authentication](https://docs.example.com/authentication.md): Configure request credentials.
+
+## Optional
+
+- [Full documentation](https://docs.example.com/llms-full.txt): every page in one file
+```
+
+Sections follow navigation groups, and pages retain authored navigation order rather than alphabetical order. The index includes indexable pages, so a page being reachable by URL does not by itself guarantee an index entry. Release-history links appear under `Optional`, alongside the full-export link and a recent-changes link when that surface is enabled.
+
+The site-root index also points to other configured versions and languages through their own scoped indexes. An `API specifications` section links available OpenAPI documents unless `markdown.schema` is `false`.
+
+When an index exceeds 100,000 characters, Margin replaces its page listing with links to sub-indexes under `/_llms/` within the same scope. Follow the returned links rather than constructing their names: sections can split again, and flat lists can split into numbered parts.
+
+## Configure the index preamble
+
+`x-margin.agents.indexPreamble` in `docs.json` controls the generated `Documentation Index` blockquote at the beginning of standalone Markdown page responses. It defaults to `true`. The block points to the page's own version-and-locale index and full export, plus the MCP server and agent-surface manifest.
+
+Merge this fragment into `docs.json` to disable that block:
+
+```json
+{
+  "x-margin": {
+    "agents": {
+      "indexPreamble": false
+    }
+  }
+}
+```
+
+This setting is a boolean, not custom preamble text. It does not disable `/llms.txt` or `/llms-full.txt`, and it does not change their page listings.
+
+## Select a version and locale
+
+Both files support URL-path scoping. A scoped request includes only indexable pages whose served URL starts with that sequence of path segments. Use the public version label and locale tag from the site's URLs, not a source-directory name.
+
+The following routes illustrate a site with a `v1` version and a non-default `fr` locale; they require those scopes to exist:
+
+| Scope | Index | Full export |
+| --- | --- | --- |
+| Site root | `/llms.txt` | `/llms-full.txt` |
+| Version | `/v1/llms.txt` | `/v1/llms-full.txt` |
+| Locale | `/fr/llms.txt` | `/fr/llms-full.txt` |
+| Locale and version | `/fr/v1/llms.txt` | `/fr/v1/llms-full.txt` |
+| Documentation subtree | `/guides/llms.txt` | `/guides/llms-full.txt` |
+
+For example, fetch the index beneath the French `v1` URL prefix:
+
+```sh
+curl --fail --silent --show-error \
+  "$DOCS_URL/fr/v1/llms.txt" \
+  --output llms-fr-v1.txt
+```
+
+Locale selection happens first: a leading configured non-default locale tag selects that locale. Otherwise, Margin uses the default locale. A locale tag takes precedence if a version has the same label.
+
+After locale selection, a leading configured local version label selects that version. Without a matching version label, Margin selects the configured default version; if no default is marked, it selects the first local version. A default version spanning the repository root uses the unprefixed tree.
+
+These selection defaults do not remove the requested path filter. An unknown prefix does not return the unscoped index: if no indexable pages exist beneath a nonempty scope, both routes return HTTP `404` with `Not Found`. Start with the site-root index and follow its version and language links when the correct prefix is unknown.

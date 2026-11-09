@@ -1,0 +1,24 @@
+{
+    "include": ["**/*.ts", "**/*.tsx"],
+    "compilerOptions": {
+        "strict": true,
+        "esModuleInterop": true,
+        "jsx": "react-jsx",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "lib": ["DOM", "DOM.Iterable", "ES2022"],
+        "types": ["vite/client", "bun"],
+        "isolatedModules": true,
+        "resolveJsonModule": true,
+        "skipLibCheck": true,
+        "target": "ES2022",
+        "allowImportingTsExtensions": true,
+        "allowJs": true,
+        "forceConsistentCasingInFileNames": true,
+        "paths": {
+            "@/*": ["./src/*"],
+            "#docs-extensions": ["./src/extensions/default.ts"]
+        },
+        "noEmit": true
+    }
+}

@@ -1,0 +1,38 @@
+---
+title: Acme Payments
+description: Accept payments anywhere with the Acme Payments API.
+icon: CreditCard
+---
+
+The Acme Payments API lets you create charges, manage customers, and receive
+webhooks from a single REST surface. Every endpoint lives under one base URL:
+
+```txt
+https://api.acme.dev/v1
+```
+
+## Core concepts
+
+- **Charges** — a one-time payment against a card or wallet. Charges are
+  immutable once captured; refunds create a linked `refund` object instead.
+- **Customers** — reusable payment profiles. Attach a payment method once and
+  charge it later without handling card data yourself.
+- **Idempotency** — every `POST` accepts an `Idempotency-Key` header. Retries
+  with the same key return the original result instead of double-charging.
+
+## Authentication
+
+Authenticate with a secret API key in the `Authorization` header:
+
+```bash
+curl https://api.acme.dev/v1/charges \
+  -H "Authorization: Bearer sk_test_51AcmeDemoKey"
+```
+
+Keys prefixed `sk_test_` operate on test data only — no real money moves.
+Keys prefixed `sk_live_` are production keys; never ship them to a browser.
+
+<Columns cols={2}>
+  <Card title="Quickstart" href="/docs/quickstart" description="Create your first charge in under five minutes." />
+  <Card title="Webhooks" href="/docs/webhooks" description="Verify signatures and react to payment events." />
+</Columns>

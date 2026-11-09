@@ -1,0 +1,21 @@
+{
+    "$schema": "https://mintlify.com/docs.json",
+    "name": "Cross-tab docs",
+    "navigation": {
+        "tabs": [
+            {
+                "tab": "Guides",
+                "groups": [{ "group": "Guides", "pages": ["index"] }]
+            },
+            {
+                "tab": "API",
+                "groups": [
+                    {
+                        "group": "Reference",
+                        "pages": ["api-reference", "status"]
+                    }
+                ]
+            }
+        ]
+    }
+}

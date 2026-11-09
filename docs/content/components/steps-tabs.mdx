@@ -1,0 +1,271 @@
+---
+title: Organize steps, tabs, and code groups
+description: Present ordered actions, alternative examples, and optional detail.
+---
+
+Use steps when every action must happen in order. Use tabs when the reader chooses one alternative, and code groups when those alternatives are code examples. Keep required instructions visible; collapse only supplemental detail.
+
+## Sequence actions with steps
+
+Place each action in a `Step` directly inside `Steps`. Give the action a title and include the result the reader should confirm before continuing. A step can contain prose, code, or a set of tabs when the action differs by environment.
+
+This procedure creates a local file, then confirms its contents. Run both commands in the same directory.
+
+<Steps>
+  <Step title="Create a test file">
+    Write a single line to `component-check.txt`.
+
+    ```sh title="Create file"
+    printf 'ready\n' > component-check.txt
+    ```
+
+    The command finishes without output and creates the file.
+  </Step>
+  <Step title="Read the test file">
+    Print the file to confirm that the write succeeded.
+
+    ```sh title="Read file"
+    cat component-check.txt
+    ```
+
+    Expected output is `ready` on one line.
+  </Step>
+</Steps>
+
+Author the procedure with this MDX:
+
+````mdx title="Ordered procedure"
+<Steps>
+  <Step title="Create a test file">
+    Write a single line to `component-check.txt`.
+
+    ```sh title="Create file"
+    printf 'ready\n' > component-check.txt
+    ```
+
+    The command finishes without output and creates the file.
+  </Step>
+  <Step title="Read the test file">
+    Print the file to confirm that the write succeeded.
+
+    ```sh title="Read file"
+    cat component-check.txt
+    ```
+
+    Expected output is `ready` on one line.
+  </Step>
+</Steps>
+````
+
+The containers and step labels have these props:
+
+| Component | Prop | Behavior |
+| --- | --- | --- |
+| `Steps` | `children` | Step content; no configuration props. |
+| `Step` | `title` | Optional label above the content. |
+| `Step` | `icon` | Optional icon that replaces the number marker. |
+| `Step` | `stepNumber` | Positive number or numeric string that sets this step's number. Later steps continue counting from it. |
+| `Step` | `titleSize` | `"h2"` or `"h3"` renders the title as that heading level. Other values, including omission, render a paragraph label. |
+| `Step` | `children` | The action, code, and expected result. |
+
+## Separate alternatives with tabs
+
+Use `Tabs` for mutually exclusive instructions such as operating systems or deployment targets. Put `Tab` elements directly inside `Tabs`, with a distinct `title` on each. Do not put a wrapper around the tab children: the parent reads their labels and assigns panel values.
+
+This pair presents alternative instructions without making either one a prerequisite for the other:
+
+<Tabs defaultValue="Local">
+  <Tab title="Local">
+    Run the file check in a working directory on your machine.
+  </Tab>
+  <Tab title="Container">
+    Run the file check inside the container whose filesystem you want to test.
+  </Tab>
+</Tabs>
+
+Author those alternatives with this MDX:
+
+```mdx title="Alternative instructions"
+<Tabs defaultValue="Local">
+  <Tab title="Local">
+    Run the file check in a working directory on your machine.
+  </Tab>
+  <Tab title="Container">
+    Run the file check inside the container whose filesystem you want to test.
+  </Tab>
+</Tabs>
+```
+
+Use these authoring props to name panels and control selection:
+
+| Component | Prop | Behavior |
+| --- | --- | --- |
+| `Tabs` | `children` | Direct `Tab` children. |
+| `Tabs` | `defaultValue` | Initial tab label or authored child `value`; defaults to the first tab. |
+| `Tabs` | `groupId` | Optional override for the automatically generated synchronization group. |
+| `Tabs` | `persist` | Saves the selection across browser sessions; enabled by default. With `persist={false}`, grouped tabs still retain the choice in session storage. |
+| `Tab` | `title` | Visible tab label. Use a distinct string for each alternative. |
+| `Tab` | `icon` | Optional icon before the label. |
+| `Tab` | `value` | Fallback label when `title` is absent; also accepted by `defaultValue`. The parent assigns the final panel value. |
+| `Tab` | `children` | Content shown when selected. |
+
+Tabs with the same normalized label set synchronize their selection and retain the choice across navigation. A saved selection can override the initial default. Inactive content remains in the HTML but is hidden visually; tabs are not an access-control boundary.
+
+## Group code examples
+
+Use `CodeGroup` for equivalent examples in different languages or tools. Put code fences directly inside the group and give every fence a `title="…"`. The titles become selectable tab labels. Keep the inputs and expected results consistent across languages.
+
+Both examples print `ready` followed by a newline:
+
+<CodeGroup>
+
+```js title="JavaScript"
+console.log("ready");
+```
+
+```python title="Python"
+print("ready")
+```
+
+</CodeGroup>
+
+Author the parallel examples with this MDX:
+
+````mdx title="Parallel code examples"
+<CodeGroup>
+
+```js title="JavaScript"
+console.log("ready");
+```
+
+```python title="Python"
+print("ready")
+```
+
+</CodeGroup>
+````
+
+The group itself accepts only its content:
+
+| Component | Prop or metadata | Behavior |
+| --- | --- | --- |
+| `CodeGroup` | `children` | Direct code fences compiled into code tabs. |
+| Code fence | `title="…"` | Tab label for the example. |
+
+Code groups with matching label sets synchronize their code selection. Avoid duplicate labels; repeated labels receive numeric suffixes to keep them selectable.
+
+`CodeGroup` arranges examples but does not replace Markdown's code syntax. For language identifiers and standalone blocks, see [Format content](/content/formatting).
+
+## Collapse optional detail
+
+Use an `Accordion` for a supplemental explanation with a visible label. Use `AccordionGroup` to coordinate several explanations, and `Expandable` for compact nested detail such as child attributes. Do not hide a required action or its expected result inside any of them.
+
+A standalone accordion needs no surrounding group:
+
+<Accordion title="Remove the test file" id="remove-test-file">
+  Delete `component-check.txt` when the check is complete. Keep it if another example still needs it.
+</Accordion>
+
+Author the standalone explanation with this MDX:
+
+```mdx title="Standalone accordion"
+<Accordion title="Remove the test file" id="remove-test-file">
+  Delete `component-check.txt` when the check is complete. Keep it if another example still needs it.
+</Accordion>
+```
+
+Group related explanations to control how many can remain open:
+
+<AccordionGroup type="single" defaultValue="location">
+  <Accordion title="Where is the file?" value="location">
+    The file is in the directory where the write command ran.
+  </Accordion>
+  <Accordion title="What if it already exists?" value="overwrite">
+    The write command replaces its previous contents.
+  </Accordion>
+</AccordionGroup>
+
+Author that group with explicit values so its default does not depend on the display labels:
+
+```mdx title="Grouped explanations"
+<AccordionGroup type="single" defaultValue="location">
+  <Accordion title="Where is the file?" value="location">
+    The file is in the directory where the write command ran.
+  </Accordion>
+  <Accordion title="What if it already exists?" value="overwrite">
+    The write command replaces its previous contents.
+  </Accordion>
+</AccordionGroup>
+```
+
+For a shorter disclosure, `Expandable` supplies the show/hide wording:
+
+<Expandable title="file details">
+  The test file contains the word `ready` and a trailing newline.
+</Expandable>
+
+Author that detail with this MDX:
+
+```mdx title="Expandable detail"
+<Expandable title="file details">
+  The test file contains the word `ready` and a trailing newline.
+</Expandable>
+```
+
+These props control labels, initial state, and linking:
+
+| Component | Prop | Behavior |
+| --- | --- | --- |
+| `Accordion` | `title` | Visible disclosure label, not a document heading. |
+| `Accordion` | `value` | Selection identifier; defaults to the string form of `title`. Use unique values within a group. |
+| `Accordion` | `id` | Optional anchor and copy-link control. Loading the page with that hash opens the matching accordion. |
+| `Accordion` | `disabled` | Disables interaction with the item. |
+| `Accordion` | `children` | Supplemental content. |
+| `AccordionGroup` | `type` | `"single"` (default) or `"multiple"`. Single permits one open item; multiple permits several. |
+| `AccordionGroup` | `defaultValue` | Initially open value for single mode, or an array of values for multiple mode. With no value, all items start closed. |
+| `AccordionGroup` | `children` | Direct `Accordion` children. |
+| `Expandable` | `title` | Text after “Show” or “Hide”; defaults to `"child attributes"`. |
+| `Expandable` | `defaultOpen` | Opens the detail initially only when set to `{true}`; closed by default. |
+| `Expandable` | `children` | Nested supplemental content. |
+
+A standalone accordion starts closed and can be closed after opening. Single-mode groups also permit closing the open item. In multiple mode, write an array expression such as `defaultValue={["location", "overwrite"]}`. `Expandable` uses a native details disclosure and does not participate in accordion group state.
+
+## Use views
+
+Use consecutive `View` blocks for alternative versions of a larger passage selected from a dropdown. Each run of adjacent sibling views becomes one selector group. Blank lines between views are fine; intervening prose or another component starts a separate group.
+
+This pair renders a “Select view” control and displays one alternative at a time:
+
+<View title="Workstation">
+  Run the file check in your local working directory.
+</View>
+
+<View title="Build environment">
+  Run the file check in the build's working directory.
+</View>
+
+Author the views as separate blocks, without a group wrapper:
+
+```mdx title="View alternatives"
+<View title="Workstation">
+  Run the file check in your local working directory.
+</View>
+
+<View title="Build environment">
+  Run the file check in the build's working directory.
+</View>
+```
+
+The component has these authoring props:
+
+| Component | Prop | Behavior |
+| --- | --- | --- |
+| `View` | `title` | Nonempty literal string used as the selector label. Missing, empty, or nonliteral titles produce a warning and fall back to `View 1`, `View 2`, and so on within the group. |
+| `View` | `icon` | Optional icon shown beside the view label. |
+| `View` | `children` | The alternative passage. |
+
+Without site variation configuration, each group starts with its first view and keeps its selection local. With `variations.options` configured in `docs.json`, view titles match option labels case-insensitively. Matching groups share the selected option across the site, and the choice is saved in browser storage. The first configured option is the initial choice; a group without that option falls back to its first view. Matching menu choices appear in configuration order, followed by unmatched views in source order. Selecting an unmatched view changes only that group.
+
+Views render all alternatives into the HTML and hide inactive passages. A link to a heading inside a hidden view activates that view. Server-rendered HTML uses the default selection; a saved browser choice applies after mount.
+
+Do not author `ViewGroup`; the renderer creates the grouping. Inline `View` elements inside a paragraph are unsupported and render as their children with a warning. Views choose content variants, not human-versus-agent visibility.

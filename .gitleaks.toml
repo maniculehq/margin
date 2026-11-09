@@ -1,0 +1,66 @@
+# Gitleaks configuration (CI job `gitleaks`, and run locally with
+#   gitleaks detect --no-git --source . --config .gitleaks.toml).
+# Gitleaks' default rules apply; the rules below add the credentials this
+# framework reads from its environment and must never appear in the tree.
+
+title = "margin"
+
+[extend]
+useDefault = true
+
+# PostHog project API keys (POSTHOG_KEY). Project keys are publishable in a
+# browser bundle, but this framework only reads one server-side from the
+# environment, so a committed key is always a mistake.
+[[rules]]
+id = "posthog-project-api-key"
+description = "PostHog project API key"
+regex = '''\b(phc_[A-Za-z0-9]{20,})\b'''
+secretGroup = 1
+keywords = ["phc_"]
+
+# Hugeicons Pro license keys (HUGEICONS_PRO_TOKEN). The key has no fixed
+# prefix, so these rules match the places one is written down: the npm
+# registry auth line, Yarn's npmAuthToken, and a literal assignment to the
+# environment variable. Each accepts a single, double or backtick (template
+# literal) delimiter and captures the whole value, up to whitespace or a
+# quote, so the allowlist below cannot be satisfied by a prefix. A `${VAR}`
+# reference is not a secret and never matches (the value must start with a
+# key character).
+[[rules]]
+id = "hugeicons-registry-auth-token"
+description = "Hugeicons Pro license key in an npm registry auth line"
+regex = '''//npm\.hugeicons\.com/:_authToken\s*=\s*["'`]?([A-Za-z0-9][^\s"'`]{7,})'''
+secretGroup = 1
+keywords = ["npm.hugeicons.com"]
+
+[[rules]]
+id = "hugeicons-pro-token-assignment"
+description = "Hugeicons Pro license key assigned to its environment variable"
+regex = '''\b(?:HUGEICONS_PRO_TOKEN|HUGEICONS_LICENSE_KEY)["'`]?\s*(?:=|:)\s*["'`]?([A-Za-z0-9][^\s"'`]{15,})'''
+secretGroup = 1
+keywords = ["hugeicons_pro_token", "hugeicons_license_key"]
+
+[[rules]]
+id = "yarn-npm-auth-token"
+description = "Registry token in a Yarn npmAuthToken setting"
+regex = '''\bnpmAuthToken["'`]?\s*:\s*["'`]?([A-Za-z0-9][^\s"'`]{15,})'''
+secretGroup = 1
+keywords = ["npmauthtoken"]
+
+# Sentry DSNs (SENTRY_DSN): https://<public key>@o<org id>.ingest[.<region>].sentry.io/<project id>.
+[[rules]]
+id = "sentry-dsn"
+description = "Sentry DSN"
+regex = '''(https://[A-Za-z0-9]+@o[0-9]+\.ingest(?:\.[a-z]{2})?\.sentry\.io/[0-9]+)'''
+secretGroup = 1
+keywords = ["sentry.io"]
+
+# Placeholders the test suite and docs fixtures use on purpose. Anchored on
+# the whole captured value, so a real key in the same files — or the
+# placeholder with anything appended — still fails.
+[[allowlists]]
+description = "Fake credentials in tests and fixtures"
+regexes = [
+    '''^sk_test_51AcmeDemoKey$''',
+    '''^fake-pro-token-7f3a9c$''',
+]

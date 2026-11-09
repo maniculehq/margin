@@ -1,0 +1,6 @@
+# Repository-only files, kept at stable GitHub URLs but not served as pages.
+# link-relations.md is the default DOCS_LINK_RELATION_BASE (src/env.ts), so
+# the relation URIs Margin emits must keep resolving there; agents/link-relations
+# is the site page. fonts.md is referenced by NOTICE and scripts/subset-fonts.ts.
+link-relations.md
+fonts.md

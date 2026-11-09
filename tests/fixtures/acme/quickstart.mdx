@@ -1,0 +1,65 @@
+---
+title: Quickstart
+description: Create your first charge in under five minutes.
+icon: Zap
+---
+
+This guide takes you from an empty project to a captured test charge.
+
+<Tabs>
+  <Tab title="macOS & Linux">
+    Install the CLI with Homebrew: `brew install acme`.
+  </Tab>
+  <Tab title="Windows">
+    Install the CLI with winget: `winget install Acme.CLI`.
+  </Tab>
+</Tabs>
+
+## 1. Get your test key
+
+Grab the secret test key from the Acme dashboard under **Developers → API
+keys**. Test keys are free and never touch real money.
+
+## 2. Install the SDK
+
+```bash
+bun add @acme/payments
+```
+
+## 3. Create a charge
+
+```ts title="charge.ts"
+import { Acme } from "@acme/payments"
+
+const acme = new Acme(process.env.ACME_SECRET_KEY)
+
+const charge = await acme.charges.create(
+    {
+        amount: 1999, // cents
+        currency: "usd",
+        source: "tok_visa_test",
+        description: "Order #1001",
+    },
+    { idempotencyKey: "order-1001" },
+)
+
+console.log(charge.id, charge.status) // ch_… "succeeded"
+```
+
+The same call over raw HTTP:
+
+```bash
+curl https://api.acme.dev/v1/charges \
+  -H "Authorization: Bearer sk_test_51AcmeDemoKey" \
+  -H "Idempotency-Key: order-1001" \
+  -d amount=1999 -d currency=usd -d source=tok_visa_test
+```
+
+## 4. Confirm it worked
+
+Every charge appears in the dashboard within seconds. In test mode the
+`tok_visa_test` token always succeeds; use `tok_visa_declined` to exercise
+your failure paths.
+
+Next: set up [webhooks](/docs/webhooks) so your backend hears about payment
+events without polling.

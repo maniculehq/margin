@@ -1,0 +1,49 @@
+---
+title: Telemetry
+description: Stream battery, pose, and mission events in real time.
+icon: Radio
+---
+
+Every robot publishes a telemetry stream — one message per second while idle,
+ten per second while a mission is active.
+
+## Subscribe to a robot
+
+```ts title="telemetry.ts"
+import { Globex } from "@globex/sdk"
+
+const globex = new Globex({ token: process.env.GLOBEX_FLEET_TOKEN })
+
+for await (const frame of globex.telemetry.stream("rbt_7741b")) {
+    console.log(frame.battery.percent, frame.pose)
+}
+```
+
+The stream is an async iterable over server-sent events; the SDK reconnects
+with backoff and resumes from the last received frame automatically.
+
+## Frame reference
+
+| Field             | Type     | Meaning                                     |
+| ----------------- | -------- | ------------------------------------------- |
+| `battery.percent` | `number` | Remaining charge, 0–100.                    |
+| `battery.charging`| `boolean`| Whether the unit is docked and charging.    |
+| `pose`            | `object` | `{ x, y, heading }` in site coordinates.    |
+| `mission`         | `object` | Active mission id, state, and progress.     |
+| `faults`          | `array`  | Open fault codes (empty when healthy).      |
+
+## Fleet-wide aggregation
+
+Subscribe to a whole fleet instead of a single unit — frames arrive tagged
+with the robot id:
+
+```ts
+for await (const frame of globex.telemetry.fleet("warehouse-east")) {
+    if (frame.battery.percent < 15) {
+        await globex.missions.dispatch(frame.robotId, { kind: "dock" })
+    }
+}
+```
+
+Telemetry is fan-out only: consuming a stream never affects robot behavior,
+so dashboards and alerting can subscribe freely.

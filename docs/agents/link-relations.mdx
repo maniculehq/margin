@@ -1,0 +1,75 @@
+---
+title: Discover resources through link relations
+description: Read discovery links without hard-coding resource locations.
+---
+
+Margin advertises documentation indexes, its MCP Server Card, and its skill manifest in HTTP `Link` headers. Match a relation to the resource you need, then fetch the advertised target rather than constructing a resource path.
+
+## Read discovery links
+
+Each link has a target URI reference in angle brackets and parameters that describe it. The `rel` parameter identifies the resource's purpose; `type` advertises its media type. A quoted `rel` value can contain several space-separated relation identifiers for the same target.
+
+This illustrative header shows the documentation index on a site served at the domain root, with Margin's default relation URI base:
+
+```http
+Link: </llms.txt>; rel="describedby llms-txt https://github.com/maniculehq/margin/blob/main/docs/link-relations.md#llms-txt"; type="text/plain"; title="LLM index"
+```
+
+The target to fetch is `/llms.txt`, not the URI in `rel`. The three relation identifiers all describe that one target.
+
+Read all `Link` fields. HTTP clients may expose them as separate fields or one combined value. Use an RFC 8288-aware parser for automation: splitting blindly on commas can break quoted parameter values, and comparing the entire `rel` string misses links with multiple relations.
+
+## Match a relation to a resource
+
+Margin emits both bare compatibility tokens and extension relation URIs for these resources. The URI is the value of `DOCS_LINK_RELATION_BASE` with the token appended. The default base is `https://github.com/maniculehq/margin/blob/main/docs/link-relations.md#`.
+
+The table gives exact bare tokens, URI suffixes, and targets for a site with no base path:
+
+| Bare token and URI suffix | Target | Media type | Resource |
+| --- | --- | --- | --- |
+| `llms-txt` | `/llms.txt` | `text/plain` | Compact documentation index with page links and summaries. Also advertises `describedby`. |
+| `llms-full-txt` | `/llms-full.txt` | `text/plain` | Documentation bodies in one corpus. Serving budgets can limit coverage. |
+| `mcp-server-card` | `/api/mcp/server-card` | `application/mcp-server-card+json` | MCP Server Card describing the public Streamable HTTP endpoint. |
+| `agent-skills` | `/.well-known/agent-skills/index.json` | `application/json` | Skill manifest linking to admitted `SKILL.md` files and supporting content. |
+
+For example, the default full URI for `agent-skills` is `https://github.com/maniculehq/margin/blob/main/docs/link-relations.md#agent-skills`. Compare complete relation URIs, not just their fragments. A deployment can change `DOCS_LINK_RELATION_BASE` without changing resource routes; clients supporting the bare compatibility tokens can match those as separate identifiers.
+
+Do not select the index by `describedby` alone: Margin also uses that relation for its JSON corpus manifest. Use `llms-txt` or its complete extension URI to distinguish the text index. Discover live MCP tools through MCP, not by assuming a tool list from the card.
+
+## Resolve and fetch a target
+
+Margin emits root-relative targets and includes the site's base path. A site mounted at `/docs`, for example, advertises `/docs/llms.txt` instead of `/llms.txt`. Preserve that prefix.
+
+Resolve relative targets against the URL of the response carrying the header, using the final response URL after redirects. A root-relative target replaces the URL path; a path-relative target resolves from the response URL's directory. An absolute target already names its location. Use a URL resolver rather than concatenating strings.
+
+Inspect a documentation page with a GET request. Replace the example page URL with the page being discovered; the command saves the headers, discards the body, and prints the final response URL:
+
+```bash
+DOCS_URL='https://margin.manicule.com/'
+curl --silent --show-error --location \
+  --dump-header /tmp/margin-discovery.headers \
+  --output /dev/null \
+  --write-out '%{url_effective}\n' \
+  "$DOCS_URL"
+cat /tmp/margin-discovery.headers
+```
+
+Select a link from the final response's headers and match one identifier in its `rel` value. Copy its target without the angle brackets. Set `RESPONSE_URL` to the final URL printed above and `LINK_TARGET` to that copied target, then resolve and fetch it:
+
+```bash
+RESPONSE_URL='https://margin.manicule.com/'
+LINK_TARGET='/llms.txt'
+TARGET_URL="$(python3 -c \
+  'import sys; from urllib.parse import urljoin; print(urljoin(sys.argv[1], sys.argv[2]))' \
+  "$RESPONSE_URL" "$LINK_TARGET")"
+curl --fail --silent --show-error --location \
+  "$TARGET_URL"
+```
+
+The target shown here corresponds to the illustrative header. Use the target actually returned by the site. A successful index fetch returns plain text containing documentation links; a card or skill-manifest fetch returns the JSON resource listed in the table.
+
+## Handle missing relations
+
+Margin adds discovery links to successful GET and HEAD responses with status codes from 200 through 299 whose content type includes `text/html`, `text/markdown`, or `text/plain`. This covers human pages, Markdown pages, and text indexes. Do not expect the same discovery header on JSON API responses, redirects, or errors.
+
+Disabled surfaces are omitted from discovery links. A missing relation can also mean the response is outside discovery coverage, so absence alone does not prove that the resource does not exist. Retry discovery on a successful documentation page before treating the surface as unavailable. If the relation remains absent, consult the site's configuration or documentation rather than guessing a target URL.

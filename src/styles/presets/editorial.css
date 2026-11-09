@@ -1,0 +1,59 @@
+/*
+ * Layout preset: EDITORIAL (§4.2) — docs-native; no docs.json theme maps to
+ * it. A long-form reading layout: the TOC is suppressed by default and that space is
+ * given back to a wide prose measure, headings shift to a system serif stack
+ * (no web-font download), and the chrome is understated so the writing leads.
+ */
+
+[data-preset="editorial"] {
+    --fd-layout-width: 1360px;
+}
+/* Suppress the TOC column by default — reclaim its width, then hide it.
+   (Stays on #nd-docs-layout: fumadocs sets the var on the element via its
+   own classes, so an inherited value would lose.) */
+[data-preset="editorial"] #nd-docs-layout {
+    --fd-toc-width: 0px;
+}
+@media (min-width: 64rem) {
+    [data-preset="editorial"] #nd-docs-layout {
+        --fd-sidebar-width: 260px;
+    }
+}
+:where([data-preset="editorial"]) :is(#nd-toc, #nd-toc-placeholder) {
+    display: none;
+}
+
+/* Understated sidebar: dissolve the divider. */
+:where([data-preset="editorial"]) #nd-sidebar {
+    border-color: color-mix(in oklab, var(--color-fd-border) 50%, transparent);
+}
+
+/* Wide, comfortable reading measure. */
+:where([data-preset="editorial"]) .prose {
+    max-width: 72ch;
+    line-height: 1.78;
+}
+/* System serif — no font download; scales up for editorial hierarchy. */
+:where([data-preset="editorial"])
+    .prose
+    :is(h1, h2, h3, h4):not(:where(.not-prose, .not-prose *)) {
+    font-family:
+        Iowan Old Style,
+        "Palatino Linotype",
+        Palatino,
+        Georgia,
+        Cambria,
+        "Times New Roman",
+        serif;
+    font-weight: 600;
+}
+:where([data-preset="editorial"]) .prose h1 {
+    font-size: 2.6rem;
+    line-height: 1.15;
+}
+:where([data-preset="editorial"])
+    .prose
+    h2:not(:where(.not-prose, .not-prose *)) {
+    font-size: 1.85rem;
+    margin-top: 2.4em;
+}

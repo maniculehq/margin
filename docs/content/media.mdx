@@ -1,0 +1,144 @@
+---
+title: Add images, files, and assets
+description: Choose supported file types, control image rendering, and permit external asset hosts.
+---
+
+Keep supported media in your docs tree and reference the source files from Markdown or MDX. Margin publishes local assets at content-addressed URLs, so authored links should use repository paths rather than copied URLs from a deployed page.
+
+## Reference repository assets
+
+A leading `/` resolves from the docs root, not necessarily the Git repository root. A relative path resolves from the directory containing the source page. CSS asset paths resolve from the CSS file's directory, and config asset paths resolve from `docs.json`.
+
+For a page at `content/demo.mdx`, both `/images/diagram.svg` and `../images/diagram.svg` select the same file in this tree:
+
+```text
+<docs-root>/
+├── docs.json
+├── content/
+│   └── demo.mdx
+└── images/
+    └── diagram.svg
+```
+
+To create a small example asset, run this from your docs root:
+
+```sh
+mkdir -p images content
+cat > images/diagram.svg <<'SVG'
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160">
+  <rect width="640" height="160" fill="#f1f5f9"/>
+  <circle cx="320" cy="80" r="48" fill="#2563eb"/>
+</svg>
+SVG
+```
+
+In `content/demo.mdx`, use a Markdown image to display the file and a Markdown link to open the asset directly:
+
+```mdx
+---
+title: Asset demo
+---
+
+![Blue circle centered on a light background](/images/diagram.svg)
+
+[Open the original diagram](../images/diagram.svg)
+```
+
+The asset link opens the file; it does not request a forced download. Local asset rewriting covers Markdown images, links, and reference definitions, plus literal MDX `src`, `href`, `poster`, `icon`, and `img` attributes with supported asset extensions. Use a literal path such as `src="/images/diagram.svg"`, rather than computing the URL in an expression.
+
+Repository media admission is limited to these extensions, matched case-insensitively:
+
+| Type | Extensions |
+| --- | --- |
+| Images | `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.gif`, `.ico` |
+| Fonts | `.woff`, `.woff2` |
+| Video | `.mp4`, `.webm`, `.mov` |
+
+Each asset must be at most 20 MiB (20,971,520 bytes). PDFs, ZIP archives, CSV files, and other unlisted types are not published as local assets. Host those files elsewhere and use an absolute HTTPS link. Being admitted as a page or config file, such as `.md` or `.json`, does not make a file a downloadable static asset.
+
+## Use the Image component
+
+`Image` renders an image with click-to-zoom behavior. It uses the same renderer as Markdown images, so use it when you need explicit image attributes rather than different image behavior.
+
+Replace the Markdown image in the demo with this MDX:
+
+```mdx
+<Image
+  src="/images/diagram.svg"
+  alt="Blue circle centered on a light background"
+  width="640"
+  height="160"
+/>
+```
+
+The rendered result is a 640 by 160 image of a blue circle on a light background, sized responsively to the article. Clicking it opens the zoom view. `alt` supplies the text description; it is not a visible caption.
+
+| Prop | Purpose and behavior |
+| --- | --- |
+| `src` | Image source. Use a supported local path or an external image URL. |
+| `alt` | Text alternative for the image. Omission defaults to an empty string. |
+| `width`, `height` | Image dimensions. Margin adds intrinsic dimensions for readable local images when neither attribute is authored on `Image`. Supply both when setting dimensions yourself. |
+| `loading` | `eager` or `lazy`. Defaults to `eager` for the first article image and `lazy` for later images. |
+| `decoding` | `auto`, `sync`, or `async`. Defaults to `auto` for the first article image and `async` for later images. |
+| `fetchPriority` | `high`, `low`, or `auto`. Defaults to `high` for the first article image; later images have no explicit priority. |
+| `srcSet` | Explicit responsive image candidates. An authored value replaces Margin's generated candidates. |
+
+For a visible caption, wrap the image in `Frame` and set `caption` on the frame:
+
+```mdx
+<Frame caption="Example repository asset">
+  <Image
+    src="/images/diagram.svg"
+    alt="Blue circle centered on a light background"
+  />
+</Frame>
+```
+
+## Understand published asset URLs
+
+During ingest, Margin hashes each admitted asset's bytes with SHA-256 and rewrites resolving references to `/_assets/<hash>`, where `<hash>` is a 64-character hexadecimal digest. SVGs are sanitized before hashing: scripts, event handlers, and unsafe references are removed.
+
+For example, `/images/diagram.svg#preview` becomes `/_assets/<hash>#preview`. Query strings and fragments are preserved. Two files with identical admitted bytes share a hash; changing those bytes changes the hash.
+
+Keep `/images/diagram.svg` in your source instead of writing `/_assets/<hash>` yourself. Reingesting the page then selects the current content without requiring you to update the published URL manually. Moving a page can break relative source references, even when the asset itself has not changed; root-relative paths avoid that dependency.
+
+For stored images with known width, Margin can generate responsive `srcSet` candidates at 640, 960, 1440, and 1920 pixels, using only widths below the image's intrinsic width. The original remains the largest candidate. External image URLs do not receive these generated asset candidates.
+
+## Allow external sources
+
+Set `x-margin.assets.allowExternal` in `docs.json` for external hosts used by CSS URLs and supported config asset fields. Add this block to your existing configuration:
+
+```json
+{
+  "x-margin": {
+    "assets": {
+      "allowExternal": [
+        "cdn.example.com",
+        "images.example.com"
+      ]
+    }
+  }
+}
+```
+
+The value is an optional array of strings. `fonts.googleapis.com` and `fonts.gstatic.com` are always included; your entries add to those defaults.
+
+Matching uses the URL hostname, case-insensitively. `cdn.example.com` does not admit `sub.cdn.example.com`, and wildcard entries such as `*.example.com` do not match subdomains. Entries written as full URLs are reduced to their hostname, so paths and ports do not restrict admission. Prefer plain hostnames to make that scope clear. The host matcher accepts HTTP and HTTPS URLs, including protocol-relative URLs.
+
+This setting is not a site-wide image firewall. External images referenced in page content remain browser-loaded URLs and are not rejected by this allow-list. Disallowed external config asset references are removed with an `asset_missing` warning; disallowed CSS URL declarations are removed with a `css_sanitized` warning. Adding a host does not permit arbitrary CSS `@import` rules: the supported external stylesheet import is an HTTPS Google Fonts stylesheet from `fonts.googleapis.com`.
+
+## Diagnose missing assets
+
+A successful page deployment does not prove every asset resolved. Missing local references in page content produce warnings and remain unchanged, so a page can publish with a broken image or link.
+
+| Diagnostic | Cause | Correction |
+| --- | --- | --- |
+| `asset_missing` | A local reference resolves to a file that was not ingested. | Check spelling and case, the source page's directory, and the docs root. Confirm the file is committed, has an admitted extension, and is not excluded by `.mintignore` or `.docsignore`. |
+| `asset_missing` | A config asset URL uses an external host outside the allow-list. | Add the exact hostname to `x-margin.assets.allowExternal` or use a local asset. |
+| `asset_oversize` | An asset exceeds 20,971,520 bytes and was skipped. | Compress the file below the cap or host it externally. |
+| `field_invalid` | An SVG is not valid UTF-8 SVG and was skipped. | Export a valid UTF-8 SVG or use a supported raster format. |
+| `css_sanitized` | CSS contains a disallowed URL or unsupported import. | Admit the URL's host when applicable; replace unsupported imports with local CSS. |
+
+An unlisted extension may be ignored without an asset-specific warning. Do not infer support from an absence of diagnostics.
+
+After ingest, open the demo page and inspect the image element. A resolved local `src` contains `/_assets/` followed by the hash, and the image request succeeds. Follow the original-diagram link too; checking the rendered image alone does not test the separate link reference.

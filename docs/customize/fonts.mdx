@@ -1,0 +1,81 @@
+---
+title: Configure site fonts
+description: Select bundled fonts or load fonts from an external host.
+---
+
+Change the site's typography with the `fonts` block in `docs.json`. Body text, headings, and code can use separate families; leaving a role unset keeps its inherited or bundled font.
+
+## Set fonts in docs.json
+
+Add `fonts` at the top level of the existing `docs.json`, not inside `x-margin`. The settings apply across the site.
+
+| Setting | Scope |
+| --- | --- |
+| `fonts.family` | Body and UI text, also inherited by headings without a heading override. |
+| `fonts.body` | Body and UI text. `body.family` takes precedence over `fonts.family`. |
+| `fonts.heading` | Headings from H1 through H6, without changing body text. |
+| `fonts.mono` | Monospace text, including code. |
+
+Each role object accepts the following fields. The same fields are also accepted directly under `fonts` for the shared body setting.
+
+| Field | Accepted value | Behavior |
+| --- | --- | --- |
+| `family` | Font-family string | Selects the family. A name without `source` can resolve through Google Fonts. |
+| `source` | Font file URL | Loads the specified file instead of resolving the family through Google Fonts. |
+| `format` | `woff` or `woff2` | Format of the supplied file; defaults to `woff2`. |
+| `weight` | Number | Requests that weight from Google Fonts, or declares that weight for a supplied file. |
+
+`weight` does not set the weight of every text element. It controls the font face loaded; headings and body styles still determine the weight used by each element. Without `weight`, a supplied file is declared for weights 100 through 900, so use a variable font that covers that range or specify the file's actual weight.
+
+## Choose a bundled font
+
+Margin bundles Inter for body and UI text, with the CSS family name `InterVariable`, and Geist Mono for code, with the CSS family name `GeistMono`. Headings inherit the body font unless `fonts.heading` is set.
+
+To use the bundled defaults, remove the `fonts` block or leave it empty. Merge this fragment into the existing configuration rather than replacing the rest of `docs.json`:
+
+```json
+{
+  "fonts": {}
+}
+```
+
+Custom sans-serif roles retain a fallback stack that starts with Inter and continues to system sans-serif fonts. Custom monospace roles retain Geist Mono and system monospace fallbacks. The bundled fonts also have metric-adjusted local fallbacks based on Arial and Courier New.
+
+Font settings affect site text, not generated social-preview images. Those use Geist Sans by default.
+
+## Load a third-party font
+
+For a Google Fonts family, set its name and omit `source`. This example changes body text and its inherited headings to Roboto while leaving code in bundled Geist Mono:
+
+```json
+{
+  "fonts": {
+    "body": {
+      "family": "Roboto"
+    }
+  }
+}
+```
+
+Margin resolves Google Fonts stylesheets during ingest and stores the resulting font rules. Visitors load the font files from `fonts.gstatic.com`; they do not fetch the Google stylesheet at page load. A family that cannot be resolved produces a `field_invalid` warning and renders through the fallback stack.
+
+To load a file from another host, provide `family`, `source`, and the matching `format`. Replace the example URL with a public font file you control. This fragment applies a single weight to headings only:
+
+```json
+{
+  "fonts": {
+    "heading": {
+      "family": "Acme Sans",
+      "source": "https://cdn.example.com/fonts/acme-sans-bold.woff2",
+      "format": "woff2",
+      "weight": 700
+    }
+  }
+}
+```
+
+The browser loads a configured external file directly. The font host must permit cross-origin font requests from the documentation site. A Google Fonts stylesheet URL is not a font-file `source`; use the family-only configuration for Google Fonts.
+
+For existing CSS-based font loading, Margin also supports `@font-face` and HTTPS `@import` URLs from `fonts.googleapis.com`. Google stylesheet imports are resolved during ingest, with a maximum of 8 distinct imports. Other CSS `@import` hosts are removed. External URLs in custom CSS must use `fonts.googleapis.com`, `fonts.gstatic.com`, or a host listed in `x-margin.assets.allowExternal`.
+
+After deploying the updated configuration, open a page with body text, a heading, and a code block. In browser developer tools, check the rendered font for each element, not just its declared `font-family`. For an external font, also confirm that the font request succeeds in the Network panel. A declared family alone does not confirm that the font loaded.

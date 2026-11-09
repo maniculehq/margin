@@ -1,0 +1,124 @@
+---
+title: Connect an MCP client
+description: Give an MCP client access to your site's documentation tools.
+---
+
+Connect Claude, Cursor, or another Model Context Protocol (MCP) client to search your Margin documentation and retrieve pages as agent Markdown. The server works with the published documentation on the site you connect to.
+
+## Locate the server endpoint
+
+The built-in server is on by default at `/api/mcp`, uses Streamable HTTP, and requires no authentication. No API key or OAuth setup is needed for Margin's public server. Use your docs site's full URL, including its base path if it has one. The examples use `https://docs.example.com`; replace it with your site's URL.
+
+A normal browser visit or plain `GET /api/mcp` returns JSON discovery information, including `transport`, `url`, `instructions`, and client-specific `connect` examples. This confirms the endpoint is reachable, but does not prove that a client has called a tool. The transport is stateless and does not require a persistent server-side session.
+
+## Connect your client
+
+### Claude Code
+
+With Claude Code installed, register the remote HTTP server from your project directory:
+
+```bash title="Claude Code"
+claude mcp add \
+  --transport http \
+  example-docs \
+  https://docs.example.com/api/mcp
+```
+
+This uses Claude Code's default local scope: the server is available to you in this project. Open Claude Code and enter `/mcp` to inspect the server connection and available tools. See the [Claude Code MCP reference](https://code.claude.com/docs/en/mcp) for other configuration scopes.
+
+### Claude web and Claude Desktop
+
+For Claude chat, add a remote custom connector rather than running the Claude Code command. Open **Customize > Connectors**, choose **Add custom connector** (or **Add > Custom > Web**), and enter a name and `https://docs.example.com/api/mcp`. If the dialog asks for authentication, select **No sign in** and leave request headers empty.
+
+On Team and Enterprise plans, an owner adds the connector under **Organization settings > Connectors** before members connect to it. Use the remote-connector workflow for Claude Desktop too; the Cursor configuration below is not a Claude Desktop configuration file. Follow [Claude's custom connector instructions](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp) for your account's dialog and availability. A hosted Claude connector must be able to reach the server; a URL accessible only on your laptop is insufficient.
+
+### Cursor
+
+Merge this entry into `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` for all projects:
+
+```json title="Cursor: .cursor/mcp.json"
+{
+  "mcpServers": {
+    "example-docs": {
+      "url": "https://docs.example.com/api/mcp"
+    }
+  }
+}
+```
+
+Enable the server in Cursor's MCP controls and confirm its tools appear. In Agent chat, request a tool by name and approve the request if prompted. See [Cursor's MCP reference](https://cursor.com/docs/context/mcp) for configuration and connection logs.
+
+### Other clients
+
+Add a remote server using Streamable HTTP and your full `/api/mcp` URL, with authentication disabled. Configuration formats differ by client; do not assume every client accepts Cursor's `mcpServers` object. A plain visit to the endpoint provides generated configurations for Claude Code, Cursor, Codex, and VS Code. Clients must support the remote HTTP transport, not only local stdio processes.
+
+## Confirm documentation access
+
+Ask your client to use `list_docs` with `{"limit":1}`, then use `read_page` with the first returned page's `url`. A successful list includes `pages`, `total`, and `nextCursor`; a successful read returns Markdown text from that page. Confirm the tool request appears in the client and the returned title and URL belong to the expected site. An empty `pages` array is a valid response but does not confirm page retrieval.
+
+To test the tool endpoint separately from a client, run this stateless HTTP request. It requests one page reference without credentials:
+
+```bash title="curl"
+export DOCS_URL="https://docs.example.com"
+curl --silent --show-error \
+  --request POST \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json, text/event-stream' \
+  --header 'MCP-Protocol-Version: 2025-06-18' \
+  --data '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_docs","arguments":{"limit":1}}}' \
+  "$DOCS_URL/api/mcp"
+```
+
+The response is a JSON-RPC result, potentially carried in an SSE `data:` line. The list object appears in `result.structuredContent` and as JSON text in `result.content`. Use its page URL for the client's subsequent `read_page` request.
+
+If the endpoint returns `404` with `Not Found`, check the host and base path and whether MCP is disabled on that deployment. A `read_page` or `get_code_examples` result with `isError: true` and `error: "not_found"` means the page was not resolved; this is a tool result, not necessarily an HTTP 404. Use `list_docs` to discover a valid URL. `read_page` may also return `candidates` or an external `redirectsTo` URL.
+
+## Choose a documentation tool
+
+All tools operate on the connected site's documentation. The six retrieval tools are read-only. `submit_feedback` records a report for review and is available only when the feedback surface is enabled; it does not edit a page.
+
+Inputs ending in `?` are optional. Structured outputs are returned both as `structuredContent` and JSON text in `content`; `read_page` returns Markdown text instead.
+
+| Tool | Inputs | Output and scope |
+| --- | --- | --- |
+| `list_docs` | `url?`, `prefix?`, `limit?`, `cursor?` | `pages`, `total`, `nextCursor`, and, when unscoped, `otherScopes`. Pages contain `title`, `url`, `markdownUrl`, nullable `description`, and `section`. Navigation order; optional URL-prefix filtering. `limit` is an integer from 1 to 500, default 200; `cursor` is a nonnegative integer, default 0. Pass `nextCursor` as `cursor` until it is `null`. |
+| `search_docs` | `query`, `limit?`, `url?`, `locale?`, `version?` | `results` with `id`, `url`, `type`, and `content`, plus any additional search fields. `query` must be nonempty after trimming. `limit` is an integer from 1 to 50, default 10. Full-text search within the selected locale/version. |
+| `read_page` | `url` | Clean agent Markdown. Accepts a slug, site-root path, or trailing `.md` URL and follows site redirects. The page URL selects its locale/version. |
+| `get_code_examples` | `url`, `language?` | `examples` with `language`, `code`, and optional `title`, `meta`, and `alternativesGroup`. Same page lookup as `read_page`; `language` filters by exact language string. Blocks with the same `alternativesGroup` are alternatives, not a sequence to execute. |
+| `get_navigation` | `url?` | `site`, `sections` containing `section` and `pages`, and, when unscoped, `otherScopes`. Each page has `title`, `url`, and `markdownUrl`. Uses `docs.json` navigation order for the selected locale/version. |
+| `query_docs_filesystem` | `command`, `url?`, `locale?`, `version?` | `stdout`, `stderr`, integer `exitCode`, and boolean `truncated`. Runs read-only commands over a virtual docs filesystem, not a host shell. `command` must contain 1 to 2,000 characters. |
+| `submit_feedback` | `url`, `kind`, `message`, `suggestedFix?` | `received`, `pageExists`. `kind` is `incorrect`, `missing`, `outdated`, `unclear`, or `other`. `url` contains 1 to 2,048 characters; `message` contains 1 to 2,000; `suggestedFix` has at most 2,000. Reports can name missing pages. |
+
+For `search_docs` and `query_docs_filesystem`, `url` takes precedence over `locale` and `version`. Without `url`, pass the actual URL segments as `locale` and `version`; omitting all three uses the site default. For `list_docs` and `get_navigation`, pass `url` to select another tree. Unscoped responses advertise available trees through `otherScopes` entries with `kind` (`version` or `locale`), `label`, optional `tag`, `url`, and page count `pages`.
+
+Use `search_docs` for a question, then `read_page` for the best result. Use `query_docs_filesystem` for exact text or regex searches, directory structure, or reading several files. Documentation paths map to the page URL plus `.md`, with `/index.md` for the home page. Discover paths with `tree / -L 2` rather than guessing. Commands support pipes; each request starts at `/`, has no network access, and cannot persist filesystem changes. A filesystem request can report command failure through `exitCode` and may set `isError: true`.
+
+The server also exposes prompts `answer_from_docs(question)` and `implement_with_docs(task)`, page resources at `docs://page/{path}`, OpenAPI resources at `openapi://{docId}` when specs exist, and `skill://{name}` resources when skills are enabled. Discover live tools with MCP `tools/list` and resources with `resources/list`.
+
+## Set server instructions
+
+Set `x-margin.agents.mcpInstructions` in `docs.json` to append site-specific guidance to the instructions sent when an MCP client connects. The string has a maximum length of 4,000 characters.
+
+Merge this fragment into your existing configuration:
+
+```json title="docs.json fragment"
+{
+  "x-margin": {
+    "agents": {
+      "mcpInstructions": "Include the documented API version when answering API questions."
+    }
+  }
+}
+```
+
+Margin first supplies generated guidance to search the docs, read matching pages, and cite page URLs. It appends `mcpInstructions`, then `markdown.instructions` if configured. Your setting does not replace that generated guidance or change the tool schemas.
+
+These are server-level instructions, not page content and not an access-control policy. Edit documentation pages to change the facts that `read_page` returns. A client decides how to follow instructions; the text cannot restrict access to public documentation. Inspect the combined `instructions` field in a plain `GET /api/mcp` response after publishing.
+
+## Discover the server card
+
+The standard server card is at `/api/mcp/server-card`, served as `application/mcp-server-card+json`. It describes the server's identity and remote Streamable HTTP connection, including supported protocol versions. It is a discovery document, not the MCP endpoint, and does not contain the live tool list.
+
+`/.well-known/mcp.json` points to both the endpoint and server card. Compatibility cards at `/.well-known/mcp/server-card.json` and `/.well-known/mcp/server-cards.json` also include tool definitions for clients that expect the earlier format. Use MCP `tools/list` for the active tool contracts, particularly when optional surfaces such as feedback are disabled.
+
+Follow the site's `Link` header for the advertised card. The [link-relations reference](/agents/link-relations#mcp-server-card) defines the `mcp-server-card` relation; changing a relation's URI base does not move the endpoint or card route.

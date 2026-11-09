@@ -1,0 +1,124 @@
+---
+title: "Reuse content with snippets"
+description: "Choose ingest-time MDX fragments or admitted local code components."
+---
+
+Store shared content under `snippets/` at the docs root, then reference it from each page that needs it. Changes take effect when the docs are ingested again; a snippet is not a separately served page.
+
+## Choose a snippet type
+
+Use an MDX fragment for repeated instructions, callouts, or code examples. Margin expands its content into the consuming page at ingest, so the text is part of the page rather than a runtime component.
+
+Use a local JavaScript or TypeScript component when the shared content needs executable behavior, such as a counter. These modules must pass compilation and import restrictions before Margin includes them in a page. They execute in the visitor's browser or a restricted render isolate, never in the application's server process.
+
+| Source | Reference from a page | Behavior |
+| --- | --- | --- |
+| `snippets/**/*.mdx` (also `.md`) | Default import and JSX tag, or `<Snippet file="…" />` | Fragment expanded at ingest |
+| Named component export in an MDX snippet | Named import and JSX tag | Compiled through the code-component path |
+| `snippets/**/*.js`, `.jsx`, `.ts`, `.tsx` | Default or named import and JSX tag | Local code compiled into the page |
+
+## Reuse an MDX fragment
+
+Create `snippets/retry-note.mdx` with the shared text. A fragment does not need an explicit default export.
+
+```mdx title="snippets/retry-note.mdx"
+<Note>
+  Before retrying a write, check whether the first request succeeded.
+</Note>
+```
+
+Import the fragment from a consuming page and render the imported name as a JSX tag. Include the file extension in the import path.
+
+```mdx title="guides/create-record.mdx"
+---
+title: "Create a record"
+---
+
+import RetryNote from '/snippets/retry-note.mdx'
+
+Check the write response before proceeding.
+
+<RetryNote />
+```
+
+A second page can use the built-in `Snippet` component instead of an import. Its `file` attribute must be a literal string.
+
+```mdx title="guides/update-record.mdx"
+---
+title: "Update a record"
+---
+
+Check the update response before proceeding.
+
+<Snippet file="retry-note.mdx" />
+```
+
+The `file` value is resolved under `snippets/`. A leading `/snippets/` or `snippets/` prefix is also accepted. If the extension is omitted, Margin tries `.mdx` before `.md`; directory traversal with `..` is rejected.
+
+For a parameterized fragment, use an imported JSX tag with static props. A string, boolean attribute, or statically evaluated expression such as `count={3}` can replace a matching `{count}` expression in the fragment, including inside fenced code. Dynamic props are not resolved at ingest.
+
+Ingest both consuming pages, then open them and confirm that each contains the retry note. Edit the fragment and ingest again to update both copies.
+
+## Use a local code component
+
+Create `snippets/Counter.tsx` with a default-exported component. React hooks are available by name without importing `react`.
+
+```tsx title="snippets/Counter.tsx"
+export default function Counter() {
+  const [count, setCount] = useState(0)
+  return (
+    <button onClick={() => setCount(count + 1)}>
+      Count: {count}
+    </button>
+  )
+}
+```
+
+Import the module into a page and invoke it as a JSX component.
+
+```mdx title="counter.mdx"
+---
+title: "Try the counter"
+---
+
+import Counter from '/snippets/Counter.tsx'
+
+Click the button to increment its count.
+
+<Counter />
+```
+
+Named exports use named imports, such as `import { Counter } from '/snippets/Counter.tsx'` for a module that exports `Counter` by name. Named component exports from `.mdx` snippets use this same executable path; a default MDX import still means fragment transclusion. Static exported constants from MDX snippets can resolve at ingest instead of requiring runtime execution.
+
+After ingest, open the counter page. The button should start at `Count: 0` and change to `Count: 1` after one click.
+
+## Understand execution limits
+
+Snippet compilation is not permission to run arbitrary server-side code. Compiled page code can run in the browser; its server-rendered snapshot runs only in a host-less V8 isolate. The isolate has no `process`, `require`, `fetch`, timers, DOM, or filesystem access. Its render budget is 250 ms with a 128 MB heap cap. A declined isolate render retains the client-only rendering path rather than granting host access.
+
+Keep render-time code independent of browser globals. Browser-only work belongs in an effect or event handler so it does not require a DOM while the isolate produces markup. Do not put secrets in snippet source: executable page content reaches the visitor's browser.
+
+| Admission rule | Accepted | Rejected or unavailable |
+| --- | --- | --- |
+| Code-module location | Files under `snippets/` with `.js`, `.jsx`, `.ts`, or `.tsx` extensions | Arbitrary application modules outside `snippets/` |
+| Imports in code modules | Explicit `/snippets/…` or `snippets/…` module paths | Relative paths, package imports, URL imports, and Node built-ins |
+| Exports consumed by pages | Default or named exports that exist in the module | Namespace imports such as `import * as Widgets` |
+| React support | Ambient `React`, JSX runtime, and supported hooks | Installing a dependency does not admit it as a snippet import |
+| Documentation components | Built-in components such as `Note` and `Card`, used without imports | Importing UI packages to supply components |
+
+The supported ambient hooks are `useState`, `useEffect`, `useMemo`, `useCallback`, `useRef`, `useReducer`, `useContext`, `useId`, `useTransition`, and `useSyncExternalStore`. JSX runtime support is provided by Margin; no `react/jsx-runtime` import is needed in authored snippets.
+
+## Fix admission failures
+
+Inspect ingest diagnostics even if the page still serves. Missing imported fragments and rejected code modules can leave a served page without the snippet's content.
+
+| Diagnostic or exact message | Cause | Correction |
+| --- | --- | --- |
+| `snippet_missing` | An imported file or named MDX export was not found | Match the full path, extension, and exported name |
+| `js_snippet_rejected` | A code module or MDX component export failed compilation | Fix syntax and imports in the indicated module; keep dependencies under `/snippets/` |
+| `namespace imports from snippets are not supported: Widgets` | A page uses `import * as Widgets` | Import a default or named component directly |
+| `<Snippet> requires a literal "file" attribute` | The `file` attribute is missing or computed | Use a literal such as `file="retry-note.mdx"` |
+| `snippet path may not traverse directories: ../retry-note.mdx` | A `Snippet` path includes `..` | Reference the file from the `snippets/` root |
+| `missing snippet file: retry-note.mdx` | A `Snippet` reference cannot resolve its fragment | Add the fragment or correct the `file` value |
+
+The missing-file warning for an import and the missing-file validation failure for `Snippet` are different diagnostics. After correcting either reference, ingest again and verify the actual content on each consuming page, not only that the page loads.

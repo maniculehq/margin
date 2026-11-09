@@ -1,0 +1,1 @@
+ALTER TABLE "docs_agent_feedback" ADD COLUMN "answer_id" varchar(36);

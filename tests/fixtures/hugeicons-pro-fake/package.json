@@ -1,0 +1,7 @@
+{
+    "name": "@hugeicons-pro/core-stroke-rounded",
+    "version": "0.0.0-fake",
+    "description": "Three invented glyphs standing in for the Hugeicons Pro package in the icons:build test.",
+    "type": "module",
+    "module": "./dist/esm/index.js"
+}

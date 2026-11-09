@@ -1,0 +1,22 @@
+{
+    "$schema": "https://mintlify.com/docs.json",
+    "theme": "luma",
+    "name": "Luma Footer",
+    "colors": { "primary": "#16A34A" },
+    "navigation": { "groups": [{ "group": "Start", "pages": ["index"] }] },
+    "footer": {
+        "socials": { "github": "https://github.com/maniculehq/margin" },
+        "links": [
+            {
+                "header": "Resources",
+                "items": [
+                    {
+                        "label": "Changelog",
+                        "href": "https://example.com/changelog"
+                    },
+                    { "label": "Status", "href": "https://example.com/status" }
+                ]
+            }
+        ]
+    }
+}

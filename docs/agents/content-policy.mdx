@@ -1,0 +1,85 @@
+---
+title: Set content signals and crawler policy
+description: Declare intended agent use and inspect the policy Margin publishes.
+---
+
+Set `x-margin.agents.contentSignals` in `docs.json` to express whether public documentation may be used for search, AI input, or model training. Margin publishes these preferences in HTTP headers and `robots.txt`.
+
+## Distinguish signals from access controls
+
+Content signals declare intended use to clients that recognize them. They do not authenticate requests, block downloads, or prevent a client from copying public content. Use access controls outside these settings when content must not be public.
+
+There is no separate citation permission field. The AI-input signal addresses use as input to AI systems; it does not require an answer to cite your documentation or guarantee that an agent will honor your preference. Do not invent a `citation` setting to express that requirement.
+
+## Configure permitted uses
+
+1. Open the site's `docs.json` and merge the following fragment into the existing configuration. Preserve other `x-margin` and `agents` settings.
+2. Publish the configuration through the site's normal deployment process.
+3. Inspect the deployed responses before relying on the published policy.
+
+This example permits search and AI input while declining model training:
+
+```json
+{
+  "x-margin": {
+    "agents": {
+      "contentSignals": {
+        "search": true,
+        "aiInput": true,
+        "aiTrain": false
+      }
+    }
+  }
+}
+```
+
+All three fields accept JSON booleans, not the strings `"yes"` and `"no"`. Each omitted field defaults independently to `true`, including when the entire `agents` block is absent.
+
+| Field under `x-margin.agents.contentSignals` | Intended use | Default | Published token |
+| --- | --- | --- | --- |
+| `search` | Use for search. | `true` | `search` |
+| `aiInput` | Use as input to AI systems. | `true` | `ai-input` |
+| `aiTrain` | Use for training AI models. | `true` | `ai-train` |
+
+These are site configuration fields, not per-page frontmatter overrides. Formatting settings such as `markdownFrontmatter`, `indexPreamble`, and `assistantMarkdown` do not add permission categories.
+
+## Inspect published signals
+
+Margin serializes `true` as `yes` and `false` as `no`, in the order `search`, `ai-input`, `ai-train`. The example configuration produces this header:
+
+```http
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+```
+
+The same serialized value appears in each `robots.txt` user-agent group. It is not a content-policy field in the Markdown body's YAML frontmatter or `agent-signals` comment. Those Markdown features are separate from the HTTP response header.
+
+The discovery middleware adds the header to successful (`2xx`) `GET` and `HEAD` responses with HTML, Markdown, or plain-text content types when the site configuration resolves. Do not expect it on every response type, redirect, or error.
+
+Set `SITE_URL` to the deployed documentation URL, including any base path and without a trailing slash. Inspect the home page's response headers with a `GET` request:
+
+```bash
+SITE_URL="https://docs.example.com"
+curl --fail --silent --show-error \
+  --dump-header - \
+  --output /dev/null \
+  "$SITE_URL/"
+```
+
+Look for the `Content-Signal` header with the value shown above. Header names may appear in lowercase. If the header differs, check that the requested deployment contains the updated `docs.json`.
+
+## Set crawler policy
+
+The supported use-policy controls are the three content-signal fields. `x-margin.agents` does not expose custom `User-agent`, `Disallow`, or crawl-delay settings. Setting `aiTrain: false` changes the training signal; it does not generate a `Disallow` rule or deny a crawler's request.
+
+Margin generates `robots.txt` with a wildcard `User-agent: *` group and named groups for `GPTBot`, `ChatGPT-User`, `OAI-SearchBot`, `ClaudeBot`, `Claude-User`, `PerplexityBot`, `Google-Extended`, `Applebot-Extended`, and `CCBot`. Each group contains the same `Content-Signal` value and an `Allow` directive scoped to the site's URL path (`/` for a root-hosted site). The file also advertises the site's `sitemap.xml`.
+
+Repeating the signal in each group matters because a crawler selects the most specific matching group rather than inheriting the wildcard group's signal. The generated `Allow` directive permits crawling of that path, while the content signals declare permitted uses of the retrieved content. Neither directive guarantees client compliance.
+
+Inspect the deployed file after publishing the configuration:
+
+```bash
+curl --fail --silent --show-error \
+  "$SITE_URL/robots.txt"
+```
+
+Confirm that every group contains `Content-Signal: search=yes, ai-input=yes, ai-train=no` for the example configuration and that the `Allow` path matches the documentation site's base path.

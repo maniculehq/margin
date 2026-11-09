@@ -1,0 +1,121 @@
+---
+title: Publish agent skills
+description: Make repository-based instructions discoverable to compatible agents.
+---
+
+Publish a `SKILL.md` with task-specific instructions, then install it from your documentation site's URL. Margin validates repository-authored skills during ingestion and exposes accepted skills through a discovery index.
+
+## Choose a published skill
+
+Use `/skill.md` for the generated guide to reading and searching your documentation. When repository-authored skills are available, this guide also links to them and includes an installation command.
+
+Author a repository skill when an agent needs instructions for a particular task, such as configuring your SDK. The discovery index lists public authored skills instead of the generated skill when at least one public authored skill is available. Otherwise, the index lists the generated documentation skill.
+
+Skills are published instructions, not server-side plugins. Publishing a skill does not execute its contents.
+
+## Add a skill to your repository
+
+Place the skill relative to the documentation root, alongside `docs.json`. Use a separate directory for each skill:
+
+```text
+.
+├── docs.json
+└── skills/
+    └── configure-client/
+        └── SKILL.md
+```
+
+Create `skills/configure-client/SKILL.md` with YAML frontmatter followed by Markdown instructions. Replace the example task with instructions and documentation links for your product:
+
+```markdown
+---
+name: configure-client
+description: Configure the product client. Use when adding the client to an application.
+---
+
+# Configure the client
+
+1. Read the installation and authentication pages on the documentation site.
+2. Follow the documented example for the application's language.
+3. Run the example and check its documented success output.
+4. Report the result without printing credentials.
+```
+
+The `description` tells a compatible agent when to select the skill. The body should tell the agent what to do and how to confirm success. Use absolute documentation URLs so links still work after installation outside the repository.
+
+Margin recognizes these locations, in precedence order when multiple files claim the same name:
+
+| Location relative to the documentation root | Name rule |
+| --- | --- |
+| `.mintlify/skills/<name>/SKILL.md` | Frontmatter `name` must match the directory. |
+| `skills/<name>/SKILL.md` | Frontmatter `name` must match the directory. |
+| `SKILL.md` | Frontmatter supplies the name. |
+| `skill.md` | Frontmatter supplies the name. |
+
+Nested skill directories require the uppercase filename `SKILL.md`. These files are skills, not documentation pages; do not add them to navigation.
+
+The accepted frontmatter fields are:
+
+| Field | Contract |
+| --- | --- |
+| `name` | Required string, 1–64 characters. Lowercase letters, digits, and single hyphens only; no leading, trailing, or consecutive hyphens. |
+| `description` | Required string, 1–1,024 characters. |
+| `license` | Optional string. |
+| `compatibility` | Optional string, 1–500 characters. |
+| `metadata` | Optional mapping of string keys to string values. |
+| `allowed-tools` | Optional string. |
+| `groups` | Optional array of strings. A nonempty value excludes the skill from public serving unless `public: true`. |
+| `public` | Optional boolean. `true` explicitly permits public serving even with `groups`. |
+
+Unknown frontmatter keys are preserved. Margin serves the authored file bytes, including frontmatter; it does not enforce an agent's interpretation of fields such as `allowed-tools`.
+
+Keep each file at or below 1,048,576 UTF-8 bytes. Invalid YAML, missing or invalid required metadata, directory/name mismatches, oversized files, and lower-precedence duplicates produce `field_invalid` warnings and are skipped. Documentation pages can still publish, so a successful build alone does not confirm that a skill was accepted.
+
+Do not put private instructions in a publicly served skill. Margin has no reader sign-in to check `groups` membership. Files beside a skill are excluded from documentation-page ingestion, and the skill-serving route currently serves only `SKILL.md`, not bundled scripts, references, or assets. Keep the published instructions self-contained or link to public documentation.
+
+## Check skill discovery
+
+Publish the repository changes through your normal documentation deployment. Set `DOCS_URL` to the deployed documentation root, including any deployment base path and without a trailing slash, then fetch its index:
+
+```bash
+export DOCS_URL="https://docs.example.com"
+curl --fail --silent --show-error \
+  "$DOCS_URL/.well-known/agent-skills/index.json"
+```
+
+The JSON response has a `skills` array. Find `configure-client`; its entry contains `name`, `type: "skill-md"`, `description`, an absolute `url`, and a `digest` formatted as `sha256:` followed by 64 lowercase hexadecimal characters. Follow the entry's URL rather than reconstructing it from the repository path.
+
+For this example, Margin maps either supported directory location for `configure-client` to `/.well-known/agent-skills/configure-client/SKILL.md`. The digest covers the exact UTF-8 bytes returned by that URL. The index follows Agent Skills discovery version 0.2.0; `/.well-known/skills/index.json` is available for legacy clients.
+
+Fetch the discovered URL and confirm that its frontmatter and task instructions match your file:
+
+```bash
+curl --fail --silent --show-error \
+  "$DOCS_URL/.well-known/agent-skills/configure-client/SKILL.md"
+```
+
+If the name is absent, check ingestion warnings, the directory/name match, and the public-serving rules above. An unknown skill name or a requested file other than `SKILL.md` returns HTTP `404` with body `Not Found`. Disabled skill surfaces also return HTTP `404`.
+
+## Install a skill in an agent
+
+Use the [skills CLI](https://github.com/vercel-labs/skills) from the project where the agent will work. The CLI requires Node.js 22.20 or later. It prompts for the skills and compatible agents to install to; installation is project-local by default.
+
+With `DOCS_URL` still set to your documentation root, run:
+
+```bash
+npx skills add "$DOCS_URL"
+```
+
+Select `configure-client` and your agent in the prompts. Then list the project's installed skills:
+
+```bash
+npx skills list
+```
+
+Confirm that `configure-client` appears for the selected agent. Open that project in the agent and check its available-skills listing, or ask it to identify the `configure-client` skill and its description. This checks agent discovery separately from successful publication.
+
+## Update published instructions
+
+Edit the same repository file and publish a new documentation version. Served skills come from the site's selected content version; the discovery digest changes when the served file bytes change. Re-fetch the index and skill URL to confirm that the deployed instructions are current.
+
+Publishing does not push new instructions into an agent's local installation. Re-run the installation command and confirm the installed skill's content before relying on a changed instruction.

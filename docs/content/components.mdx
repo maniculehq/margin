@@ -1,0 +1,150 @@
+---
+title: "Choose MDX components"
+description: "Find a built-in component by its purpose and open its usage reference."
+---
+
+Use built-in components directly in an MDX page without importing them. Choose a component by the content it needs to present, then copy its source example.
+
+The linked Mintlify syntax references provide longer examples. Margin's supported behavior is described here; a tag being supported does not mean every Mintlify prop or layout behavior is supported.
+
+## Choose callouts and layouts
+
+Use a callout for information that changes how the reader completes a task. Use cards for destinations and columns for side-by-side content.
+
+| Component | Choose it for | Short source example |
+| --- | --- | --- |
+| [Callout](https://www.mintlify.com/docs/components/callouts) | A general callout with an explicit type | `<Callout type="info">Changes apply on the next build.</Callout>` |
+| [Note](https://www.mintlify.com/docs/components/callouts) | A blue informational note | `<Note>The page must be in navigation.</Note>` |
+| [Info](https://www.mintlify.com/docs/components/callouts) | Neutral supporting information | `<Info>The preview uses this branch.</Info>` |
+| [Tip](https://www.mintlify.com/docs/components/callouts) | An optional recommendation | `<Tip>Reuse this block as a snippet.</Tip>` |
+| [Warning](https://www.mintlify.com/docs/components/callouts) | A caution before continuing | `<Warning>Check the target branch before pushing.</Warning>` |
+| [Check](https://www.mintlify.com/docs/components/callouts) | A successful result | `<Check>The build completed.</Check>` |
+| [Danger](https://www.mintlify.com/docs/components/callouts) | An error or destructive-action warning | `<Danger>Deleting this file removes its content.</Danger>` |
+| [Card](https://www.mintlify.com/docs/components/cards) | A linked or unlinked content card | `<Card title="Source" href="https://github.com/maniculehq/margin">Read the framework code.</Card>` |
+| [CardGroup](https://www.mintlify.com/docs/components/cards) | A responsive card grid | `<CardGroup cols="2"><Card title="Hosted">Publish on Manicule.</Card><Card title="Self-hosted">Run Margin yourself.</Card></CardGroup>` |
+| [Columns](https://www.mintlify.com/docs/components/columns) | A responsive grid for content other than cards too | `<Columns cols="2"><div>Before</div><div>After</div></Columns>` |
+| [Image](https://www.mintlify.com/docs/create/image-embeds) | An image with click-to-zoom | `<Image src="/images/preview.png" alt="Documentation preview" />` |
+| [Frame](https://www.mintlify.com/docs/components/frames) | Media with a caption | `<Frame caption="Documentation preview"><Image src="/images/preview.png" alt="Documentation preview" /></Frame>` |
+| [Panel](https://www.mintlify.com/docs/components/panel) | Compatibility with authored panel content | `<Panel>Related deployment information.</Panel>` |
+| [Tile](https://www.mintlify.com/docs/components/tiles) | A preview above a title and description | `<Tile title="Preview" description="Open the source repository." href="https://github.com/maniculehq/margin">Margin</Tile>` |
+| PreviewButton | A link styled as a small button | `<PreviewButton href="https://github.com/maniculehq/margin">Open source</PreviewButton>` |
+
+`CardGroup` and `Columns` use the same grid. `cols` accepts 1 through 4 and defaults to 2. `Panel` currently renders its children inline; it does not replace the table-of-contents column. For the image examples, add your own image at `images/preview.png` relative to the docs root.
+
+## Organize procedures and alternatives
+
+Use `Steps` when the reader must perform actions in sequence. Use `Tabs` for alternative instructions and `CodeGroup` when the alternatives are code samples. Keep optional detail in an accordion rather than hiding a required action.
+
+| Component | Choose it for | Short source example |
+| --- | --- | --- |
+| [Steps and Step](https://www.mintlify.com/docs/components/steps) | A numbered procedure and each action within it | `<Steps><Step title="Publish">Push the documentation change.</Step></Steps>` |
+| [Tabs and Tab](https://www.mintlify.com/docs/components/tabs) | Labeled alternative content panels | `<Tabs><Tab title="Hosted">Connect the repository.</Tab><Tab title="Self-hosted">Deploy Margin.</Tab></Tabs>` |
+| [Accordion](https://www.mintlify.com/docs/components/accordions) | One collapsible block, including standalone use | `<Accordion title="Troubleshooting">Check the build diagnostics.</Accordion>` |
+| [AccordionGroup](https://www.mintlify.com/docs/components/accordions) | Related collapsible blocks | `<AccordionGroup><Accordion title="Build">Check diagnostics.</Accordion><Accordion title="Links">Check destinations.</Accordion></AccordionGroup>` |
+| [Expandable](https://www.mintlify.com/docs/components/expandables) | Collapsible nested attributes | `<Expandable title="child attributes">Describe nested fields here.</Expandable>` |
+
+`CodeGroup` takes fenced code blocks. Give every fence a `title` so the tab label identifies the sample:
+
+````mdx
+<CodeGroup>
+
+```json title="docs.json"
+{"name": "Acme"}
+```
+
+```md title="index.mdx"
+# Welcome
+```
+
+</CodeGroup>
+````
+
+Read the [code-group syntax reference](https://www.mintlify.com/docs/components/code-groups) for larger examples.
+
+`View` creates selectable content variations from consecutive sibling tags. Write the variations next to each other without an authored `ViewGroup` wrapper:
+
+```mdx
+<View title="Hosted">Connect the repository on Manicule.</View>
+<View title="Self-hosted">Deploy the Margin application.</View>
+```
+
+See the [view syntax reference](https://www.mintlify.com/docs/components/view). Unlike numbered steps, views represent alternatives rather than actions to complete in order.
+
+## Describe API contracts
+
+Use `ParamField` for an input and `ResponseField` for an output. These components describe fields; they do not send requests or enforce validation.
+
+| Component | Choose it for | Short source example |
+| --- | --- | --- |
+| [ParamField](https://www.mintlify.com/docs/components/fields) | An input name, location, type, and description | `<ParamField query="limit" type="integer">Number of results requested.</ParamField>` |
+| [ResponseField](https://www.mintlify.com/docs/components/responses) | An output field and its description | `<ResponseField name="items" type="array">Returned results.</ResponseField>` |
+
+The names and data below illustrate a hypothetical API, not a Margin endpoint. `RequestExample` and `ResponseExample` currently render inline as code groups, not in a separate right-hand example column:
+
+````mdx
+<RequestExample>
+
+```json title="Request body"
+{"name": "Example"}
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json title="Response body"
+{"id": "example"}
+```
+
+</ResponseExample>
+````
+
+The [example syntax reference](https://www.mintlify.com/docs/components/examples) has larger request and response samples. Use `Expandable` inside a field description when the field contains child attributes.
+
+## Add diagrams and annotations
+
+Use diagrams for relationships and trees for file structure. Keep status labels and definitions near the content they qualify.
+
+| Component | Choose it for | Short source example |
+| --- | --- | --- |
+| [Mermaid](https://www.mintlify.com/docs/components/mermaid-diagrams) | A diagram rendered in the browser | `<Mermaid chart="graph LR; Source-->Build;" />` |
+| [Icon](https://www.mintlify.com/docs/components/icons) | An inline icon | `<Icon icon="terminal" />` |
+| [Badge](https://www.mintlify.com/docs/components/badge) | A neutral status label | `<Badge>Beta</Badge>` |
+| [Tooltip](https://www.mintlify.com/docs/components/tooltips) | A definition shown on hover or focus | `<Tooltip tip="The branch used for publishing">Deploy branch</Tooltip>` |
+| [Update](https://www.mintlify.com/docs/components/update) | A dated changelog entry | `<Update label="2026-01-01" description="Documentation update">Added a setup guide.</Update>` |
+| [Prompt](https://www.mintlify.com/docs/components/prompt) | Prompt text with a copy action | `<Prompt description="Review a page">Find broken links in this page.</Prompt>` |
+| [Tree](https://www.mintlify.com/docs/components/tree) | A file hierarchy | `<Tree><Tree.Folder name="docs"><Tree.File name="index.mdx" /></Tree.Folder></Tree>` |
+| [FileTree](https://www.mintlify.com/docs/components/tree) | The same file hierarchy using its alias | `<FileTree><FileTree.Folder name="docs"><FileTree.File name="index.mdx" /></FileTree.Folder></FileTree>` |
+| [Color](https://www.mintlify.com/docs/components/color) | Click-to-copy color swatches | `<Color><Color.Row title="Brand"><Color.Item name="Primary" value="#2563EB" /></Color.Row></Color>` |
+| [GitHub](https://www.mintlify.com/docs/components/github) | A public repository card | `<GitHub.Repo repo="maniculehq/margin" />` |
+
+`GitHub` is used through `GitHub.Repo`. The card fetches repository details in the visitor's browser and falls back to a repository link when details are unavailable. `Prompt` displays its description and copy control; the prompt body is not displayed as page prose.
+
+The supported built-in member tags are `Tree.File`, `Tree.Folder`, `FileTree.File`, `FileTree.Folder`, `Color.Item`, `Color.Row`, and `GitHub.Repo`. Other dotted names are not accepted as built-in members.
+
+## Target readers and reuse content
+
+Use audience wrappers when human instructions and agent instructions need to differ. Content outside an audience wrapper remains available to both readers.
+
+| Component | Choose it for | Short source example |
+| --- | --- | --- |
+| [Visibility](https://www.mintlify.com/docs/components/visibility) | Explicit audience selection | `<Visibility for="agents">Read the Markdown rendition.</Visibility>` |
+| Agent | Agent-only content, as an alias | `<Agent>Read the Markdown rendition.</Agent>` |
+| Human | Human-only content, as an alias | `<Human>Use the navigation sidebar.</Human>` |
+| [Snippet](https://www.mintlify.com/docs/create/reusable-snippets) | Including reusable content at ingest | `<Snippet file="snippets/shared-note.mdx" />` |
+
+`Visibility` recognizes `for="agents"` and `for="humans"`. Agent content is absent from the human HTML rendition; human content is omitted from agent Markdown. An omitted or unrecognized `for` value addresses both audiences. Audience wrappers select presentation, not access permissions.
+
+Before using the snippet example, create `snippets/shared-note.mdx` under the docs root with the content to reuse. Margin expands the snippet into the page during ingest.
+
+## Handle unknown components
+
+An unknown capitalized component is removed as a wrapper during ingest. Its children remain, and the build records a `component_unknown` warning rather than failing for that unknown name. The component's layout and behavior do not survive.
+
+For example, an unsupported wrapper around a sentence leaves the sentence as ordinary content:
+
+```mdx
+<CustomBox>Check the build diagnostics.</CustomBox>
+```
+
+The result is `Check the build diagnostics.` without a box. An unknown self-closing component has no children to preserve. Replace unknown tags with the closest built-in component, and check the rendered page as well as the build diagnostics. Misspelled or unsupported member tags follow the same warning-and-unwrapping behavior.

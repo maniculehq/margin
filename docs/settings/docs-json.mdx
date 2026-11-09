@@ -1,0 +1,373 @@
+---
+title: Configure your site with docs.json
+description: Look up configuration fields, their Margin compatibility status, and Margin-specific extensions.
+---
+
+Place `docs.json` at the root of your documentation folder to override Margin's derived configuration. The file is optional, and every top-level field is optional. Margin also accepts legacy `mint.json`; when both files exist, `docs.json` wins.
+
+## Read field definitions and compatibility status
+
+Compatibility describes the field's effect, not just whether the JSON parses.
+
+| Status | Meaning |
+| --- | --- |
+| Supported | Margin implements the setting's documented behavior. |
+| Adapted | Margin maps the setting to its own renderer or layout. The definition names differences. |
+| Ignored | Margin accepts the setting but does not apply it. Unsupported settings produce diagnostics rather than failing publication. |
+
+Types below describe authored JSON. A default is the behavior when a field is omitted, not a value you must copy into the file. Nested fields are optional unless marked required. `string[]` means an array of strings; a light/dark pair means an object with both `light` and `dark` strings.
+
+Omitting `colors`, `logo`, or `favicon` permits derivation or detection. Setting those fields to `null` explicitly disables that behavior. `x-margin.css: null` disables stylesheet injection. Do not assume other fields accept `null`.
+
+This valid configuration sets only a site name; Margin derives the remaining settings from your documentation folder:
+
+```json title="docs.json"
+{
+  "name": "Acme Docs"
+}
+```
+
+Unknown top-level fields and unknown direct children of `x-margin` produce `unknown_field` diagnostics. Malformed known fields produce `field_invalid` diagnostics and fall back to defaults; recovery may discard the containing top-level field. Invalid JSON fails the build.
+
+To check JSON syntax locally, run this command from the documentation folder. No output and exit status `0` mean the file parses; this does not validate Margin compatibility:
+
+```sh title="Check JSON syntax"
+python3 -m json.tool "docs.json" > /dev/null
+```
+
+## Set site identity
+
+<ParamField body="$schema" type="string">
+Ignored at runtime. Supplies an editor schema URL, for example `"https://mintlify.com/docs.json"`. Configuring the URL does not change Margin's accepted fields. The `markdown.schema` setting can expose this URL to agents.
+</ParamField>
+
+<ParamField body="name" type="string">
+Supported. Must be non-empty. Sets the site title used by documentation chrome and metadata. Example: `"Acme Docs"`. Without an override, Margin derives a site name; a self-hosted `SITE_NAME` overrides the configured name.
+</ParamField>
+
+<ParamField body="description" type="string">
+Supported. Site-level fallback for page descriptions and social metadata. Defaults to a derived page description or excerpt. Example: `"Build applications with Acme."`.
+</ParamField>
+
+<ParamField body="logo" type="string | object | null">
+Supported. A string supplies the image for both modes. The object requires `light` and `dark` asset paths and accepts an optional absolute URL in `href` for the click target. Example: `{"light":"/logo-light.svg","dark":"/logo-dark.svg","href":"https://example.com"}`. Omission permits logo detection; `null` selects a text-only navbar.
+</ParamField>
+
+<ParamField body="favicon" type="string | object | null">
+Supported. A string supplies one icon, or use `{"light":"/favicon-light.svg","dark":"/favicon-dark.svg"}`. Defaults to a detected or generated favicon. `null` suppresses the favicon link.
+</ParamField>
+
+## Configure appearance and layout
+
+<ParamField body="theme" type="string">
+Adapted. Selects a Margin-owned layout and palette that approximate the Mintlify theme rather than reproduce its layout exactly. Without a theme, Margin uses its `neutral` layout.
+
+| Value | Margin layout | Palette |
+| --- | --- | --- |
+| `mint` | `neutral` | `neutral` |
+| `linden` | `neutral` | `neutral` |
+| `maple` | `warm` | `ruby` |
+| `almond` | `warm` | `solar` |
+| `palm` | `verdant` | `emerald` |
+| `willow` | `verdant` | `ocean` |
+| `aspen` | `aspen` | `aspen` |
+| `sequoia` | `dusk` | `dusk` |
+| `luma` | `contrast` | `black` |
+</ParamField>
+
+<ParamField body="colors" type="object | null">
+Supported. `primary`, `light`, and `dark` are hex color strings. Example: `{"primary":"#2563EB","light":"#60A5FA","dark":"#1D4ED8"}`. Defaults to derived theme tokens, with an optional detected logo accent. `null` forces neutral colors and disables logo-accent derivation.
+</ParamField>
+
+<ParamField body="appearance" type="object">
+Adapted. `default` accepts `system`, `light`, or `dark` and defaults to `system`. `strict: true` disables the reader's theme switch and pins an explicit `light` or `dark` default; `system` continues to follow the system theme. Example: `{"default":"dark","strict":true}`.
+</ParamField>
+
+<ParamField body="background" type="object">
+Adapted. No background override by default. `color` accepts a hex string or a light/dark pair of hex strings. `image` accepts an asset path or a light/dark pair of paths. `decoration` accepts `gradient`, `grid`, or `windows`, rendered with Margin-owned styling. Example: `{"decoration":"grid"}`.
+</ParamField>
+
+<ParamField body="fonts" type="object">
+Adapted. Configure one face using `family` (string), `weight` (number), `source` (font asset path), and `format` (`woff` or `woff2`). Alternatively, set `heading`, `body`, or `mono` objects with those same fields. Self-hosted sources produce font-face declarations; supported Google Fonts families use the font service. The bundled text defaults are Inter and Geist Mono. Example: `{"body":{"family":"Acme Sans","source":"/fonts/acme.woff2","format":"woff2","weight":400}}`.
+</ParamField>
+
+<ParamField body="icons.library" type="string">
+Adapted. Accepts `lucide`, `fontawesome`, or `tabler`; the configuration default is `lucide`. Alternate libraries use best-effort name matching, and missing icons fall back with a diagnostic. Example: `"tabler"`.
+</ParamField>
+
+<ParamField body="styling" type="object">
+Set individual rendering controls:
+
+| Field | Type | Status | Default and effect |
+| --- | --- | --- | --- |
+| `eyebrows` | string | Adapted | `section`; use `breadcrumbs` for the full trail. |
+| `latex` | boolean | Supported | `false`; `true` compiles math with KaTeX. |
+| `codeblocks` | string or object | Supported | Framework highlighting defaults; a mode string such as `system` follows the display mode. |
+| `codeblocks.theme` | string or light/dark pair | Supported | Shiki theme selection, for example `{"light":"github-light","dark":"github-dark"}`. |
+| `codeblocks.languages` | string[] or object | Supported | Custom TextMate grammar paths; object form is `{"custom":["/grammars/acme.json"]}`. |
+</ParamField>
+
+<ParamField body="navbar" type="object">
+Supported. `links` is an array of link objects with required `href` and optional `label` or `name`. `primary` requires `href` and accepts optional `type` and `label` strings; use `type: "button"` for a labeled action or `type: "github"` for a GitHub target. Example: `{"links":[{"label":"Support","href":"mailto:support@example.com"}]}`. With no authored links, Margin can derive a GitHub link from the repository. Placement follows the selected chrome layout; sidebar layouts place links above the page tree. Invalid links are dropped independently.
+</ParamField>
+
+<ParamField body="footer" type="object">
+Supported. `socials` maps platform names to URLs. `links` is an array of columns, each with required `header` and `items`; each item requires `label` and `href`. Example: `{"socials":{"github":"https://github.com/acme"},"links":[{"header":"Company","items":[{"label":"Home","href":"https://example.com"}]}]}`. No footer links by default. Invalid items are dropped without discarding valid siblings.
+</ParamField>
+
+<ParamField body="banner" type="object">
+Supported. Requires a non-empty `content` string with basic inline MDX. Optional fields are `type` (`info`, `warning`, or `critical`), `dismissible` (boolean), and `color` (hex string or light/dark pair). Example: `{"content":"Version 2 is available.","type":"info","dismissible":true}`. No banner by default. `contentHast` is generated by Margin and cannot be authored.
+</ParamField>
+
+## Configure navigation
+
+A non-empty `navigation` object replaces filesystem and `meta.json` navigation structure. Pages omitted from navigation remain reachable by URL. A page's `hidden: true` frontmatter still hides it even when listed. Navigation settings do not provide access control.
+
+<ParamField body="navigation" type="object">
+Supported. Accepts the container fields below. Omission uses filesystem-derived navigation. Example: `{"groups":[{"group":"Start","pages":["index","quickstart"]}]}`. Page strings name documentation paths without `.md` or `.mdx` extensions.
+
+| Field | Entry shape and status |
+| --- | --- |
+| `pages` | Supported. Array of page strings, `{href}` link objects, or nested group objects. |
+| `groups` | Supported. Array of objects with required `group` string; `pages` defaults to `[]`. |
+| `tabs` | Supported. Array of objects with required `tab` string. External `href` produces a link. |
+| `anchors` | Adapted. Array of objects with required `anchor` string; grouped anchors become root folders, and link-only anchors become links. |
+| `dropdowns` | Supported. Array of objects with required `dropdown` string; nested content forms a menu, while `href` alone forms a link. |
+| `versions` | Supported. Array of objects with required `version` string; controls product-version navigation. |
+| `languages` | Supported. Array of objects with required `language` string; the default language uses unprefixed paths, and others use locale prefixes. |
+| `products` | Adapted. Array of objects with required `product` string; optional `name`, `description`, and content. Link products remain links; container products become menus. |
+| `menu` | Supported. Array of objects with required `item` string; each item can contain navigation children. |
+| `global` | Supported. Object containing `languages`, `versions`, `tabs`, `dropdowns`, `anchors`, or `products` shown across sections. |
+</ParamField>
+
+Container children are recursive, but the accepted child set depends on the node type:
+
+| Node | Child fields |
+| --- | --- |
+| Group | `pages` |
+| Tab | `languages`, `versions`, `tabs`, `dropdowns`, `menu`, `groups`, `pages`, `global` |
+| Anchor | `languages`, `versions`, `tabs`, `dropdowns`, `groups`, `pages` |
+| Dropdown | `languages`, `versions`, `tabs`, `anchors`, `products`, `groups`, `pages` |
+| Version | `languages`, `tabs`, `groups`, `pages`, `global` |
+| Language | `versions`, `tabs`, `groups`, `pages`, `global` |
+| Product | `languages`, `versions`, `tabs`, `anchors`, `groups`, `pages`, `menu`, `global` |
+| Menu item | `groups`, `pages`, `tabs`, `dropdowns`, `anchors`, `products`, `versions`, `languages`, `global` |
+
+<ParamField body="navigation node modifiers" type="object">
+Modifiers belong on a node, not beside `navigation`. Use only modifiers appropriate to that node:
+
+| Modifier | Type and placement | Status and effect |
+| --- | --- | --- |
+| `href` | string; link-capable containers | Supported. Link destination. |
+| `icon` | string; groups, tabs, anchors, dropdowns, products, menu items | Supported. Icon name. |
+| `hidden` | boolean; containers | Supported. Hides the node from navigation without removing its URL. |
+| `searchable` | boolean; groups and tabs | Supported. Controls search inclusion. |
+| `root` | string; groups | Supported. Root-folder target. |
+| `expanded` | boolean; groups | Supported. Initial folder expansion. |
+| `tag` | string; groups and versions | Supported. Group label or version badge. |
+| `default` | boolean; versions and languages | Supported. Marks the default selection. |
+| `directory` | string; containers | Adapted. Directory presentation or placement; group presentation accepts `accordion` or `card`. |
+| `color` | hex string or light/dark pair; anchors, dropdowns, products | Adapted. Element color. |
+| `description` | string; dropdowns, products, menu items | Supported. Menu description. |
+| `boost` | number; groups | Ignored. Margin's search backend controls ranking. |
+| `public` | boolean; groups | Ignored for access control. All documentation remains public. |
+| `align` | `start` or `end`; tabs | Adapted. Per-tab end alignment is ignored. |
+</ParamField>
+
+<ParamField body="navigation source fields" type="object">
+`openapi` is supported on groups, tabs, anchors, versions, languages, products, and menu items. Supply a source string, or `{"source":"openapi.yaml","directory":"reference"}`. Under an OpenAPI-bearing node, a page string such as `"GET /users"` resolves to the generated operation page. Generated API pages not referenced by explicit navigation remain URL-reachable but hidden, with an `openapi_orphaned` diagnostic.
+
+`asyncapi` and `graphql` navigation sources are ignored and diagnosed. `sdk` is adapted for local TypeDoc JSON artifacts using `{"format":"typedoc","source":"reference.json","directory":"sdk"}`. TypeDoc generation accepts at most 500 pages and a 30 MB artifact. Formats `docfx`, `javadoc`, `sphinx`, and `phpdoc`, and remote SDK artifact sources, do not generate pages.
+</ParamField>
+
+<ParamField body="navigation.$ref" type="string">
+Supported when the entire referenced node is `{"$ref":"./navigation.json"}`. References resolve JSON files inside the documentation snapshot, including nested references. The same form works for `redirects`. Circular, missing, invalid, or out-of-root references are dropped with a diagnostic. Expansion limits are 8 nesting levels, 32 expansions, and a 2 MiB total reference budget.
+</ParamField>
+
+## Configure API documentation
+
+API settings configure generated OpenAPI documentation. They do not turn a manual MDX page into an API console.
+
+<ParamField body="api.openapi" type="string | object | array">
+Supported. Registers OpenAPI sources instead of relying on convention discovery. Example: `"openapi.yaml"`, an array of source strings, or `{"source":"openapi.yaml","directory":"reference"}`. Navigation source fields determine placement when explicit navigation is present.
+</ParamField>
+
+<ParamField body="openapi" type="array">
+Supported legacy registration form. Each entry is a source string or an object with required `id` and `spec`, plus optional `label` and `path`. Example: `[{"id":"public","spec":"openapi.yaml","label":"Public API","path":"reference"}]`. `label` defaults to `API Reference`; `path` defaults to `api-reference`. IDs contain lowercase letters, digits, and hyphens, start with a letter or digit, and are at most 64 characters. Do not register the same specification twice.
+</ParamField>
+
+<ParamField body="api.playground" type="object">
+Adapted. Controls the request playground:
+
+| Field | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `display` | `interactive`, `simple`, `none`, or `auth` | `interactive` | `auth` behaves as `none`; documentation visitors have no authentication state. |
+| `proxy` | boolean | `true` | Routes requests through `/api/proxy`, restricted to specification servers. |
+| `credentials` | boolean | `false` | Sends browser credentials only with `proxy: false`; has no effect through the proxy. |
+</ParamField>
+
+<ParamField body="api.params" type="object">
+Adapted. `expanded` accepts `all` or `closed` to control parameter section expansion. Example: `{"expanded":"all"}`. `post` accepts a string array but is ignored with an `unsupported_field` diagnostic; parameter pills are not implemented.
+</ParamField>
+
+<ParamField body="api.examples" type="object">
+Adapted. `languages` is an array of sample-language identifiers. `defaults` accepts `required` or `all` (default `all`); `autogenerate` is boolean (default `true`). Example: `{"defaults":"required","autogenerate":true}`. The playground always prefills from the selected example. Authored `prefill: false` is unsupported and produces a diagnostic.
+</ParamField>
+
+<ParamField body="api.url" type="string">
+Adapted. `"full"` shows the request URL using OpenAPI server precedence: operation, then path item, then root. Server variables use declared defaults. Relative servers remain relative; Margin does not invent an origin.
+</ParamField>
+
+<ParamField body="api.asyncapi / api.mdx" type="object or source value">
+Ignored with `unsupported_field` diagnostics. AsyncAPI does not generate reference pages. `api.mdx` server and authentication settings do not create consoles for manual API pages.
+</ParamField>
+
+## Configure metadata and integrations
+
+<ParamField body="seo" type="object">
+Supported, except the authored organization ID described below.
+
+| Field | Type | Default and behavior |
+| --- | --- | --- |
+| `indexing` | `navigable` or `all` | `navigable`; controls sitemap inclusion and page indexing directives. |
+| `trailingSlash` | boolean | `false`; `true` adds a trailing slash to canonical URLs. |
+| `metatags` | string-to-string map | No additional tags. Example: `{"robots":"noarchive"}`. Executable markup is rejected; `canonical` is ignored because each page emits its own canonical URL. |
+| `organization` | object | Structured publisher identity. Optional `name` and `legalName` are non-empty strings up to 255 characters; `url` is a public HTTP(S) URL; `logo` is a safe relative asset or public HTTP(S) URL; `sameAs` is an array of public HTTP(S) URLs. |
+| `organization.id` | string | Ignored. Margin creates its own origin-bound structured-data ID. |
+
+An authored `seo.organization` identity takes precedence over `x-margin.seo.publisher`.
+</ParamField>
+
+<ParamField body="thumbnails" type="object">
+Adapted. Site-wide social-card defaults. `appearance` selects the card appearance, with a fallback derived from the background or site appearance. `image` is an image-asset string; invalid image URLs fall back to generated cards. `background` is a background-image path string, and `fonts.family` is a font-family string for generated card assets; font families resolve at ingest, and failed asset resolution falls back with a diagnostic. The default generated-card font is Geist Sans.
+</ParamField>
+
+<ParamField body="integrations" type="object">
+Supported for the providers below. Omission loads no provider. Each entry supplies data to a Margin-owned loader, not arbitrary JavaScript.
+
+| Provider | Fields | Restrictions or defaults |
+| --- | --- | --- |
+| `ga4` | `measurementId`: string | Starts with `G`. |
+| `posthog` | `apiKey`: string; optional `apiHost`: string | Key starts with `phc_`. Only official cloud origins are accepted: `https://us.i.posthog.com`, `https://eu.i.posthog.com`, `https://us.posthog.com`, `https://eu.posthog.com`. Paths, queries, and fragments are not accepted. |
+| `plausible` | `domain`: string | `server` is ignored; custom script origins are not permitted. |
+| `fathom` | `siteId`: string | Example shape: `{"siteId":"SITE_ID"}`. |
+| `clarity` | `projectId`: string | Example shape: `{"projectId":"PROJECT_ID"}`. |
+| `amplitude` | `apiKey`: non-empty string | Provider key only. |
+| `mixpanel` | `projectToken`: non-empty string; optional `region` | Region accepts `us`, `eu`, or `in`; default `us`. |
+| `segment` | `key`: non-empty string | Provider key only. |
+| `hotjar` | `hjid`: string or number; optional `hjsv`: string or number | Site ID must be numeric; script version defaults to `6`. |
+| `intercom` | `appId`: non-empty string | Provider ID only. |
+
+`gtm` accepts a `tagId` string but is ignored because containers can execute custom scripts. Unknown providers, arbitrary script loaders, Plausible custom servers, and non-official PostHog hosts are ignored with `integration_unsupported` diagnostics. A deployment can suppress configured analytics.
+</ParamField>
+
+## Configure site behavior
+
+<ParamField body="public" type="boolean">
+Ignored with an `unsupported_field` diagnostic. All served documentation is public; `false` does not protect a page or site.
+</ParamField>
+
+<ParamField body="search.prompt" type="string">
+Supported. Changes search placeholder text, for example `"Search Acme docs"`. Select the search backend separately with `x-margin.search.mode`.
+</ParamField>
+
+<ParamField body="redirects" type="array | reference object">
+Supported. Each rule requires `source` and `destination` strings; optional `permanent` defaults to `true` (HTTP 308). `false` selects HTTP 307. Example: `[{"source":"/old-guide","destination":"/quickstart"}]`. A standalone `{"$ref":"./redirects.json"}` can load the array.
+
+Sources support exact paths, `:param`, `:param*`, `*`, and `prefix-*`. Sources cannot include queries or fragments. Destinations can include queries or fragments and substitute only captured tokens. HTTP(S) external destinations are supported. Invalid rules, loops, missing internal destinations, and rules that shadow published pages are dropped with diagnostics. Exact matches take precedence over patterns; patterns use declaration order.
+</ParamField>
+
+<ParamField body="contextual" type="object">
+Adapted. Configures the page action menu. `display` accepts `header` (default) or `toc`. `options` is an ordered array of option IDs or custom objects. Default IDs are `copy`, `view`, `chatgpt`, `claude`, `cursor`, and `t3`. Other IDs are `perplexity`, `grok`, `aistudio`, `devin`, `windsurf`, `devin-desktop`, `devin-mcp`, `download-spec`, `download-pdf`, `github`, `mcp`, `add-mcp`, and `vscode`. Downloads and GitHub actions require the corresponding page resource. An empty array removes the menu; unknown IDs are not rendered.
+
+Custom objects require a non-empty `title` and `href`; optional string fields are `description`, `icon`, and `src` (image icon). `href` is a URL-template string or `{base,query:[{key,value}]}`. Templates substitute `$page` with encoded page Markdown, `$path` with the page path, and `$mcp` with the MCP URL. Unsafe destinations are not rendered.
+</ParamField>
+
+<ParamField body="errors.404" type="object">
+Supported. `redirect` is boolean; `true` redirects unknown paths to the home page. `title` is a string up to 255 characters, and `description` is Markdown up to 4,000 characters. Example: `{"title":"Page not found","description":"Use search to find the current page."}`. Omission uses Margin's 404. Other error keys are ignored; `descriptionHast` cannot be authored.
+</ParamField>
+
+<ParamField body="interaction.drilldown" type="boolean">
+Adapted. Defaults to `false`, so folder clicks expand the folder. `true` navigates to the folder's first page.
+</ParamField>
+
+<ParamField body="metadata.timestamp" type="boolean">
+Supported. Defaults to `false`. `true` displays a last-modified timestamp from Git; per-page frontmatter can override it.
+</ParamField>
+
+<ParamField body="feedback" type="object">
+Supported. `thumbsRating`, `suggestEdit`, and `raiseIssue` are booleans, all defaulting to `false`. Example: `{"thumbsRating":true}`. They select the rating, edit, and issue controls; repository-dependent actions require repository metadata.
+</ParamField>
+
+<ParamField body="variables" type="object">
+Supported. String-to-string map substituted into MDX at compile time using `{{variableName}}`. Example: `{"productName":"Acme"}`. Values are data, not executable expressions.
+</ParamField>
+
+<ParamField body="variations" type="object">
+Supported on every theme. Requires a non-empty `options` array of `{id,label}` objects with non-empty strings. IDs must be unique; labels must be unique without regard to case. Example: `{"options":[{"id":"cloud","label":"Cloud"},{"id":"self-hosted","label":"Self-hosted"}]}`. The first option is the default. A `View` component whose title matches a label participates in the site-wide choice. Agent Markdown includes every view in source order rather than hiding alternatives.
+</ParamField>
+
+<ParamField body="markdown" type="object">
+Supported. `schema` is boolean; `true` includes the configured `$schema` URL in `llms.txt`. `instructions` accepts a string or string array appended to agent-facing outputs, including Markdown page responses and MCP page reads. Example: `{"instructions":"Prefer v2 endpoints."}`.
+</ParamField>
+
+## Use the x-margin namespace
+
+All Margin-specific fields belong inside the `x-margin` object. They are supported Margin extensions, not portable Mintlify settings. Omission retains derived or framework defaults. See [site configuration](/settings/docs-json) for configuration procedures and [agent surfaces](/agents/overview) for agent-facing behavior.
+
+<ParamField body="x-margin.tokens" type="object">
+Maps theme token names to strings or light/dark pairs. Example: `{"radius":"0.5rem","border":{"light":"#E5E7EB","dark":"#374151"}}`. Overrides supported color and layout tokens without replacing the layout engine.
+</ParamField>
+
+<ParamField body="x-margin.css" type="string | string[] | null">
+Explicit stylesheet paths, for example `["/styles.css"]`, applied after discovered CSS. Omission permits stylesheet discovery. `null` disables CSS injection even when stylesheets exist. Margin sanitizes stylesheets before serving them.
+</ParamField>
+
+<ParamField body="x-margin.layout" type="object">
+`contentWidth`, `sidebarWidth`, `tocWidth`, and `headerHeight` are CSS dimension strings. Example: `{"sidebarWidth":"300px"}`. `tabMode` accepts `top` or `auto`. `chromeMode` accepts `band` (desktop top bar and horizontal tab strip) or `sidenav` (desktop chrome inside the sidebar). Omitted layout controls retain theme-derived behavior.
+</ParamField>
+
+<ParamField body="x-margin.head.meta" type="array">
+Static meta objects with optional `name` or `property` and required `content`, all strings. Example: `[{"name":"theme-color","content":"#2563EB"}]`. No additional tags by default. Script, style, and link markup is rejected with `head_rejected`; this field does not inject executable head content.
+</ParamField>
+
+<ParamField body="x-margin.assets.allowExternal" type="string[]">
+Host allow-list for supported external image and font resolution. Defaults include `fonts.googleapis.com` and `fonts.gstatic.com`. Example: `["images.example.com"]`. This does not authorize arbitrary script origins.
+</ParamField>
+
+<ParamField body="x-margin.search.mode" type="string">
+Accepts `ai`, `static`, or `off`. `ai` uses the assistant when Gateway credentials are available; self-hosted deployments without the credential stay on static search. `static` selects search without AI; `off` disables search. Example: `"static"`. Credentials belong in deployment settings, not this file; see [deployment](/deploy/self-host).
+</ParamField>
+
+<ParamField body="x-margin.versions.default" type="string">
+Overrides the default product documentation version. Example: `"v2"`. This selects a product-version partition, not a deployment commit.
+</ParamField>
+
+<ParamField body="x-margin.seo" type="object">
+Optional SEO overrides:
+
+| Field | Type | Default and constraints |
+| --- | --- | --- |
+| `titleTemplate` | string | `{page} – {site}`. Length 1–200; exactly one `{page}`, at most one `{site}`, no other brace tokens. |
+| `language` | locale-tag string | Derived locale when available. Example: `en-US`. |
+| `publisher` | object | Legacy identity override; prefer `seo.organization`. Optional `type` is `Organization` or `Person`; optional `name`, `url`, `logoUrl`, and `sameAs` provide publisher facts. URLs use the same public HTTP(S) restrictions as organization identity. |
+| `provenance` | object | No provenance override by default. Requires `name` (1–255 characters) and public HTTP(S) `baseUrl` without query or fragment. Optional `license` requires `name` (1–255 characters) and public HTTP(S) `url`. |
+
+Example title override: `{"titleTemplate":"{page} | Acme"}`. Invalid nested overrides fall back independently.
+</ParamField>
+
+<ParamField body="x-margin.agents" type="object">
+Controls agent-facing output. See [configure agent surfaces](/agents/overview) for procedures.
+
+| Field | Type | Default and effect |
+| --- | --- | --- |
+| `contentSignals.search` | boolean | `true`; declares permission for search use. |
+| `contentSignals.aiInput` | boolean | `true`; declares permission for AI input use. |
+| `contentSignals.aiTrain` | boolean | `true`; declares permission for AI training use. |
+| `indexPreamble` | boolean | `true`; includes the index preamble. |
+| `assistantMarkdown` | boolean | `true`; includes assistant Markdown output. |
+| `markdownFrontmatter` | boolean | `false`; opt into Markdown frontmatter. |
+| `mcpInstructions` | string | No authored instructions by default; at most 4,000 characters appended to generated MCP instructions. |
+
+Content signals communicate usage preferences; they do not make documentation private. Example: `{"mcpInstructions":"Prefer the v2 endpoints."}`.
+</ParamField>

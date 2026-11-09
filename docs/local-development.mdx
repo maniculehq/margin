@@ -1,0 +1,134 @@
+---
+title: Run locally
+description: Use the bundled Postgres service and ingest watcher to preview documentation changes before pushing.
+---
+
+Run Margin from a repository checkout to preview documentation edits at `http://localhost:3000` before pushing. The development command imports the documentation into Postgres and keeps watching for edits under `docs/`. Running locally does not publish your documentation.
+
+To publish, use [Manicule hosting](/deploy/manicule), which is free, with no limits. It includes the database, runs the latest release, and requires no servers or environment variables to configure. Each push to your docs branch publishes your documentation, and pull requests get previews. For deployment on Vercel with Neon or on a Node.js 24+ server with your own Postgres database, use [self-hosting](/deploy/self-host).
+
+## Check prerequisites
+
+Install [Bun](https://bun.sh), Node.js 24 or newer, Git to obtain the repository, and Docker with Compose. Start the Docker daemon before starting Postgres. Bun 1.4.3 is the version used by the repository's CI; the repository does not declare a minimum Bun version.
+
+Check that the tools are available:
+
+```bash
+bun --version
+node --version
+git --version
+docker compose version
+docker info
+```
+
+The Node.js major version must be at least 24, and `docker info` must connect to the daemon. Keep local ports 3000 (Margin) and 5440 (Postgres) available for the default setup.
+
+## Start Margin locally
+
+1. Obtain the repository and enter its root directory. If you already have a checkout, enter that checkout instead:
+
+   ```bash
+   git clone https://github.com/maniculehq/margin.git
+   cd margin
+   ```
+
+   Run the remaining commands from the directory containing `package.json`, `.env.example`, and `docker-compose.yml`.
+
+2. Install dependencies, then create the local environment file:
+
+   ```bash
+   bun install
+   cp .env.example .env
+   ```
+
+   For the bundled database and default application port, the copied values need no edits. If `.env` already exists, retain it rather than overwriting local settings. Check these values in `.env`:
+
+   ```dotenv
+   DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5440/docs
+   SITE_ORIGIN=http://localhost:3000
+   ```
+
+   The local commands load `.env` explicitly. `DATABASE_URL` selects the database, and `SITE_ORIGIN` supplies the public origin used for generated URLs. No integration credentials are needed to serve the bundled docs.
+
+3. Start Postgres and wait for its health check:
+
+   ```bash
+   docker compose up -d --wait postgres
+   docker compose ps postgres
+   ```
+
+   Compose runs Postgres 17 with database `docs`, user `postgres`, and password `postgres`. It binds the database to `127.0.0.1:5440`. Confirm that the service is healthy before proceeding: migrations connect to this database to create or update the schema, so they cannot run while Postgres is unavailable.
+
+4. Apply the database migrations:
+
+   ```bash
+   bun run db:migrate
+   ```
+
+   A successful run prints `[db:migrate] database is up to date`. Running the command again leaves an up-to-date schema unchanged.
+
+5. Start the development processes:
+
+   ```bash
+   bun run dev
+   ```
+
+   Keep this terminal open. The command builds the icon map, then starts Vite and the ingest watcher together. Wait for a successful ingest message with a page count and version ID, then open `http://localhost:3000`. The bundled Margin documentation should render.
+
+## Confirm documentation updates
+
+Open `docs/index.mdx` in your editor and add a temporary paragraph such as `Local preview check.` after its introductory paragraph. Save the file and watch the development terminal for another successful ingest message.
+
+The watcher performs an initial ingest, then re-ingests changes under the documentation directory after a 300 ms debounce. Each watch ingest creates a new development content version and updates the site's current version. Refresh `http://localhost:3000` after ingest succeeds and confirm that `Local preview check.` appears. Automatic ingest does not require a separate command; use a browser refresh to check the rendered result rather than relying on a live-reload event. Remove the temporary paragraph, save, and refresh again after the next successful ingest.
+
+Use explicit ingest commands only when you are not already running the watcher through `bun run dev`:
+
+- For a single import into the database, run:
+
+  ```bash
+  bun run ingest
+  ```
+
+  This exits after ingest. The version key normally comes from the current Git commit, so repeating it for uncommitted edits can print `nothing to do (--force re-ingests)`. To replace that already-ingested version with the edited files, run:
+
+  ```bash
+  bun run ingest --force
+  ```
+
+- To watch the documentation directory without starting the application server, run:
+
+  ```bash
+  bun run ingest:watch
+  ```
+
+  This performs an initial import and continues watching. It needs the migrated database, but does not start Vite. Do not start another watcher alongside `bun run dev`.
+
+The default documentation directory is `docs/` when it exists. Set `DOCS_DIR` to use another directory, or pass `--dir` to an explicit ingest command.
+
+## Stop the local database
+
+Press Ctrl-C in the development terminal to stop both Vite and the ingest watcher. If either child process exits, the development command also stops the other.
+
+From the repository root, stop and remove the Compose containers:
+
+```bash
+docker compose down
+```
+
+The named `postgres-data` volume retains the database contents. Stopping containers is not a database reset: the next `docker compose up -d --wait postgres` reuses that data. Removing the volume separately deletes the stored data.
+
+## Fix startup and ingest errors
+
+Use the terminal output to identify whether startup, database access, or content validation failed.
+
+| Symptom | Likely cause | Corrective action |
+| --- | --- | --- |
+| Docker cannot connect to its daemon | Docker is not running or the current user cannot access it. | Start Docker, restore access, and confirm `docker info` succeeds before retrying Compose. |
+| Compose cannot bind port 5440 | Another service is using the default database port. | Free port 5440, or set `POSTGRES_PORT` in `.env` to an available port and update the port in `DATABASE_URL` to match. Recreate the service with `docker compose up -d --wait postgres`. |
+| Migrations or ingest cannot connect to Postgres | Postgres is not healthy, or `DATABASE_URL` points to the wrong host or port. | Check `docker compose ps postgres`, start the service with the wait command, and match `DATABASE_URL` to its host port. Run migrations before restarting development. |
+| `Invalid environment variables: DATABASE_URL (missing or empty)` | The database URL is absent or empty. | Restore `DATABASE_URL` in the root `.env` and restart the command. |
+| `Invalid environment variables: SITE_ORIGIN` | The local origin is missing or is not a valid URL. | Set `SITE_ORIGIN=http://localhost:3000` in `.env` and restart development. |
+| `[ingest] no docs folder: pass --dir, set DOCS_DIR, or add docs/ (or a docs.json in the current directory)` | Ingest is running from the wrong directory or cannot find a documentation folder. | Return to the repository root, restore `docs/`, or set `DOCS_DIR` to the intended folder. |
+| Ingest prints a failure report with file paths and messages | Documentation failed content validation. | Fix the reported files and save again while the watcher runs. Confirm a successful ingest before refreshing the browser. |
+| Explicit ingest reports `nothing to do (--force re-ingests)` | The current version key has already been imported. | Run `bun run ingest --force` for a one-time replacement, or use the development watcher for repeated edits. |
+| Development exits after `[ingest] DOCS_INGEST=off: skipping build-time ingest` | `DOCS_INGEST=off` makes the watcher exit, which also stops Vite. | Unset `DOCS_INGEST` or set it to `on`, then restart `bun run dev`. |

@@ -1,0 +1,47 @@
+---
+title: Webhooks
+description: Verify signatures and react to payment events.
+icon: Webhook
+---
+
+Acme sends a `POST` to your endpoint whenever a payment event happens —
+`charge.succeeded`, `charge.refunded`, `dispute.opened`, and friends.
+
+## Verify every signature
+
+Each delivery carries an `Acme-Signature` header: an HMAC-SHA256 of the raw
+body, keyed with your endpoint's signing secret. Verify it **before** parsing
+the payload, and always compare with a constant-time function:
+
+```ts title="webhook.ts"
+import { createHmac, timingSafeEqual } from "node:crypto"
+
+export function verify(rawBody: string, signature: string, secret: string) {
+    const expected = createHmac("sha256", secret)
+        .update(rawBody)
+        .digest("hex")
+    const a = Buffer.from(signature)
+    const b = Buffer.from(expected)
+    return a.length === b.length && timingSafeEqual(a, b)
+}
+```
+
+Reject anything that fails verification with a `400` — do not reveal why.
+
+## Respond fast, process later
+
+Return `2xx` within 10 seconds or the delivery counts as failed. Enqueue the
+event and process it out of band. Failed deliveries retry with exponential
+backoff for 24 hours.
+
+## Event reference
+
+| Event              | Fired when                                    |
+| ------------------ | --------------------------------------------- |
+| `charge.succeeded` | A charge is captured successfully.            |
+| `charge.failed`    | The card was declined or the charge errored.  |
+| `charge.refunded`  | A refund settles (full or partial).           |
+| `dispute.opened`   | The cardholder disputes a charge.             |
+
+Deliveries are at-least-once: keep your handlers idempotent by keying on the
+event `id`.

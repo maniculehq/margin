@@ -1,0 +1,34 @@
+/* Neutral is the zero-config preset. Dimension vars override fumadocs defaults; --fd-layout-width stays on root so header and grid share one cap. :where keeps preset rules below site CSS; colors come from site tokens. */
+
+[data-preset="neutral"] {
+    --fd-layout-width: 1400px;
+}
+/* 64rem = the chrome switch (--breakpoint-md in app.css): below it the
+   sidebar is a drawer and the layout zeroes --fd-sidebar-width — a lower
+   gate here would re-reserve an empty grid column for the absent aside. */
+@media (min-width: 64rem) {
+    [data-preset="neutral"] #nd-docs-layout {
+        --fd-sidebar-width: 268px;
+    }
+}
+@media (min-width: 1280px) {
+    [data-preset="neutral"] #nd-docs-layout {
+        --fd-toc-width: 268px;
+    }
+}
+
+:where([data-preset="neutral"]) .prose {
+    line-height: 1.7;
+}
+/*
+ * Contrast floor (WCAG AA): fumadocs' default muted foreground lands under
+ * 4.5:1 on light backgrounds. 38% grey clears it on white and on the card
+ * tint; the dark scheme's token already passes. TOC inactive rows and footer
+ * links read the token directly instead of app.css's 72% mix.
+ */
+[data-preset="neutral"]:not(.dark) {
+    --color-fd-muted-foreground: hsl(0 0% 38%);
+}
+[data-preset="neutral"] #nd-toc a[data-active="false"]:not([style*=":20px"]) {
+    color: var(--color-fd-muted-foreground);
+}

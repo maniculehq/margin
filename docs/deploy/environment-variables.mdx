@@ -1,0 +1,83 @@
+---
+title: Configure environment variables
+description: Look up each supported variable, its requirement, and its default before changing deployment settings.
+---
+
+Environment variable configuration applies to self-hosted sites; [Manicule-hosted sites](/deploy/manicule) set no environment variables.
+
+Configure Margin's build environment and running server separately. A deployment needs Postgres; outside Vercel, the application also needs an explicit public site URL.
+
+## Set variables for the correct deployment stage
+
+Build settings select the server target, compile the display-name override, and pin the content version. Ingest settings select the docs folder, database site, storage, and retention policy. Runtime settings control database access and optional integrations. A CI build uses the same settings as a deployment build; CI does not replace the database or site-origin requirements.
+
+Provide database access to migrations, ingest, and the server. Provide the site origin to the build and server with the same value: the browser receives a build-time copy, while the server reads its environment. Vercel supplies deployment metadata and can derive the origin. For a Node deployment, export settings into both environments rather than assuming the built server loads a local `.env` file.
+
+The `dev`, `start`, `db:migrate`, and `ingest` package scripts explicitly load `.env`. The direct Node server command does not. Set a private database CA before process startup, including for migrations and ingest.
+
+The inventory covers Margin's deployment and maintenance interfaces, plus the platform variables they consume. Test-only switches and internal debugging switches are not deployment settings. Analytics configured only through `docs.json` are documented in [Configure analytics](/deploy/analytics).
+
+## Look up supported variables
+
+Empty strings count as unset in Margin's validated application, database, and ingest settings. Defaults below apply when a setting is unset. The scope column distinguishes settings you configure from values normally supplied by a platform or tool.
+
+| Variable | Purpose | Required condition | Default or unset behavior | Read stage and scope |
+| --- | --- | --- | --- | --- |
+| `DATABASE_URL` / `POSTGRES_URL` | Postgres connection | Required for migrations, ingest, and serving database-backed docs | First non-empty value wins, in the listed order; no built-in connection URL | Migrations, ingest, runtime; user or database integration |
+| `DATABASE_URL_UNPOOLED` / `POSTGRES_URL_NON_POOLING` | Direct connection for migrations and the ingest advisory lock | Supply a direct URL when the main URL uses a transaction-mode pooler | First non-empty value wins; otherwise uses the main connection URL | Migrations, ingest; user or database integration |
+| `DATABASE_POOL_MAX` | Maximum database connections per server instance | Optional | `2`; accepts integers from `1` through `20` | Database pool creation, including runtime and ingest; user |
+| `NODE_EXTRA_CA_CERTS` | PEM CA bundle for a database signed by a private CA | Needed for a private CA not trusted by Node | Node's built-in CA list; remote database certificates remain verified | Process startup for build, migrations, ingest, and server; Node setting |
+| `POSTGRES_PORT` | Local Compose database's host port | Optional, local Compose only | `5440`; changing it does not update the connection URL | Compose startup; user |
+| `SITE_ORIGIN` | Absolute public URL for canonical links, sitemap, and OG images; may include a base path | Required when no Vercel-derived URL is available | On Vercel production, `https://` plus `VERCEL_PROJECT_PRODUCTION_URL`; otherwise `https://` plus `VERCEL_URL`. Explicit value overrides inference | Build and runtime; user or inferred |
+| `SITE_SLUG` | Database site slug and cache tag for the built-in single-site extension | Optional; must match the ingested site | `docs`; lowercase letters, digits, and inner hyphens, at most 55 characters | Ingest and runtime; user |
+| `SITE_NAME` | Deployment display-name override | Optional | Content's `docs.json` name, then stored site name or slug; before site resolution, the application fallback is `Docs` | Build, inlined into client and server; user |
+| `SITE_SECRET` | Salt for hashed visitor identifiers used by feedback and chat rate limits | Optional | Resolved database URL | Runtime; user |
+| `DOCS_DIR` | Folder containing `docs.json` and MDX | Required only if neither default folder can be found | `docs/` if present, otherwise `.` if it contains `docs.json`; CLI `--dir` takes precedence | Ingest; user |
+| `DOCS_CONTENT_SHA` | Content-version key pinned into the deployment | Optional with the deployment build command | `VERCEL_GIT_COMMIT_SHA`, then git HEAD, then `dev-<unix ms>` under `bun run vercel-build`; without a baked key, development follows the current pointer | Deployment build and ingest; user or build-generated |
+| `DOCS_INGEST` | Control ingest | Optional | `on`; accepts `on`, `off`, `force`. `off` skips ingest; `force` replaces an existing key. CLI `--force` overrides `off` | Ingest, including deployment builds; user |
+| `DOCS_KEEP_VERSIONS` | Count of other production versions retained alongside age-based and protected versions | Optional | `20`; integer of at least `1` | Ingest garbage collection; user |
+| `DOCS_CANONICAL_REDIRECT` | Redirect production requests to the configured canonical host | Optional | `1`; accepts `0` or `1`. `0` disables the redirect. Built-in redirects require `VERCEL_ENV=production` and no base path; previews do not redirect | Runtime; user |
+| `DOCS_CHAT_MODEL` | AI Gateway model for Ask AI | Optional | `openai/gpt-5.6-terra` | Runtime; user |
+| `AI_GATEWAY_API_KEY` | AI Gateway credential | Required for the assistant outside Vercel; Vercel can use deployment OIDC with Gateway access | Unset disables the assistant outside Vercel; static search remains available | Runtime, checked at call time; user |
+| `DOCS_LINK_RELATION_BASE` | Base URI for agent discovery link relations | Optional | `https://github.com/maniculehq/margin/blob/main/docs/link-relations.md#` | Runtime; user |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob storage for large assets, search corpus, and safe blob cleanup | Optional | Assets and corpus remain in Postgres within ingest size caps; versions with blobs are retained if cleanup cannot safely delete them | Ingest and garbage collection; user or storage integration |
+| `HUGEICONS_PRO_TOKEN` | Fetch licensed Pro icons | Optional | Free icons | Icon build; user |
+| `HUGEICONS_PRO_STYLE` | Select Pro icon style | Optional; used with a Pro token | `stroke-rounded` | Icon build; user |
+| `GITHUB_TOKEN` | Authenticate the repository stars widget's GitHub API requests | Optional | Unauthenticated requests | Runtime; user |
+| `POSTHOG_KEY` | Agent-journey analytics credential | Optional | Agent-journey analytics off | Runtime; user |
+| `POSTHOG_HOST` | PostHog ingestion host | Optional; used with a key | `https://us.i.posthog.com` | Runtime; user |
+| `SENTRY_DSN` | Server error reporting | Optional | Sentry off; development also stays silent unless `SENTRY_ENVIRONMENT` is set | Build upload gate and runtime; user |
+| `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` | Sentry source-map uploads and release creation | All three plus `SENTRY_DSN` required for uploads | Upload plugin omitted if any value is missing | Build; user |
+| `SENTRY_ENVIRONMENT` | Sentry environment label; explicit opt-in for local development reporting | Optional | `VERCEL_ENV`, otherwise `NODE_ENV` | Runtime; user |
+| `SENTRY_RELEASE` | Sentry release override | Optional | No application-defined fallback; SDK/platform detection may supply a release | Runtime; user |
+| `DOCS_EXTENSIONS` | Module exporting `extensions: DocsExtensions` | Optional | Built-in single-site extension; relative paths resolve from the repository root | Build; user |
+| `NITRO_PRESET` | Server build target | Set `node-server` for the supported self-hosted Node deployment | `vercel` | Build; user |
+| `PORT` | Listening port | Optional | Vite's default for `dev` and `start`; a configured value must be a positive integer. The generated Node server also accepts `PORT` | Dev/preview startup and Node server startup; user |
+| `NODE_ENV` | Application environment | Optional; normally set by tooling | `development`; accepts `development`, `test`, `production` | Build and runtime; tool or user |
+| `VERCEL` | Identify Vercel execution for assistant availability | Normally platform-provided | No Vercel availability signal when unset; a signal alone does not grant Gateway access | Runtime; Vercel |
+| `VERCEL_ENV` | Deployment environment, preview behavior, and inferred origin selection | Normally platform-provided | Unset off Vercel; accepts `development`, `preview`, `production`. Deployment environment otherwise uses `NODE_ENV` | Build, ingest, runtime; Vercel |
+| `VERCEL_URL` | Deployment hostname for inferred site URL | Needed only when relying on Vercel URL inference | No fallback hostname | Build and runtime; Vercel |
+| `VERCEL_PROJECT_PRODUCTION_URL` | Production hostname for inferred site URL | Used for production inference when present | Falls back to `VERCEL_URL` | Build and runtime; Vercel |
+| `VERCEL_GIT_COMMIT_SHA` | Fallback content key and agent-surface commit metadata | Optional | Deployment build uses git HEAD, then a generated development key if unavailable | Build, ingest, runtime metadata; Vercel |
+| `VERCEL_GIT_PULL_REQUEST_ID` | Preview pull-request metadata | Optional | No PR metadata; when set, a positive integer | Preview ingest; Vercel |
+| `VERCEL_OIDC_TOKEN` | Deployment identity for AI Gateway authentication | Needed for Vercel Gateway access without an API key | No OIDC credential | Runtime; Vercel, refreshed during instance lifetime |
+| `CI` | Build logging behavior | Optional; normally supplied by CI | Sentry upload plugin is silent when no CI signal is present | Build; CI runner |
+| `AGENT_DOCTOR_URL` | Target public URL for the HTTP doctor command | Required only when invoking the doctor without `--url` | No default; `--url` takes precedence | Maintenance command; user |
+
+## Apply configuration changes
+
+Rebuild and redeploy after changing a build-time setting. In particular, changing the display-name override requires a new build, not just restarting the server. Keep the origin consistent across build and runtime so browser and server URLs agree.
+
+Restart the server after changing runtime settings. On Vercel, deploy again to apply changed project settings to new functions. Build-only secrets, such as source-map upload credentials and Pro icon tokens, do not need to be installed on a standalone runtime.
+
+Rerun ingest when changing the docs folder, site slug, asset-storage selection, or retention settings. A ready content key is reused unless ingest is forced, so changing ingest inputs alone does not rewrite an existing version. Prefer a new content key for a normal publish. Forced ingest replaces content under the same key and affects every deployment pinned to it. A slug change must be applied to both ingest and runtime. A database URL change requires the destination database to be migrated and populated before the server switches to it.
+
+For a standalone Node deployment, use Node.js 24 or newer and Bun for build commands. With the required settings exported, `bun run vercel-build` runs icon generation, migrations, the server build, bundle-budget checks, and ingest, in that order. Start the generated Node server with `node .output/server/index.mjs` from the repository root.
+
+Use [Deploy Margin](/deploy/self-host) for the Vercel and Node build procedures, migration order, and retention behavior. After deployment, run the HTTP doctor against the public site URL:
+
+```bash
+bun run doctor --url=https://docs.example.com
+```
+
+The doctor prints a check report and exits with code `0` when every check passes. It exits with code `1` if any check fails; investigate the failed checks before treating the deployment as ready.

@@ -1,0 +1,23 @@
+---
+title: Gantt in tabs
+---
+
+<Tabs>
+  <Tab title="First">
+    Nothing here.
+  </Tab>
+  <Tab title="Timeline">
+    ```mermaid
+    gantt
+        title Zero-downtime promote
+        dateFormat ss
+        axisFormat %S s
+        section Old deployment
+        Serving :a1, 00, 20s
+        Draining :a2, after a1, 10s
+        section New deployment
+        Health checks :b1, 10, 10s
+        Serving :b2, after b1, 20s
+    ```
+  </Tab>
+</Tabs>

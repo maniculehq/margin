@@ -1,0 +1,159 @@
+---
+title: Format text and code
+description: Reference for Markdown syntax, code highlighting, optional math, and ingestion safety checks.
+---
+
+Write page content in Markdown, then use MDX components when Markdown cannot express the layout. Formatting inside code fences is displayed as source rather than parsed as page markup.
+
+## Format text and links
+
+Use `#` through `######` for headings. When frontmatter supplies the page title, start body sections at `##` to avoid repeating the title.
+
+This source combines emphasis, inline code, and a same-page link:
+
+```md title="Text source"
+Use **bold** for a label, *italics* for emphasis, and `docs.json` for a filename.
+Read [MDX safety](#keep-mdx-safe) before adding markup.
+```
+
+Rendered result:
+
+Use **bold** for a label, *italics* for emphasis, and `docs.json` for a filename. Read [MDX safety](#keep-mdx-safe) before adding markup.
+
+Choose a link form based on its destination. Internal documentation links omit the source file extension.
+
+| Destination | Markdown source |
+| :--- | :--- |
+| Heading on this page | `[MDX safety](#keep-mdx-safe)` |
+| Page from the docs root | `[Formatting](/content/formatting)` |
+| Page beside this file | `[Formatting](./formatting)` |
+| Page in a parent directory | `[Formatting](../content/formatting)` |
+| Heading on another page | `[Math](./formatting#write-math)` |
+| External page | `[Margin](https://margin.manicule.com)` |
+| Email address | `[Email](mailto:docs@example.com)` |
+
+## Write lists and tables
+
+Use `-` for unordered lists and numbered markers for ordered lists. Indent a child item beneath its parent's text. Four spaces also works beneath multi-character ordered markers such as `1.`.
+
+This source nests a checklist of actions beneath the first numbered item:
+
+```md title="List source"
+1. Prepare the page.
+    - Set the frontmatter title.
+    - Add a section heading.
+2. Preview the result.
+```
+
+Rendered result:
+
+1. Prepare the page.
+    - Set the frontmatter title.
+    - Add a section heading.
+2. Preview the result.
+
+Tables use a header row, a separator row, and one row per entry. Colons in the separator select left, center, or right alignment. Escape a literal pipe as `\|` so it does not start another cell.
+
+This source aligns the first column left and the second right:
+
+```md title="Table source"
+| File | Purpose |
+| :--- | ---: |
+| `docs.json` | Site configuration |
+| `.mdx` | Page content |
+```
+
+Rendered result:
+
+| File | Purpose |
+| :--- | ---: |
+| `docs.json` | Site configuration |
+| `.mdx` | Page content |
+
+Keep table cells short. Move multi-paragraph explanations or nested lists out of the table.
+
+## Label code blocks
+
+Put the language after the opening backticks and add `title="…"` to label the block. Margin highlights code with Shiki. An unknown language renders as plain text and produces a `field_invalid` informational diagnostic rather than failing ingestion.
+
+This fence labels a TypeScript example and highlights lines 1 and 3:
+
+````md title="Fence source"
+```ts title="message.ts" {1,3} lines
+const name = "Margin"
+const message = `Hello, ${name}`
+console.log(message)
+```
+````
+
+The resulting block has a filename, line numbers, and selected lines:
+
+```ts title="message.ts" {1,3} lines
+const name = "Margin"
+const message = `Hello, ${name}`
+console.log(message)
+```
+
+Fence metadata controls the presentation independently of the code language.
+
+| Metadata | Result |
+| :--- | :--- |
+| `title="message.ts"` | Display a filename or label. |
+| `{1,3-5}` | Highlight line 1 and lines 3 through 5, counted from 1. |
+| `lines` | Display line numbers. |
+| `wrap` | Soft-wrap long lines instead of horizontal scrolling. |
+| `expandable` | Collapse long blocks with a control to show all lines. |
+
+A trailing language-appropriate comment containing `[!code highlight]` also marks a line for highlighting. For example, `const ready = true // [!code highlight]` marks that TypeScript line.
+
+For tabbed examples, see [Code groups](/content/components/steps-tabs). Give each fence inside a code group its own `title="…"`.
+
+## Write math
+
+Math rendering is off by default. Enable `styling.latex` in `docs.json` to render LaTeX with KaTeX. Merge this field into the existing configuration rather than replacing the whole file.
+
+This configuration enables math on the site:
+
+```json title="docs.json"
+{
+  "styling": {
+    "latex": true
+  }
+}
+```
+
+Use single dollar signs for inline math and double dollar signs on separate lines for display math:
+
+```md title="Math source"
+The area is $A = \pi r^2$.
+
+$$
+E = mc^2
+$$
+```
+
+With math enabled, the first expression appears within its sentence and the second appears as a separate equation. Without `styling.latex: true`, the math plugins do not run.
+
+## Keep MDX safe
+
+Ingestion checks page markup before compilation. A denied element, attribute, raw HTML node, or literal URL scheme is a hard failure; correct the reported page and line before ingesting again. An unknown capitalized component instead loses its wrapper and renders its children with a `component_unknown` warning.
+
+Plain `.md` files cannot contain raw HTML blocks. In `.mdx`, permitted HTML-like elements are parsed as JSX. Close elements correctly, use framework components for page layouts, and do not assume arbitrary HTML is admitted.
+
+The following constructs require correction:
+
+| Rejected source | Reason | Correction |
+| :--- | :--- | :--- |
+| `<script>alert(1)</script>` | Script elements are denied. | Put example scripts inside a code fence. |
+| `<style>p { color: red; }</style>` | Style elements are denied. | Configure site styling instead of embedding a style element. |
+| `<button onClick={run}>Run</button>` | Authored attributes beginning with `on` are denied. | Describe the action or link to its destination. |
+| `<div {...props}>Text</div>` | Spread attributes are denied. | Write each permitted attribute explicitly. |
+| `<iframe srcdoc="…" />` | `srcdoc` is denied. | Use a static HTTPS `src` for an iframe. |
+| `[Run](javascript:alert(1))` | The URL scheme is disallowed. | Link to an HTTPS destination. |
+| `<div>Text</div>` in a `.md` raw HTML block | Raw HTML nodes are denied. | Use ordinary Markdown, or permitted JSX in `.mdx`. |
+
+The denied element names are `script`, `object`, `embed`, `style`, `link`, `meta`, `base`, `frame`, `frameset`, `noscript`, `foreignobject`, `animate`, `set`, `animatemotion`, and `animatetransform`. An iframe requires a static string `src` beginning with `https://`; an expression-valued `src` does not qualify. Attributes beginning with `data-rail` are reserved and rejected.
+
+URL checks apply to Markdown links, images, reference definitions, and literal URL-bearing JSX attributes. Allowed schemes are `http:`, `https:`, `mailto:`, `cursor:`, `vscode:`, and `vscode-insiders:`. Fragments and relative paths are also admitted. Schemes such as `javascript:`, `data:`, and `file:` are rejected. For documentation links, use the forms listed in [Format text and links](#format-text-and-links).
+
+MDX treats braces as expression delimiters and angle brackets as possible markup. Expression-valued props are supported, but ordinary prose should not accidentally become JavaScript or JSX. Put comparisons such as `limit <= 100`, placeholders such as `<TOKEN>`, and object shapes such as `{ name: string }` in inline code. Escape a literal brace outside code as `\{` or `\}`. Use a longer backtick fence when showing source that itself contains fenced code.

@@ -1,0 +1,53 @@
+/* Page mode comes from frontmatter on a wrapper above #nd-docs-layout. These rules reshape the active preset; later site CSS can override them. */
+
+/* CENTER — centered single column, no TOC. */
+[data-page-mode="center"] #nd-docs-layout {
+    --fd-toc-width: 0px;
+}
+[data-page-mode="center"] :is(#nd-toc, #nd-toc-placeholder) {
+    display: none;
+}
+[data-page-mode="center"] #nd-page {
+    max-width: 52rem;
+    margin-inline: auto;
+}
+
+/* WIDE — full content width, TOC suppressed. */
+[data-page-mode="wide"] #nd-docs-layout {
+    --fd-toc-width: 0px;
+}
+[data-page-mode="wide"] :is(#nd-toc, #nd-toc-placeholder) {
+    display: none;
+}
+[data-page-mode="wide"] #nd-page :where(.prose) {
+    max-width: none;
+}
+
+/* CUSTOM — chrome minimized: nav only (sidebar + TOC removed). */
+[data-page-mode="custom"] #nd-docs-layout {
+    --fd-sidebar-width: 0px;
+    --fd-toc-width: 0px;
+}
+[data-page-mode="custom"] :is(#nd-sidebar, #nd-toc, #nd-toc-placeholder) {
+    display: none;
+}
+
+/* FRAME — docs.json semantics: sidebar KEPT, TOC and page-end footer hidden,
+ * full content width. The old interpretation (chrome removed + a bordered
+ * card) rendered the home page with no sidebar and a big bordered box. */
+[data-page-mode="frame"] #nd-docs-layout {
+    --fd-toc-width: 0px;
+}
+[data-page-mode="frame"] :is(#nd-toc, #nd-toc-placeholder) {
+    display: none;
+}
+[data-page-mode="frame"] #nd-page footer {
+    display: none;
+}
+/* Landing pages (frame/custom) carry no docked assistant bar upstream. */
+:is([data-page-mode="frame"], [data-page-mode="custom"]) [data-assistant-dock] {
+    display: none;
+}
+[data-page-mode="frame"] #nd-page :where(.prose) {
+    max-width: none;
+}

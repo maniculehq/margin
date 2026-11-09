@@ -1,0 +1,53 @@
+---
+title: Introduction
+description: Publish Markdown or MDX, then serve readers in the browser and agents through Markdown, indexes, and MCP.
+---
+
+Bring your Mintlify docs as they are. Host them free on Manicule, or run them yourself.
+
+Margin is an open-source, agent-first framework that turns a folder of Markdown or MDX into a searchable, versioned documentation site backed by Postgres. Use [Manicule hosting](/deploy/manicule) by default, or choose [self-hosting](/deploy/self-host) as an alternative. The same repository and `docs.json` work in either direction, and Margin is Apache 2.0 either way.
+
+## Start building your docs site
+
+<CardGroup cols="2">
+  <Card title="Quickstart" href="/quickstart">
+    Get a live docs site hosted free on Manicule.
+  </Card>
+  <Card title="Run locally" href="/local-development">
+    Preview your docs locally and see changes as you edit.
+  </Card>
+  <Card title="Components" href="/content/components">
+    Find the built-in MDX components for structuring your pages.
+  </Card>
+  <Card title="Agents" href="/agents/overview">
+    Connect agents to your published docs through Markdown, discovery indexes, and MCP.
+  </Card>
+</CardGroup>
+
+## Understand what Margin provides
+
+### Host free on Manicule, with no limits
+
+Manicule includes the database and runs the latest release. You do not need to manage servers or environment variables.
+
+### Start without a configuration file
+
+One `.mdx` file is enough to define a site. Margin derives page titles, URLs, navigation, and a default appearance from your files, so you can start writing before creating `docs.json`.
+
+### Keep your Mintlify configuration
+
+Margin accepts Mintlify-compatible `docs.json` for navigation, colors, fonts, redirects, product versions, and OpenAPI references. You can keep supported settings rather than rewrite your configuration; Margin-specific options live under `x-margin`. Unknown fields produce diagnostics, and theme presets approximate Mintlify layouts rather than reproduce them pixel for pixel. See [configuration](/settings/docs-json) for the supported behavior.
+
+### Serve agents alongside readers
+
+Every page has Markdown and PDF representations. The `/llms.txt` index helps agents find pages, and `/llms-full.txt` provides a combined text corpus within the configured serving budget. A built-in MCP server at `/api/mcp` supports documentation search and reads. These interfaces select the same published content version as browser pages, so agents do not need a separately maintained copy of your docs.
+
+### Validate content before serving it
+
+Margin validates MDX during ingest and server-renders executable content in an isolate without host access. SVGs and CSS are sanitized before serving. These defaults constrain authored content; they do not make public docs private. A page omitted from navigation can still be reached by URL.
+
+### Publish commit-specific content versions
+
+Each normal deployment uses a commit-specific content version, and the deployed server reads its baked content key. Preview ingest does not advance the production pointer, so a preview sharing the database cannot replace production content. Validation failures stop deployment, and ingest runs after the build so a failed build does not advance that pointer.
+
+Immutable deployment versions are not permanent archives. Retention can remove older versions, and forced ingest replaces content under an existing key. Use a new content key for a normal immutable publish; see [deployment](/deploy/rollbacks) for retention and rollback behavior.

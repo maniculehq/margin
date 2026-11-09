@@ -1,0 +1,274 @@
+---
+title: Add callouts, cards, and layouts
+description: Choose a message style or container and configure its supported properties.
+---
+
+Use callouts for messages that affect the reader's next action, cards for related destinations, and columns to arrange sibling content. Use `Tile`, `Panel`, or `Frame` when the content needs a preview, a right-side reference, or a captioned container.
+
+## Choose a callout
+
+Choose a named variant when its meaning fits the message. Use `Callout` with a `type` when you need to select the style through a property.
+
+| Component | Use for | Presentation |
+| --- | --- | --- |
+| `Callout` | A message with an explicit type | Informational by default |
+| `Note` | A detail that changes how the reader follows an instruction | Blue, information icon |
+| `Info` | Supplemental context | Neutral gray, information icon |
+| `Tip` | An optional improvement | Green, lightbulb icon |
+| `Warning` | A risk to address before continuing | Warning style, alert icon |
+| `Danger` | A destructive action or error condition | Error style, error icon |
+| `Check` | A completed action or successful check | Success style, check icon |
+
+These examples show each message style.
+
+<Callout type="idea" title="Choose a container">
+Use a card when the whole item should link to another page.
+</Callout>
+
+<Note title="Link paths">
+Use extensionless paths for internal documentation links.
+</Note>
+
+<Info>
+A card without an `href` is not a link.
+</Info>
+
+<Tip>
+Use `CardGroup` to align related cards.
+</Tip>
+
+<Warning>
+Check the destination before publishing a linked card.
+</Warning>
+
+<Danger>
+Replacing a page's content removes the previous text from that draft.
+</Danger>
+
+<Check>
+The card has a title and a destination.
+</Check>
+
+Insert the matching tag around the message body.
+
+```mdx
+<Callout type="idea" title="Choose a container">
+Use a card when the whole item should link to another page.
+</Callout>
+
+<Note title="Link paths">
+Use extensionless paths for internal documentation links.
+</Note>
+
+<Info>
+A card without an `href` is not a link.
+</Info>
+
+<Tip>
+Use `CardGroup` to align related cards.
+</Tip>
+
+<Warning>
+Check the destination before publishing a linked card.
+</Warning>
+
+<Danger>
+Replacing a page's content removes the previous text from that draft.
+</Danger>
+
+<Check>
+The card has a title and a destination.
+</Check>
+```
+
+The named variants share the following properties. Their type and visual tone are fixed by the tag.
+
+| Property | Type | Default | Applies to | Behavior |
+| --- | --- | --- | --- | --- |
+| `children` | MDX content | Empty | All callouts | Message body; accepts paragraphs, lists, code, and links |
+| `title` | Text or content | None | All callouts | Optional heading above the body |
+| `className` | String | None | All callouts | Additional CSS classes |
+| `type` | `info`, `warn`, `warning`, `error`, `success`, `idea` | `info` | `Callout` | Selects the semantic color; `warn` aliases `warning` |
+| `tone` | String | Value of `type`, or `info` | `Callout` | Selects the visual tone and icon independently of `type`; use `note`, `info`, `tip`, `warning`, `check`, `success`, `error`, or `idea` |
+
+Use blank lines around block content inside a callout. A callout does not make its body clickable; put a Markdown link in the body when needed. The `icon` property does not override the icon chosen by Margin. Setting `type` on `Note`, `Info`, `Tip`, `Warning`, `Danger`, or `Check` does not change that variant.
+
+## Link with cards
+
+Use `Card` for a destination with a title and a short description. Wrap related cards in `CardGroup` to align them in a responsive grid.
+
+This group links to a documentation page and an external website.
+
+<CardGroup cols="2">
+  <Card title="Add media" href="/content/media" icon="image" cta="Read the guide">
+    Add images and videos to a page.
+  </Card>
+  <Card title="Manicule" href="https://manicule.com" icon="globe" horizontal="true">
+    Visit the Manicule website.
+  </Card>
+</CardGroup>
+
+Set `href` on each card, not on the group.
+
+```mdx
+<CardGroup cols="2">
+  <Card title="Add media" href="/content/media" icon="image" cta="Read the guide">
+    Add images and videos to a page.
+  </Card>
+  <Card title="Manicule" href="https://manicule.com" icon="globe" horizontal="true">
+    Visit the Manicule website.
+  </Card>
+</CardGroup>
+```
+
+### Card properties
+
+| Property | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `title` | Text or content | None | Title above the description and body |
+| `description` | Text or content | None | Description above the body |
+| `children` | MDX content | Empty | Card body |
+| `href` | String | None | Makes the whole card a link; omit for a non-linked container |
+| `icon` | Icon name, image reference, or content | None | Icon above the text, or beside it in horizontal mode; unknown icon names show no icon |
+| `iconType` | String | None | Accepted for compatibility; does not change the icon style |
+| `color` | CSS color string | None | Tints the icon |
+| `img` | String | None | Thumbnail for a non-horizontal card; use an ingested image asset, as described in [Add media](/content/media) |
+| `cta` | Text or content | None | Action label below the body; uses the card's destination |
+| `horizontal` | Boolean or string | `false` | Places the icon beside the text instead of above it |
+| `arrow` | Boolean or string | Shown for HTTP(S) destinations, hidden otherwise | Forces or hides the top-right arrow |
+| `className` | String | None | Additional CSS classes |
+
+For `horizontal` and `arrow`, a bare property, `true`, or `"true"` turns the option on. Use `"false"` to turn it off. Hiding the arrow does not change the link behavior.
+
+Internal documentation paths open within the site. External HTTP(S) destinations open in a new tab with `rel="noreferrer noopener"`. `Card` does not expose `target` or `rel` overrides. Use extensionless internal paths such as `/content/media`, same-page anchors such as `#choose-a-callout`, or full external URLs.
+
+Because a linked card is one link, keep its body free of other links, buttons, or linked cards. Use a card without `href` if its body needs separate destinations. A card title is display text, not a heading in the page outline.
+
+### CardGroup properties
+
+| Property | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `cols` | String or number | `2` | Accepts integers `1`, `2`, `3`, or `4`; invalid values fall back to `2` |
+| `children` | MDX content | Empty | Direct children become grid items |
+
+`CardGroup` and `Columns` share the same layout behavior. A group accepts content other than cards, but it does not add titles or destinations to its children.
+
+## Arrange content in columns
+
+Use `Columns` to place independent blocks beside each other. Each direct child is one grid item, so wrap content that should stay together in a single container.
+
+This two-column layout keeps a note and a tip separate.
+
+<Columns cols="2">
+  <Note title="Required context">
+    Use a note for a detail that affects the instruction.
+  </Note>
+  <Tip title="Optional improvement">
+    Use a tip for advice the reader can skip.
+  </Tip>
+</Columns>
+
+Set the requested column count on the parent.
+
+```mdx
+<Columns cols="2">
+  <Note title="Required context">
+    Use a note for a detail that affects the instruction.
+  </Note>
+  <Tip title="Optional improvement">
+    Use a tip for advice the reader can skip.
+  </Tip>
+</Columns>
+```
+
+| Property | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `cols` | String or number | `2` | Accepts integers `1`, `2`, `3`, or `4`; invalid values fall back to `2` |
+| `children` | MDX content | Empty | Direct children become grid items |
+
+The count is a responsive maximum, not a fixed count at every width. A one-column grid stays at one. Two-column grids start at one column; three- and four-column grids start at one, then use two before reaching the requested count as the container widens. Cards also span the full grid width in narrow containers.
+
+Neither `Columns` nor `CardGroup` accepts a gap or per-item span property. Nesting containers does not create a shared grid: a nested grid arranges only its own direct children.
+
+## Use content containers
+
+### Tile
+
+Use `Tile` when a visual preview should appear above a title and description. Place multiple tiles inside `Columns` to arrange them; a tile does not create a grid.
+
+This tile uses text as its preview so it needs no image asset.
+
+<Tile title="Media examples" description="Add an image or video to a page." href="/content/media">
+  Image and video previews
+</Tile>
+
+Place preview content between the tags.
+
+```mdx
+<Tile title="Media examples" description="Add an image or video to a page." href="/content/media">
+  Image and video previews
+</Tile>
+```
+
+| Property | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `title` | String | None | Centered title below the preview |
+| `description` | String | None | Centered description below the title |
+| `href` | String | None | Makes the whole tile a link when the destination is valid |
+| `children` | MDX content | Empty | Content inside the fixed-height preview area |
+
+Internal links stay within the site; external HTTP(S) links open in a new tab. Without `href`, the tile is a non-linked container. Unsafe schemes and protocol-relative destinations do not make a tile clickable. Keep linked tile children free of other links or interactive controls. `Tile` has no `arrow`, `horizontal`, `icon`, or `target` property. For image sources and loading behavior, see [Add media](/content/media).
+
+### Panel
+
+Use a top-level `Panel` for reference material that should occupy the desktop right column instead of the table of contents. On smaller screens, its content stays inline at the authored position. Page layouts that suppress the right column also show the content inline.
+
+This panel provides a related reference alongside the page on desktop.
+
+<Panel>
+  <Note title="Media reference">
+    See [Add media](/content/media) for image sources and loading behavior.
+  </Note>
+</Panel>
+
+Keep `Panel` at the page's top level when it should occupy the right column.
+
+```mdx
+<Panel>
+  <Note title="Media reference">
+    See [Add media](/content/media) for image sources and loading behavior.
+  </Note>
+</Panel>
+```
+
+| Property | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `children` | MDX content | Empty | Content for the right column, with an inline fallback |
+
+A `Panel` nested inside another component stays inline. The panel supplies no border or padding of its own; add a callout or another container inside it if needed. When a page has a top-level `Panel`, that panel supplies the right-column content instead of standalone `RequestExample` or `ResponseExample` blocks.
+
+### Frame
+
+Use `Frame` to group content with an optional caption and a secondary hint. It clips its contents to rounded corners without adding the padded border of a card.
+
+This frame captions a rendered content sample.
+
+<Frame caption="A framed message" hint="The hint appears below the caption.">
+  <Info>Captioned content stays inside the rounded frame.</Info>
+</Frame>
+
+Supply the content as children, not as a `src` property.
+
+```mdx
+<Frame caption="A framed message" hint="The hint appears below the caption.">
+  <Info>Captioned content stays inside the rounded frame.</Info>
+</Frame>
+```
+
+| Property | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `children` | MDX content | Empty | Content inside the rounded wrapper; images and videos fill its width |
+| `caption` | String | None | Centered caption below the content |
+| `hint` | String | None | Smaller, muted line below the caption |
+
+`Frame` does not load an image or video from `src`. Put the media element inside it; see [Add media](/content/media) for media properties and loading behavior.

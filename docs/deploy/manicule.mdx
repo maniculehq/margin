@@ -1,0 +1,75 @@
+---
+title: Deploy free on Manicule
+description: Connect a GitHub repository for automatic publishing, pull request previews, and built-in agent analytics.
+---
+
+Manicule is the default way to publish Margin. Hosting is free with no limits, the database is included, and there are no servers to run. Hosted sites always run the latest Margin.
+
+Use hosted deployment when you want to publish from GitHub without maintaining infrastructure. Self-host when you need to operate the server and database yourself or change the framework code.
+
+## Publish your first site
+
+Start with a GitHub repository containing your docs and `docs.json`. Existing Mintlify docs can use the same configuration and MDX files without conversion.
+
+<Steps>
+  <Step title="Connect GitHub">
+    Sign up or sign in at [Margin setup in Manicule](https://app.manicule.com/onboard?product=margin). A new user creates an organization with the docs product preselected. Choose **Connect GitHub** under **Where are your docs?**. Grant the GitHub app access to the repositories you want to use. The app reads only the repositories you choose.
+
+    Confirm that your docs repository is available in the repository picker before continuing.
+  </Step>
+  <Step title="Choose the docs source">
+    Pick the repository, the branch to deploy, and the folder containing your docs. The selected branch is your docs branch: pushes to it publish the site, and pull requests targeting it get previews.
+
+    Check the branch and folder before creating the site, especially when the repository contains application code alongside the docs.
+  </Step>
+  <Step title="Create the docs site">
+    Select **Create docs site** and wait for the first deployment to finish. The app confirms **Your docs site is up.** Manicule assigns the site a free `manicule.dev` address.
+
+    Open the assigned address and confirm that the homepage and a page from your navigation load. This is the published site; a custom domain is optional.
+  </Step>
+</Steps>
+
+## Publish changes and preview pull requests
+
+Every push to the selected docs branch publishes the site. Open a pull request targeting that branch to get a preview before publishing the change to production.
+
+Review the changed pages at the preview address. Merge the pull request into the docs branch when the changes are ready; the resulting push publishes them at the site's production address.
+
+## Use your own domain
+
+Open the site's **Domains** page in Manicule to configure a custom address. Choose the address based on where you want the docs to live:
+
+| Address | Setup |
+| --- | --- |
+| Subdomain, such as `docs.acme.com` | Add the subdomain on the Domains page and follow the domain setup instructions shown there. |
+| Path, such as `acme.com/docs` | Configure the address on the Domains page and route the path through your own proxy. You operate the proxy. |
+| Assigned `manicule.dev` address | No custom domain setup required. |
+
+After completing domain setup, open a docs page at the custom address and confirm that navigation works. Path-based hosting requires your proxy; adding an address in Manicule does not configure that proxy for you.
+
+## Check agent analytics
+
+Manicule includes agent analytics for hosted sites with nothing to install. Use the Manicule dashboards to inspect agent traffic per page, see AI answers that cite your docs, and track visibility.
+
+These dashboards help distinguish pages agents visit from pages that appear as sources in AI answers. No analytics package needs to be added to the docs repository for hosted analytics.
+
+## Compare hosted and self-hosted deployment
+
+Both options use Margin under Apache 2.0. Hosted deployment includes infrastructure and updates; self-hosted deployment puts those responsibilities with you.
+
+| | Hosted by Manicule | Self-hosted |
+| --- | --- | --- |
+| Cost | Free, with no limits | Free software, plus your infrastructure costs |
+| Address | Assigned `manicule.dev` address or your custom domain | Your domain |
+| Pull request previews | Included for pull requests targeting the docs branch | Vercel preview deployments when using Vercel; otherwise your deployment setup |
+| Servers | Nothing to run | Vercel, or a server running Node.js 24 or newer |
+| Database | Included | Your own Postgres, such as Neon on Vercel |
+| Analytics | Agent traffic and AI citations in Manicule | Your own PostHog for agent-journey analytics |
+| Updates | Always the latest Margin | You merge new releases and redeploy |
+| License | Apache 2.0 | Apache 2.0 |
+
+## Move between hosting options
+
+The same docs repository and `docs.json` work in either direction. Moving to self-hosting does not require rewriting the docs, but you must provision the server and Postgres database and configure the deployment. Follow [Self-host](/deploy/self-host) or [Deploy to Vercel](/deploy/vercel) for that setup.
+
+To move to Manicule, connect the same docs repository through [Margin setup](https://app.manicule.com/onboard?product=margin), select its branch and folder, and create the site. Confirm the new deployment works before changing your custom domain or proxy to direct readers to it.

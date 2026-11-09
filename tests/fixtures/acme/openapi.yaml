@@ -1,0 +1,74 @@
+openapi: 3.1.0
+info:
+  title: Acme Payments API
+  version: 1.0.0
+  description: Accept payments anywhere with the Acme Payments API.
+servers:
+  - url: https://api.acme.test
+tags:
+  - name: payments
+    description: Create and inspect payments.
+paths:
+  /payments:
+    get:
+      tags: [payments]
+      operationId: listPayments
+      summary: List payments
+      description: Returns payments, newest first.
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of payments to return.
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: A page of payments.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+    post:
+      tags: [payments]
+      operationId: createPayment
+      summary: Create a payment
+      description: Creates a payment and returns it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewPayment"
+      responses:
+        "201":
+          description: The created payment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+components:
+  schemas:
+    NewPayment:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: integer
+          description: Amount in the currency's smallest unit.
+        currency:
+          type: string
+          example: usd
+    Payment:
+      allOf:
+        - $ref: "#/components/schemas/NewPayment"
+        - type: object
+          required: [id, status]
+          properties:
+            id:
+              type: string
+            status:
+              type: string
+              enum: [pending, succeeded, failed]

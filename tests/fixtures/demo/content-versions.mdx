@@ -1,0 +1,45 @@
+---
+title: Build-time content versions
+description: How each build turns a docs folder into an immutable content version the site serves.
+icon: Network
+---
+
+This framework serves one documentation site from one deployment. Content is
+**ingested at build time**: the build reads the docs folder, compiles every
+page once, and stores the result as an immutable **content version** in
+Postgres. Request-time rendering reads those stored artifacts, so a page never
+recompiles MDX while a visitor waits.
+
+## How content flows
+
+1. You push MDX (plus optional `meta.json` ordering files) and a `docs.json`
+   configuration to your repository.
+2. The build reads the docs folder, validates it (frontmatter schema,
+   component allow-list, broken links), compiles every page once, and
+   persists a new **content version** keyed by the commit SHA.
+3. The serving pointer flips to the new version in one transaction — readers
+   never see a half-published state.
+4. A build that fails validation stops before the pointer moves, so broken
+   docs never silently replace the last good version.
+
+Every surface — HTML, `.md` routes, `llms.txt`, search, MCP, sitemaps —
+resolves through the same loader, so they always agree on which version is
+live.
+
+## Rebuilding the same commit
+
+Ingest is keyed by the content SHA. Rebuilding a commit that already has a
+version reuses it instead of compiling again; force a fresh ingest when the
+pipeline itself changed.
+
+## Keeping old versions
+
+Older versions stay in the database so a rollback is a pointer move, not a
+rebuild. Garbage collection keeps the most recent versions and removes the
+rest once nothing points at them.
+
+## Why nothing is prerendered
+
+Pages render on request from the stored version and cache on the CDN with a
+short freshness window and a long stale-while-revalidate window — new content
+appears shortly after a deploy, with no cache purging.

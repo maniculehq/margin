@@ -1,0 +1,22 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": ["config:recommended"],
+    "rangeStrategy": "bump",
+    "automerge": false,
+    "lockFileMaintenance": {
+        "enabled": true
+    },
+    "packageRules": [
+        {
+            "matchPackageNames": ["*"],
+            "description": "Supply-chain guard: wait seven days before proposing a newly published version.",
+            "minimumReleaseAge": "7 days"
+        },
+        {
+            "matchPackageNames": ["fumadocs-ui"],
+            "description": "The checked-in patch must be reviewed and regenerated on update.",
+            "automerge": false,
+            "minimumReleaseAge": "7 days"
+        }
+    ]
+}

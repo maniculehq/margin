@@ -1,0 +1,171 @@
+---
+title: Document API fields and examples
+description: Field props, nested attributes, and example placement for hand-authored MDX references.
+---
+
+Use `ParamField` and `ResponseField` to describe a request and its response in MDX. Pair them with `RequestExample` and `ResponseExample` to show sample data without generated endpoint content.
+
+These components format documentation. They do not define a live endpoint, validate requests, or generate an API contract. All API names and data on this page belong to a fictional project-creation API.
+
+## Describe request parameters
+
+Choose one name prop on `ParamField` to identify a parameter. Put the parameter's meaning and constraints in the component's children.
+
+| Name prop | Use |
+| --- | --- |
+| `path` | A path parameter's name. |
+| `query` | A query parameter's name. |
+| `body` | A request body's field name. |
+| `header` | A request header's name. |
+| `name` | A field name without a location. |
+
+The location props select the displayed name; they do not add a location label. If more than one is set, the first defined value wins in this order: `path`, `query`, `body`, `header`, `name`. Use prose to identify the location when readers need it.
+
+Both field components support these additional props:
+
+| Prop | Value | Rendering |
+| --- | --- | --- |
+| `type` | String | Displays the supplied text in a type chip. No type validation or fixed type vocabulary. |
+| `required` | Boolean or string | Displays `required` when supplied, except for boolean `false`. Omit it for an optional field. |
+| `deprecated` | Boolean or string | Displays `deprecated` when supplied, except for boolean `false`. |
+| `default` | String, number, or boolean | Displays `default: <value>`. Values `0` and `false` are displayed; omitted or null values are not. |
+| `children` | MDX content | Describes the field below its name and metadata. |
+
+Use bare `required` or `required={true}` to mark a required field. Use `required={false}` to suppress the label explicitly. The string `required="false"` still displays the label; the same distinction applies to `deprecated`.
+
+For the fictional API, the JSON request body must contain a project name. Write the field as follows:
+
+```mdx
+<ParamField body="name" type="string" required>
+  Name of the project to create.
+</ParamField>
+```
+
+The field renders with its name, type, and required label:
+
+<ParamField body="name" type="string" required>
+  Name of the project to create.
+</ParamField>
+
+## Describe response fields
+
+`ResponseField` accepts the same props and renders the same field block as `ParamField`. Use `name` for response properties, and put child fields inside the parent field's content to describe an object.
+
+Wrap nested fields in `Expandable` when readers should open the object details on demand. `Expandable` accepts a `title` string and a boolean `defaultOpen`; without either prop, it starts closed and labels the control “Show child attributes.” Set `defaultOpen={true}` to start open. The control changes “Show” to “Hide” when opened.
+
+The fictional response contains a `project` object. This source documents its `id` and `name` properties:
+
+```mdx
+<ResponseField name="project" type="object">
+  The newly created project.
+  <Expandable title="project properties">
+    <ResponseField name="id" type="string">
+      Identifier assigned to the project.
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Name supplied in the request.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+```
+
+Open the rendered object to inspect its child fields:
+
+<ResponseField name="project" type="object">
+  The newly created project.
+  <Expandable title="project properties">
+    <ResponseField name="id" type="string">
+      Identifier assigned to the project.
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Name supplied in the request.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+Nesting is authored content, not schema inference. Write every child field you want to show. Child names are displayed as written; nesting does not automatically prefix `id` with `project.`.
+
+## Add request and response examples
+
+`RequestExample` and `ResponseExample` wrap example content. Both use the same visual grouping as `CodeGroup`; neither sends a request nor checks a response.
+
+| Component | Supported prop | Content |
+| --- | --- | --- |
+| `RequestExample` | `children` | Request instructions and code fences. |
+| `ResponseExample` | `children` | Response explanations and code fences. |
+
+Add headings or introductory prose inside the wrappers to label examples. A `title` prop on either wrapper does not supply a heading. Label fences with `title="…"`; use an explicit `CodeGroup` inside a wrapper when you want multiple fences as tabs, with a title on every fence.
+
+Placement depends on where the wrappers appear:
+
+- Top-level examples appear in the desktop right-hand rail instead of the table of contents on default, non-editorial pages. On smaller screens, the examples remain inline at their authored position.
+- Examples nested inside another component stay inline. Pages whose layout hides the rail, including wide, center, frame, and editorial layouts, also show examples inline.
+- If the page contains a top-level `Panel`, that panel supplies the rail content instead. Request and response examples outside the panel stay inline.
+
+The following rendered examples are deliberately nested in an accordion so they stay inline. Both describe the same fictional API used in the field examples:
+
+<Accordion title="Inspect the fictional request and response">
+  <RequestExample>
+    Send a JSON body containing the project name.
+
+    ```json title="Request body"
+    { "name": "Docs" }
+    ```
+  </RequestExample>
+  <ResponseExample>
+    The example response contains the created project.
+
+    ```json title="Response body"
+    { "project": { "id": "proj_demo", "name": "Docs" } }
+    ```
+  </ResponseExample>
+</Accordion>
+
+## Assemble a hand-written reference
+
+Use a short operation description before the fields, then show matching request and response data. The following complete MDX fragment documents a fictional `POST /projects` operation; it does not create that endpoint. Its example wrappers are top-level, so the placement rules above apply.
+
+````mdx
+## Create a project
+
+This fictional POST /projects operation accepts a JSON body and returns
+an object containing the created project.
+
+### Request body
+
+<ParamField body="name" type="string" required>
+  Name of the project to create.
+</ParamField>
+
+### Response fields
+
+<ResponseField name="project" type="object">
+  The newly created project.
+  <Expandable title="project properties">
+    <ResponseField name="id" type="string">
+      Identifier assigned to the project.
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Name supplied in the request.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+  Send a JSON body containing the project name.
+
+  ```json title="Request body"
+  { "name": "Docs" }
+  ```
+</RequestExample>
+
+<ResponseExample>
+  The example response contains the created project.
+
+  ```json title="Response body"
+  { "project": { "id": "proj_demo", "name": "Docs" } }
+  ```
+</ResponseExample>
+````
+
+Preview the page at desktop and mobile widths. Confirm that the request field shows `required`, the response object's properties expand, and each example appears either in the rail or inline according to its placement and the page layout.

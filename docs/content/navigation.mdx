@@ -1,0 +1,201 @@
+---
+title: Control documentation navigation
+description: Choose filesystem ordering or an explicit navigation configuration.
+---
+
+Margin builds a sidebar from your documentation files unless you supply a `navigation` block in `docs.json`. Use filesystem navigation when folders match the structure readers need. Use explicit navigation when you want groups or tabs that span directories.
+
+## Choose the navigation source
+
+The presence of `docs.json` alone does not change navigation. Its `navigation` block does: the block replaces filesystem and `meta.json` navigation structure for the entire site.
+
+| Source | What controls the sidebar | What happens to unlisted pages |
+| --- | --- | --- |
+| No `navigation` block | Folders, page titles, and each directory's optional `meta.json` | Pages appear by default unless excluded or hidden. |
+| A `navigation` block | The groups, pages, and containers declared in that block | Pages stay reachable by URL but disappear from navigation. |
+
+Put `docs.json` at the root of your documentation folder. To return to filesystem navigation, remove the `navigation` property rather than leaving an empty object. An empty block does not request automatic navigation.
+
+Explicit navigation replaces folder membership, order, folder labels, icons, and tab definitions. It does not rename page URLs or override per-page frontmatter. In particular, a page with `hidden: true` remains hidden even when explicitly listed.
+
+## Order filesystem navigation
+
+Without explicit navigation, folders become sidebar folders. By default, entries sort by title, case-insensitively, with the directory's `index` page first. Folder labels use a humanized directory name unless `meta.json.title` supplies one.
+
+For example, this documentation folder has a home page and three guide pages:
+
+```text
+index.mdx
+guides/
+  meta.json
+  index.mdx
+  authentication.mdx
+  quickstart.mdx
+```
+
+Set the label and order for `guides/` in `guides/meta.json`:
+
+```json
+{
+  "title": "Guides",
+  "pages": ["index", "quickstart", "authentication", "..."]
+}
+```
+
+The guide landing page comes first, followed by Quickstart and Authentication. The `"..."` entry includes remaining entries, so adding another guide does not require updating this list. References in `meta.json.pages` are relative to that directory and omit the file extension. A folder name references that child folder.
+
+Use these entries to adjust a directory's list:
+
+| Entry | Behavior |
+| --- | --- |
+| `"quickstart"` | Include the named page or folder at this position. |
+| `"..."` | Include remaining entries. |
+| `"z...a"` | Include remaining entries in reverse order. |
+| `"...folder"` | Flatten the named folder's entries into this list. |
+| `"!draft"` | Exclude the named entry. |
+| `"---Guides---"` | Insert a labeled separator. |
+| `"---"` | Insert an unlabeled separator. |
+| `"[Status](https://status.example.com)"` | Insert a link with a label. |
+
+Without a rest entry, unlisted pages disappear from that directory's navigation but keep their URLs. A `meta.json` applies to its own directory, not sibling directories.
+
+The other common folder settings are `icon` for the folder icon, `defaultOpen` for its initial expanded state, `collapsible` for whether readers can collapse it, and `root` for making the folder a tab. These settings describe filesystem navigation; a site-wide `navigation` block supplies its own structure instead.
+
+## Declare groups and pages
+
+An explicit `navigation.groups` array labels sidebar groups, and each group's `pages` array sets its entries and order. Page references are relative to the documentation root, not to the group or the location of a preceding page. Use extensionless paths such as `guides/quickstart`.
+
+To show only the home page and two guides from the earlier file tree, add this block to `docs.json`. The nested group places Authentication under Account:
+
+```json
+{
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start",
+        "pages": [
+          "index",
+          "guides/quickstart",
+          {
+            "group": "Account",
+            "pages": ["guides/authentication"]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+This example omits `guides/index`, so that page remains available at `/guides` without appearing in navigation. Keep other existing `docs.json` fields when adding the block.
+
+| Field | Purpose |
+| --- | --- |
+| `navigation.pages` | Declare an ordered list without group labels. |
+| `navigation.groups` | Declare labeled groups. |
+| `group` | Set a group's visible label. |
+| `pages` | Include page-path strings, `{ "href": "…" }` references, or nested group objects. |
+| `root` | Set a group's landing-page reference. |
+| `icon` | Set a group's icon. |
+| `expanded` | Set a group's expanded state. |
+| `hidden` | Hide the group and its pages from navigation. |
+| `searchable` | Keep the group's hidden pages eligible for search. |
+
+A navigation reference does not create a missing page. A missing reference produces a `field_invalid` warning with the message `Navigation references a page that does not exist: <reference>.` Correct the path or add the file before publishing.
+
+## Add tabs, anchors, and dropdowns
+
+Tabs divide documentation into sections with their own sidebar content. Anchors with only an `href` are navigation links; anchors containing pages or groups behave as documentation sections like tabs. Dropdowns present a menu of destinations rather than a single link.
+
+Each example below is an alternative `navigation` block. Merge the fields you need into your existing block; do not add duplicate `navigation` keys.
+
+### Tabs
+
+Use `tabs` to separate Guides from Reference. This example requires `reference/index.mdx` in addition to the guide files:
+
+```json
+{
+  "navigation": {
+    "tabs": [
+      { "tab": "Guides", "pages": ["guides/quickstart", "guides/authentication"] },
+      { "tab": "Reference", "pages": ["reference/index"] }
+    ]
+  }
+}
+```
+
+Each tab requires a `tab` label. A tab can contain `groups` or `pages`, with `icon` and `hidden` settings. A tab with an external `href` becomes a link instead of a content section.
+
+For filesystem navigation, set `"root": true` in a directory's `meta.json` to make that folder a tab. Without tab roots or configured tabs, Margin uses a single sidebar. Tabs appear in the top bar by default; `x-margin.layout.tabMode` set to `"auto"` places them in the sidebar.
+
+### Anchors
+
+Use an `href`-only anchor for a destination outside the documentation tree:
+
+```json
+{
+  "navigation": {
+    "groups": [{ "group": "Start", "pages": ["index", "guides/quickstart"] }],
+    "anchors": [
+      { "anchor": "Status", "href": "https://status.example.com" }
+    ]
+  }
+}
+```
+
+Each anchor requires an `anchor` label and can set `icon`, `color`, and `hidden`. An anchor with `groups` or `pages` defines a documentation section instead. Put persistent link anchors in `navigation.global.anchors` to show them across sections.
+
+### Dropdowns
+
+Use a dropdown to collect related destinations into a menu:
+
+```json
+{
+  "navigation": {
+    "groups": [{ "group": "Start", "pages": ["index", "guides/quickstart"] }],
+    "dropdowns": [
+      {
+        "dropdown": "Resources",
+        "groups": [
+          { "group": "Guides", "pages": ["guides/authentication"] }
+        ],
+        "anchors": [
+          { "anchor": "Status", "href": "https://status.example.com" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Each dropdown requires a `dropdown` label. Dropdowns support child navigation containers, including `groups`, `pages`, `tabs`, and `anchors`, plus `icon`, `description`, `color`, `hidden`, and `href`. A dropdown with only an `href` renders as a plain link, not an empty menu.
+
+## Check page visibility
+
+Navigation visibility is not access control. Hiding or omitting a published page does not prevent readers from opening its URL.
+
+| Condition | Navigation | Direct URL |
+| --- | --- | --- |
+| Page included, without a hidden setting | Visible | Available |
+| Page omitted from explicit navigation | Hidden | Available |
+| Page omitted from `meta.json.pages` without a rest entry | Hidden | Available |
+| Page has frontmatter `hidden: true`, even if listed | Hidden | Available |
+| Page belongs to a configured `hidden: true` group or tab | Hidden | Available |
+| Page is in a leading-underscore draft folder and is not explicitly referenced | Not published | Not available |
+
+Explicit references in `navigation` or `meta.json.pages` can publish pages inside leading-underscore folders. Do not use those folders to store confidential material in a documentation source tree.
+
+For an unlisted page that readers should still find through search, set both frontmatter fields:
+
+```yaml
+hidden: true
+searchable: true
+```
+
+After deploying the updated configuration, open each tab or menu and confirm its first destination and sidebar order. Inspect the published navigation as Markdown by replacing the origin in this command:
+
+```sh
+curl --fail --silent --show-error 'https://docs.example.com/sitemap.md'
+```
+
+The response should contain links for the visible pages. Open an omitted page's URL separately to confirm that it still loads. If a listed page is absent, check its frontmatter and ancestor containers for `hidden: true`, then check build diagnostics for missing references.

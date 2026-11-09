@@ -1,0 +1,102 @@
+---
+title: "Publish a changelog"
+description: "Choose release labels and tags that control how readers browse updates."
+---
+
+Publish release notes as an MDX page containing one `Update` component per release. Readers see the entries in the order you write them, with tag filters on wide screens and an RSS feed for subscriptions.
+
+## Create a changelog page
+
+Create `changelog.mdx` in your documentation source. The filename is a choice, not a required route. No changelog-specific frontmatter, import, or wrapper is required.
+
+Use this complete page as a starting point. Replace the sample release content with your changes, keeping the newest entry first.
+
+```mdx
+---
+title: "Changelog"
+description: "Release notes for the API and dashboard."
+---
+
+<Update
+  label="October 28, 2026"
+  description="v2.4.0"
+  tags={["API"]}
+>
+  ## Retry failed deliveries
+
+  Failed webhook deliveries now retry for 24 hours.
+</Update>
+
+<Update
+  label="October 14, 2026"
+  description="v2.3.0"
+  tags={["Dashboard"]}
+>
+  ## Export delivery history
+
+  Download delivery history as a CSV from the dashboard.
+</Update>
+```
+
+Add the page's extensionless path to an existing navigation group in `docs.json`, then publish through your usual documentation workflow. For a file at the documentation root, a group can contain this entry:
+
+```json
+{
+  "group": "Releases",
+  "pages": ["changelog"]
+}
+```
+
+## Write release entries
+
+Each `Update` wraps the entry body. Use Markdown headings, paragraphs, lists, and code blocks inside it. The component displays the release label, description, and tags beside the body on wider screens and above it on smaller screens.
+
+All metadata is optional, but a unique date label and consistent tags make entries easier to browse.
+
+| Prop | Value | Behavior |
+| --- | --- | --- |
+| `label` | String | Visible label and source of the entry anchor. Use a date when readers need publication dates. |
+| `date` | String | Fallback label when `label` is absent. Does not override `label` or sort entries. |
+| `description` | String | Short release title or version shown with the label. Also the default RSS item title when present. |
+| `tags` | Array of strings | Visible tag labels and the source of filter choices. Omit for an untagged entry. |
+| `rss` | Static object with optional string fields `title` and `description` | Overrides the feed item's title and supplies its feed description. Does not change the visible release metadata. |
+
+Write metadata as literal strings, arrays, or objects. Do not calculate tags or RSS metadata with function calls or runtime variables.
+
+To give a feed item a different title and a summary, add this attribute to its `Update` opening tag:
+
+```mdx
+rss={{ title: "API v2.4.0", description: "Webhook retries now last 24 hours." }}
+```
+
+The feed title falls back from `rss.title` to `description`, then to the label, and finally to `Update`. The entry body is not copied into the feed description. A feed publication date is included only when the chosen label can be parsed as a date. If both `label` and `date` are supplied, the label is used for that date too.
+
+## Configure filters
+
+Set `tags` on entries to create filters. There is no separate filter declaration: the page collects the distinct tag strings from its entries, in first-appearance order, and shows them in a Filters panel instead of the right-hand table of contents.
+
+Tag matching is exact and case-sensitive, so use one spelling for each category. An array with two strings assigns two categories; a comma inside one string remains part of that single category.
+
+With no filter selected, every entry is visible. Selecting a tag shows entries with that tag. Selecting multiple tags shows entries matching any selected tag, not only entries matching every selected tag. Untagged entries disappear while any filter is selected. Select an active tag again to remove it; clearing all selections restores every entry.
+
+The rendered sample below provides two filter choices for this page. On a wide screen, select `API` to keep the first sample visible, or `Dashboard` to keep the second sample visible.
+
+<Update label="October 28, 2026" description="v2.4.0" tags={["API"]}>
+  This sample belongs to the API category. Selecting both categories keeps both samples visible.
+</Update>
+
+<Update label="October 14, 2026" description="v2.3.0" tags={["Dashboard"]}>
+  This sample belongs to the Dashboard category. Clear the selection to restore all samples.
+</Update>
+
+The Filters panel is hidden below the extra-large layout breakpoint. Entries remain readable on smaller screens, but the panel does not provide a mobile filtering control. Navigating to another page resets the selection. A page with no tags has no Filters panel.
+
+## Check the reader experience
+
+Open the published page on a wide screen and confirm that the newer release appears first. Entries are not automatically sorted by date or version; move the entire `Update` block to change its position.
+
+Check that each entry has the intended label and release description. Entry anchors come from `label`, or from `date` when `label` is absent: letters become lowercase, runs of non-alphanumeric characters become hyphens, and leading or trailing hyphens are removed. For example, `October 28, 2026` becomes `#october-28-2026`. Use distinct labels to avoid duplicate anchors.
+
+Test each filter, then select both filters and clear them. Confirm that the visible entries follow the tag rules above. Resize to a narrow screen to check that the metadata remains readable without the panel.
+
+Use the page's Open RSS feed action to check subscriptions. A page at `/changelog` has its feed at `/changelog.rss.xml`; a different page path gets its own `.rss.xml` feed. The feed contains one item per authored entry in source order, with tags as RSS categories. Browser filter selections do not change the feed.

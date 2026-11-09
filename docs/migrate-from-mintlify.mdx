@@ -1,0 +1,58 @@
+---
+title: Migrate from Mintlify
+description: Retain your source files while reviewing configuration mappings, rendering differences, and migration warnings.
+---
+
+Publish your existing Mintlify documentation with Margin without converting `docs.json` or rewriting your MDX first. Source acceptance does not guarantee identical presentation or support for every Mintlify feature. Review the rendered site and diagnostics before replacing your current deployment.
+
+## Publish your existing documentation
+
+1. Retain the source layout. Keep `docs.json`, MDX pages, snippets, local images, and OpenAPI files together with their relative paths intact. Put `docs.json` at the documentation folder's root. Do not rename `docs.json` or add an `x-margin` block just to migrate. Margin also reads `mint.json` as a legacy fallback when `docs.json` is absent.
+2. Review configuration compatibility below. Identify adapted settings and ignored features that need attention when you check the rendered site.
+3. [Deploy your repository on Manicule](/deploy/manicule), free, with no limits. No servers or environment variables are required, and the database is included. Every push to your docs branch publishes, and pull requests get previews. Open a page containing your navigation, branding, and a component or image, then follow its links. Compare light and dark appearance if your site uses both. Review migration diagnostics before changing your public documentation address.
+
+[Self-hosting](/deploy/self-host) is the alternative. Both options use the same repository and `docs.json`; Margin is Apache 2.0 licensed. A self-hosted deployment requires the Margin server, build scripts, and database integration, which a docs-only Mintlify repository does not contain. Complete the shared framework setup in [Quickstart](/quickstart), then place the existing documentation tree in the framework's `docs/` directory, replacing its example documentation, or set `DOCS_DIR` to the existing folder available in the build environment. Publish with the framework's configured deployment build.
+
+## Check configuration compatibility
+
+Margin classifies configuration behavior as Supported, Adapted, or Ignored. Adapted settings use Margin's implementation, so retain the setting but review its visible effect.
+
+| Status | Meaning | Examples and behavior to check |
+| --- | --- | --- |
+| Supported | The setting retains its documented Mintlify behavior. | `name`, `colors`, `logo`, `favicon`, `navigation`, and `redirects`. An explicit `navigation` block controls visible navigation; pages omitted from it remain reachable by URL. |
+| Adapted | The setting maps to a Margin implementation with different presentation or behavior. | `theme` selects a framework-owned layout preset rather than reproducing Mintlify's layout exactly. `appearance.default` selects the default color mode; `appearance.strict: true` disables the theme switch. Page-frontmatter `mode` accepts `default`, `center`, `wide`, `custom`, and `frame` as Margin layout classes. `background.decoration` accepts `gradient`, `grid`, and `windows` as Margin-owned decorations. |
+| Ignored | The field is accepted but has no runtime effect; a diagnostic records the unsupported behavior. | Unknown configuration keys, `public`, `api.asyncapi`, and `api.mdx`. Google Tag Manager configuration is not executed. `public` does not restrict access: served documentation is public. |
+
+A supported field does not make the entire containing object supported. For example, integration providers have separate rules: an accepted provider does not imply that an arbitrary script origin or executable container is accepted.
+
+## Resolve migration diagnostics
+
+For self-hosted framework deployments, read the ingest output in your terminal or deployment build log. Warning and error entries include the affected path when available. The complete diagnostics collection is stored with the ingested content version; informational entries are not printed by the ingest CLI. A successful build is not proof that every configured field took effect.
+
+An ignored field needs no edit for parsing to succeed, but its feature will not run. Remove it if you no longer need it, or configure a supported replacement. Unknown keys produce `unknown_field`; recognized fields without an implementation produce `unsupported_field`. Invalid values on known configuration fields can produce `field_invalid` and fall back independently without discarding valid siblings. Unparseable JSON or unsafe content can still fail the build.
+
+Check component and asset warnings against the rendered page:
+
+- `component_unknown` means an unrecognized component was replaced by its children. Its text can remain visible while its layout or interaction disappears. Replace it with a supported built-in component, or use a supported local snippet component.
+- `asset_missing` identifies an asset reference that could not be resolved. Check the file path and keep local assets inside the documentation folder. Supported remote asset resolution can require an allowed host through `x-margin.assets.allowExternal`. A warned asset URL can remain unchanged, so a page that publishes can still contain a broken image.
+
+Margin sanitizes SVGs and stylesheets. Inspect any custom styling after migration rather than assuming every CSS rule or asset is served unchanged.
+
+## Add Margin-specific settings
+
+`x-margin` is an optional namespace inside `docs.json` for Margin settings. Migration does not require it. Add settings only when you want behavior beyond the retained configuration, such as an explicit search mode, layout dimensions, SEO title formatting, or MCP instructions.
+
+To select static search and set the sidebar width, merge this block into your existing `docs.json`; keep the other fields:
+
+```json
+{
+  "x-margin": {
+    "search": { "mode": "static" },
+    "layout": { "sidebarWidth": "300px" }
+  }
+}
+```
+
+`x-margin.search.mode` accepts `ai`, `static`, or `off`. AI search also requires AI Gateway access; choosing `ai` alone does not supply that access. `x-margin.layout.sidebarWidth` controls the sidebar dimension, not a replacement layout engine.
+
+Other supported extensions include `x-margin.tokens` for theme tokens, `x-margin.css` for stylesheet paths, `x-margin.seo.titleTemplate` for page titles, and `x-margin.agents.mcpInstructions` for instructions appended to the MCP server's generated instructions. Unknown `x-margin` keys are ignored with diagnostics, just like unknown top-level keys.

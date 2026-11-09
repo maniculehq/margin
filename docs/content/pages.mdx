@@ -1,0 +1,96 @@
+---
+title: Create pages with frontmatter
+description: Set page metadata and control whether a page appears in navigation.
+---
+
+Add a Markdown file to your docs folder to publish a page. The file path determines its URL; optional YAML frontmatter sets its title and other page-level settings.
+
+## Create a page file
+
+Margin reads `.md` and `.mdx` files from the folder selected by `DOCS_DIR`. A site needs only one content file: `docs.json`, `meta.json`, and frontmatter are optional. Use `.md` for Markdown content or `.mdx` when the page includes components.
+
+Create `guides/first-request.mdx` inside your docs folder with this content:
+
+```mdx
+---
+title: Make your first request
+description: Send a request and inspect the response.
+---
+
+Run the request from your terminal, then inspect the response body.
+```
+
+After publishing the change, open `/guides/first-request`. The page heading should read “Make your first request,” with the description beneath it. If your site has an explicit navigation configuration, the new file is still URL-reachable even before you add it to navigation.
+
+To check the published route from a terminal, set `SITE_ORIGIN` to your docs origin and request the page. A published page returns HTTP `200`:
+
+```sh
+curl --silent --output /dev/null --write-out '%{http_code}\n' \
+  "${SITE_ORIGIN}/guides/first-request"
+```
+
+## Set the title and URL
+
+The page title uses the first available value: frontmatter `title`, the first Markdown H1 (`# Heading`), then a title derived from the filename. Filename titles split hyphens and underscores into spaces and capitalize words; recognized acronyms such as API and SDK remain uppercase. A title is not required to build a page.
+
+An `index.md` or `index.mdx` without a title or H1 uses its parent directory's name as the title. A root `index` without either uses “Overview.”
+
+URLs preserve the file's directory structure, remove the `.md` or `.mdx` extension, and remove a trailing `index` segment. Changing a title does not change the URL. Rename or move the file to change its path; frontmatter has no supported `slug` override.
+
+These examples use paths relative to the docs folder:
+
+| File | Authored title source | Page title | URL |
+| --- | --- | --- | --- |
+| `guides/first-request.mdx` | `title: Make your first request` | Make your first request | `/guides/first-request` |
+| `guides/setup.md` | Body starts with `# Configure the client` | Configure the client | `/guides/setup` |
+| `api-reference.mdx` | No title or H1 | API Reference | `/api-reference` |
+| `guides/index.mdx` | No title or H1 | Guides | `/guides` |
+| `index.md` | No title or H1 | Overview | `/` |
+
+In filesystem-derived navigation, parenthesized folders are transparent: `api/(rest)/users.mdx` becomes `/api/users`. An explicit reference to that authored path in `docs.json` navigation or a `meta.json` page list preserves the parenthesized segment instead. Leading-underscore folders are unpublished drafts unless explicitly referenced. Version and language roots follow their configured routing prefixes. Do not create two files that resolve to the same URL.
+
+## Configure frontmatter
+
+Place YAML frontmatter at the start of the file, between the opening and closing `---` delimiters. All fields are optional. Use YAML booleans such as `hidden: true`, not quoted strings such as `hidden: "true"`.
+
+The fields below control page metadata and behavior. Omitted values use the defaults shown.
+
+| Field | Type | Default and effect |
+| --- | --- | --- |
+| `title` | String, 1–255 characters | First H1, then filename-derived title. Sets the page heading. |
+| `sidebarTitle` | String, 1–255 characters | Page title. Changes the navigation label without changing the heading. |
+| `description` | String, up to 2,000 characters | First prose paragraph becomes a shortened excerpt for metadata and search. Only an authored description renders as the page subtitle. |
+| `icon` | String, up to 255 characters | Unset. Sets the page's navigation icon by name or image path. |
+| `tag` | String, 1–24 characters | Unset. Adds a short badge, such as `Beta`, after the sidebar label. |
+| `hidden` | Boolean | `false`. Removes the page from navigation, not from publication. |
+| `searchable` | Boolean | `false`. Set `true` to keep a hidden page eligible for search and agent indexes. Visible pages do not need this opt-in. |
+| `mode` | `default`, `center`, `wide`, `custom`, or `frame` | `default` for ordinary pages; `wide` for pages with an API console. Selects the page layout. |
+| `timestamp` | Boolean | Inherits `docs.json`'s `metadata.timestamp`, which defaults to off. Overrides whether the page shows its git-derived last-modified date. |
+| `sidebar_position`, `order` | Number | Optional ordering values accepted in frontmatter. Use `meta.json` or `docs.json` navigation to specify sidebar order. |
+| `api` | String | Unset. A value such as `GET /users` adds a sidebar method badge; it does not create an API console. |
+| `openapi` | String | Unset. References an operation as `[spec path] METHOD /path` or `[spec path] webhook name`, where the spec path is optional. Adds the operation's API console alongside authored content. |
+| `ogImage` | String | Generated Open Graph image. Overrides the page's social preview image with an admitted image path or URL. |
+| `url` | String | Unset. An admitted external HTTP(S) URL makes the navigation entry link externally and the internal HTML route redirect with status `307`. It does not rename the internal route. |
+| `provenance` | `true` or object with `sourceUrl` | Unset. With site-level `x-margin.seo.provenance` configured, declares an upstream source. `true` uses the site's source base URL; `sourceUrl` supplies an absolute public HTTP(S) URL. Neither changes the canonical URL. |
+| `contextual` | Object with optional `options` array and `display` | Inherits the site's contextual menu. A page override replaces the site setting. `options` accepts strings or custom-option objects; `display` accepts `header` or `toc`. Use `options: []` to disable the menu on this page. |
+
+Unknown frontmatter keys are retained, but retention does not give them built-in behavior. Invalid known fields are dropped with a `field_invalid` warning and use their derived defaults. An unresolved `openapi` reference produces an `openapi_ref_unresolved` warning and leaves the page without its API console.
+
+## Hide a page from navigation
+
+Set `hidden: true` when a published page should not appear in the sidebar. This example creates a URL-reachable preview page without a navigation entry:
+
+```mdx
+---
+title: Preview the migration
+hidden: true
+---
+
+Review the migration instructions before updating your client.
+```
+
+Save it as `migration-preview.mdx`, publish the change, and open `/migration-preview` to confirm it still loads. Check the sidebar to confirm it is absent. The page remains hidden even if a navigation configuration explicitly lists it.
+
+Under the default indexing policy, hidden pages are excluded from search and agent indexes unless `searchable: true` opts them back in. A site-wide indexing policy can also include hidden pages. Neither hiding nor excluding a page from indexes restricts access to its URL. Do not publish confidential content in a public docs folder.
+
+To order pages or group them in the sidebar, configure [navigation](/content/navigation).
