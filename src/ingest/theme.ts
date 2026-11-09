@@ -1,12 +1,19 @@
 import type { Declaration, ReturnedRule } from "lightningcss"
 import {
+    composite,
+    parseColor,
+    type Rgba,
+    readableAccent,
+    readableOn,
+    toHex,
+} from "../lib/color"
+import {
     CONFIG_EXTENSION_KEY,
     type Diagnostic,
     type DocsConfigSuperset,
     LAYOUT_PRESET_PALETTES,
     type LayoutPreset,
     THEME_LAYOUT_PRESETS,
-    THEME_PRESET_PALETTES,
     type ThemeTokens,
     themePresetSchema,
 } from "../types/docs"
@@ -73,6 +80,31 @@ const LAYOUT_PROPERTIES = new Set([
     "z-index",
 ])
 
+/** Palette grays that follow a site's primary hue. */
+const NEUTRAL_TOKENS = [
+    "background",
+    "foreground",
+    "card",
+    "card-foreground",
+    "popover",
+    "popover-foreground",
+    "muted",
+    "muted-foreground",
+    "secondary",
+    "secondary-foreground",
+    "accent",
+    "accent-foreground",
+    "border",
+    "input",
+].map((suffix) => `--color-fd-${suffix}`)
+/** Surfaces accent text is set on, and the one its active-row tint
+ * (`bg-fd-primary/10`) is laid over: presets whose sidebar sits on a fill
+ * mark the active row without a tint. Kept in step with the chrome CSS and
+ * checked by tests/theme-contrast.test.ts. */
+const ACCENT_SURFACES = ["background", "card", "popover", "muted", "secondary"]
+const ACCENT_TINT_BASES = ["background"]
+const ACCENT_TINT_ALPHA = 0.1
+
 export function resolveLayoutPreset(theme: string | undefined): {
     preset: LayoutPreset
     diagnostic?: Diagnostic
@@ -96,11 +128,9 @@ export function resolveThemeTokens(
     detectedAccent?: string,
     diagnostics: Diagnostic[] = [],
 ): ThemeTokens {
-    const palette = config?.theme
-        ? THEME_PRESET_PALETTES[config.theme]
-        : LAYOUT_PRESET_PALETTES[preset]
-    const tokens: ThemeTokens =
-        palette === "neutral" ? {} : structuredClone(PALETTE_TOKENS[palette])
+    const tokens: ThemeTokens = structuredClone(
+        PALETTE_TOKENS[config?.theme ?? LAYOUT_PRESET_PALETTES[preset]],
+    )
 
     // An explicit null pins the bare preset and disables every derived/config
     // token source. Tenant CSS remains a separate, later cascade layer.
@@ -112,123 +142,91 @@ export function resolveThemeTokens(
         path: string,
     ): boolean => {
         if (value === undefined) return false
-        if (typeof value === "string") {
-            if (HEX_COLOR.test(value)) {
-                tokens[cssVar] = value
-                return true
-            } else {
-                diagnostics.push({
-                    code: "field_invalid",
-                    severity: "warn",
-                    message: `Invalid color at ${path}; expected #RGB or #RRGGBB.`,
-                    path,
-                })
-                return false
-            }
-        }
-        if (HEX_COLOR.test(value.light) && HEX_COLOR.test(value.dark)) {
-            tokens[cssVar] = value
-            return true
-        } else {
+        const valid =
+            typeof value === "string"
+                ? HEX_COLOR.test(value)
+                : HEX_COLOR.test(value.light) && HEX_COLOR.test(value.dark)
+        if (valid) tokens[cssVar] = value
+        else
             diagnostics.push({
                 code: "field_invalid",
                 severity: "warn",
                 message: `Invalid color at ${path}; expected #RGB or #RRGGBB.`,
                 path,
             })
-            return false
-        }
+        return valid
+    }
+    const hexAt = (
+        value: string | undefined,
+        path: string,
+    ): string | undefined => {
+        if (value === undefined) return undefined
+        if (HEX_COLOR.test(value)) return value
+        diagnostics.push({
+            code: "field_invalid",
+            severity: "warn",
+            message: `Invalid color at ${path}; expected #RGB or #RRGGBB.`,
+            path,
+        })
+        return undefined
     }
 
-    let basePrimarySupplied = false
-    let explicitPrimaryForeground = false
-    if (detectedAccent !== undefined)
-        basePrimarySupplied = setColor(
-            "--color-fd-primary",
-            detectedAccent,
-            "detectedAccent",
-        )
-
+    // Mintlify semantics: `primary` is the light-mode accent, `light` the
+    // dark-mode accent, `dark` the button and hover fill in both modes; each
+    // falls back to `primary`, and a logo accent stands in for a missing
+    // `primary`.
     const colors = config?.colors
-    if (colors?.primary !== undefined)
-        basePrimarySupplied = setColor(
-            "--color-fd-primary",
-            colors.primary,
-            "colors.primary",
-        )
-    if (colors?.dark !== undefined || colors?.light !== undefined) {
-        const current = tokens["--color-fd-primary"]
-        const base =
-            typeof current === "string"
-                ? current
-                : (current?.light ?? current?.dark)
-        const lightMode = colors.dark ?? base
-        const darkMode = colors.light ?? base
-        if (lightMode !== undefined && darkMode !== undefined)
-            setColor(
-                "--color-fd-primary",
-                { light: lightMode, dark: darkMode },
-                "colors",
-            )
+    const primary =
+        hexAt(colors?.primary, "colors.primary") ??
+        hexAt(detectedAccent, "detectedAccent")
+    const accentSources = {
+        light: primary,
+        dark: hexAt(colors?.light, "colors.light") ?? primary,
     }
+    const button = hexAt(colors?.dark, "colors.dark") ?? primary
 
-    // Dark neutrals follow the primary color: a pink primary reads warm
-    // plum-black in dark mode where a static palette would stay cool. Re-tint the palette's DARK neutrals with the
-    // primary's hue (saturation capped so it stays a near-black, not a brand
-    // wash). Explicit background.color below still overrides.
-    const primaryToken = tokens["--color-fd-primary"]
-    const primaryHex =
-        typeof primaryToken === "string" ? primaryToken : primaryToken?.dark
-    if (basePrimarySupplied && primaryHex && HEX_COLOR.test(primaryHex)) {
-        const hex =
-            primaryHex.length === 4
-                ? `#${primaryHex[1]}${primaryHex[1]}${primaryHex[2]}${primaryHex[2]}${primaryHex[3]}${primaryHex[3]}`
-                : primaryHex
-        const r = Number.parseInt(hex.slice(1, 3), 16) / 255
-        const g = Number.parseInt(hex.slice(3, 5), 16) / 255
-        const b = Number.parseInt(hex.slice(5, 7), 16) / 255
-        const max = Math.max(r, g, b)
-        const min = Math.min(r, g, b)
+    // Neutrals follow the primary hue: a green brand reads as green-gray
+    // chrome and a green-black dark page, as Mintlify themes do. Re-tint the
+    // palette's neutral grays with the primary's hue (saturation capped so
+    // they stay gray, not a brand wash); the light page stays as the theme
+    // set it. Explicit background.color below still overrides.
+    const hueSource = parseColor(primary ?? accentSources.dark ?? "")
+    if (hueSource) {
+        const [r, g, b] = hueSource.map((channel) => channel / 255)
+        const max = Math.max(r ?? 0, g ?? 0, b ?? 0)
+        const min = Math.min(r ?? 0, g ?? 0, b ?? 0)
         let hue = 0
-        if (max !== min) {
+        if (
+            max !== min &&
+            r !== undefined &&
+            g !== undefined &&
+            b !== undefined
+        ) {
             const d = max - min
             if (max === r) hue = ((g - b) / d + (g < b ? 6 : 0)) * 60
             else if (max === g) hue = ((b - r) / d + 2) * 60
             else hue = ((r - g) / d + 4) * 60
         }
         const primaryHue = Math.round(hue)
-        const DARK_HSL =
+        const NEUTRAL_HSL =
             /^hsl(a?)\((\d+(?:\.\d+)?), ?(\d+(?:\.\d+)?)%, ?([^)]+)\)$/
-        // NEUTRAL surfaces only — semantic/brand tokens (primary, ring,
-        // info/warning/error/success) must keep their own hue and
-        // saturation; the 12% cap would gray a brand focus ring out.
-        const darkNeutralTokens = new Set(
-            [
-                "background",
-                "foreground",
-                "card",
-                "card-foreground",
-                "popover",
-                "popover-foreground",
-                "muted",
-                "muted-foreground",
-                "secondary",
-                "secondary-foreground",
-                "accent",
-                "accent-foreground",
-                "border",
-                "input",
-            ].map((suffix) => `--color-fd-${suffix}`),
-        )
-        for (const [name, value] of Object.entries(tokens)) {
-            if (!darkNeutralTokens.has(name)) continue
-            if (typeof value === "string" || value.dark === undefined) continue
-            const match = DARK_HSL.exec(value.dark)
-            if (!match) continue
+        const tint = (value: string): string => {
+            const match = NEUTRAL_HSL.exec(value)
+            if (!match) return value
             const saturation = Math.min(Number.parseFloat(match[3] ?? "0"), 12)
+            return `hsl${match[1]}(${primaryHue}, ${saturation}%, ${match[4]})`
+        }
+        // NEUTRAL surfaces only — semantic/brand tokens (primary, ring,
+        // info/warning/error/success) keep their own hue and saturation.
+        for (const name of NEUTRAL_TOKENS) {
+            const value = tokens[name]
+            if (value === undefined || typeof value === "string") continue
             tokens[name] = {
-                light: value.light,
-                dark: `hsl${match[1]}(${primaryHue}, ${saturation}%, ${match[4]})`,
+                light:
+                    name === "--color-fd-background"
+                        ? value.light
+                        : tint(value.light),
+                dark: tint(value.dark),
             }
         }
     }
@@ -251,6 +249,64 @@ export function resolveThemeTokens(
         )
     }
 
+    // Accent text must stay readable wherever it lands: on the page, cards,
+    // popovers and fills, and on the 10% tint of itself that marks the
+    // active sidebar row. A brand color that falls short in a scheme moves
+    // along lightness until it clears 4.5:1 (src/lib/color.ts); one that
+    // already passes is kept exactly.
+    if (accentSources.light !== undefined || accentSources.dark !== undefined) {
+        const accent = { light: "", dark: "" }
+        for (const scheme of ["light", "dark"] as const) {
+            const surface = (name: string): Rgba | null => {
+                const value = tokens[`--color-fd-${name}`]
+                if (value === undefined) return null
+                return parseColor(
+                    typeof value === "string" ? value : value[scheme],
+                )
+            }
+            const page = surface("background")
+            const on = (names: string[]) =>
+                names.flatMap((name) => {
+                    const color = surface(name)
+                    return color ? [page ? composite(color, page) : color] : []
+                })
+            const source = accentSources[scheme]
+            const current = tokens["--color-fd-primary"]
+            const fallback =
+                typeof current === "string" ? current : current?.[scheme]
+            const base = parseColor(source ?? fallback ?? "")
+            if (!base) continue
+            accent[scheme] =
+                source === undefined
+                    ? (fallback ?? "")
+                    : toHex(
+                          readableAccent(
+                              base,
+                              {
+                                  surfaces: on(ACCENT_SURFACES),
+                                  tintBases: on(ACCENT_TINT_BASES),
+                                  tintAlpha: ACCENT_TINT_ALPHA,
+                              },
+                              scheme,
+                          ),
+                      )
+        }
+        if (accent.light && accent.dark) {
+            tokens["--color-fd-primary"] = accent
+            // Focus rings follow the accent, which clears 4.5:1 (over the
+            // 3:1 a focus indicator needs) on every surface it was fit to.
+            tokens["--color-fd-ring"] = accent
+        }
+    }
+    if (button !== undefined) {
+        const fill = parseColor(button)
+        if (fill) {
+            tokens["--margin-button"] = button
+            tokens["--margin-button-foreground"] = readableOn(fill)
+        }
+    }
+
+    let explicitPrimaryForeground = false
     for (const [name, value] of Object.entries(
         config?.[CONFIG_EXTENSION_KEY]?.tokens ?? {},
     )) {
@@ -260,10 +316,27 @@ export function resolveThemeTokens(
             value,
             `${CONFIG_EXTENSION_KEY}.tokens.${name}`,
         )
-        if (name === "primary" && typeof value === "string" && applied)
-            basePrimarySupplied = true
         if (name === "primary-foreground" && applied)
             explicitPrimaryForeground = true
+    }
+
+    // Text on primary fills: black or white per scheme, whichever reads
+    // better, unless the site set it.
+    const finalPrimary = tokens["--color-fd-primary"]
+    if (!explicitPrimaryForeground && finalPrimary !== undefined) {
+        const light = parseColor(
+            typeof finalPrimary === "string"
+                ? finalPrimary
+                : finalPrimary.light,
+        )
+        const dark = parseColor(
+            typeof finalPrimary === "string" ? finalPrimary : finalPrimary.dark,
+        )
+        if (light && dark)
+            tokens["--color-fd-primary-foreground"] = {
+                light: readableOn(light),
+                dark: readableOn(dark),
+            }
     }
 
     const setDimension = (
@@ -339,36 +412,6 @@ export function resolveThemeTokens(
     if (headingFamily)
         tokens["--font-heading"] = `${headingFamily}, ${SANS_FALLBACK}`
     if (monoFamily) tokens["--font-mono"] = `${monoFamily}, ${MONO_FALLBACK}`
-
-    const primary = tokens["--color-fd-primary"]
-    if (
-        basePrimarySupplied &&
-        !explicitPrimaryForeground &&
-        typeof primary === "string" &&
-        HEX_COLOR.test(primary)
-    ) {
-        const compact = primary.slice(1)
-        const expanded =
-            compact.length === 3
-                ? compact
-                      .split("")
-                      .map((digit) => `${digit}${digit}`)
-                      .join("")
-                : compact
-        const channels = [0, 2, 4].map((offset) => {
-            const channel =
-                Number.parseInt(expanded.slice(offset, offset + 2), 16) / 255
-            return channel <= 0.04045
-                ? channel / 12.92
-                : ((channel + 0.055) / 1.055) ** 2.4
-        })
-        const luminance =
-            0.2126 * (channels[0] ?? 0) +
-            0.7152 * (channels[1] ?? 0) +
-            0.0722 * (channels[2] ?? 0)
-        tokens["--color-fd-primary-foreground"] =
-            luminance > 0.179 ? "#000" : "#fff"
-    }
 
     return tokens
 }

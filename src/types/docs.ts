@@ -775,23 +775,6 @@ export const LAYOUT_PRESETS = [
 export const layoutPresetSchema = z.enum(LAYOUT_PRESETS)
 export type LayoutPreset = z.infer<typeof layoutPresetSchema>
 
-export const PALETTE_NAMES = [
-    "neutral",
-    "shadcn",
-    "ocean",
-    "aspen",
-    "black",
-    "catppuccin",
-    "dusk",
-    "emerald",
-    "purple",
-    "ruby",
-    "solar",
-    "vitepress",
-] as const
-export const paletteNameSchema = z.enum(PALETTE_NAMES)
-export type PaletteName = z.infer<typeof paletteNameSchema>
-
 export const themeTokenValueSchema = z.union([
     z.string(),
     z.object({ light: z.string(), dark: z.string() }),
@@ -820,28 +803,19 @@ export const versionsManifestSchema = z.array(
 )
 export type VersionsManifest = z.infer<typeof versionsManifestSchema>
 
-/** Default palette seed for each framework-owned layout preset. */
-export const LAYOUT_PRESET_PALETTES: Record<LayoutPreset, PaletteName> = {
-    neutral: "neutral",
-    editorial: "neutral",
-    warm: "ruby",
-    verdant: "emerald",
+/**
+ * Palette for a layout preset reached without a docs.json `theme` (zero
+ * config). A `theme` selects its own palette: PALETTE_TOKENS is keyed by
+ * theme name.
+ */
+export const LAYOUT_PRESET_PALETTES: Record<LayoutPreset, ThemePreset> = {
+    neutral: "mint",
+    editorial: "mint",
+    warm: "maple",
+    verdant: "palm",
     aspen: "aspen",
-    dusk: "dusk",
-    contrast: "black",
-}
-
-/** Exact seed per docs.json theme, including the two shared-layout variants. */
-export const THEME_PRESET_PALETTES: Record<ThemePreset, PaletteName> = {
-    mint: "neutral",
-    linden: "neutral",
-    maple: "ruby",
-    almond: "solar",
-    palm: "emerald",
-    willow: "ocean",
-    aspen: "aspen",
-    sequoia: "dusk",
-    luma: "black",
+    dusk: "sequoia",
+    contrast: "luma",
 }
 
 export const THEME_LAYOUT_PRESETS: Record<ThemePreset, LayoutPreset> = {
