@@ -1,45 +1,57 @@
 /*
- * Layout preset: ASPEN (§4.2). Airy and light: the widest shell of the set,
- * generous whitespace, and near-invisible borders that let content float. Light
- * heading weights with a hint of tracking keep the chrome quiet; a taller top
- * band gives the page room to breathe.
+ * Layout preset: ASPEN (§4.2). A 56px top row over a 40px tab row with a
+ * wide, fully rounded search field on the muted fill; small uppercase group
+ * labels divided by hairlines; tinted active rows (app.css) and the rail
+ * TOC; the 36rem reading column centred.
  */
 
 [data-preset="aspen"] {
-    --fd-layout-width: 1500px;
+    --fd-layout-width: 94rem;
+    --margin-measure: 36rem;
+}
+:root[data-preset="aspen"] {
+    --docs-band-row: 3.5rem;
+    --docs-band-tabs: 2.5rem;
 }
 @media (min-width: 64rem) {
     [data-preset="aspen"] #nd-docs-layout {
-        --fd-sidebar-width: 284px;
+        --fd-sidebar-width: 19rem;
     }
 }
 @media (min-width: 1280px) {
     [data-preset="aspen"] #nd-docs-layout {
-        --fd-toc-width: 284px;
+        --fd-toc-width: 17rem;
     }
 }
 
-/* Barely-there borders — dissolve them toward the background. */
-:where([data-preset="aspen"]) #nd-sidebar,
-:where([data-preset="aspen"]) #nd-toc {
-    border-color: color-mix(in oklab, var(--color-fd-border) 45%, transparent);
+[data-preset="aspen"] [data-search-pill] {
+    max-width: 24rem;
+    border-color: transparent;
+    border-radius: 9999px;
+    background-color: var(--color-fd-muted);
 }
-:where([data-preset="aspen"]) #nd-sidebar a {
-    padding-block: 0.5rem;
-    border-radius: 0.75rem;
+[data-preset="aspen"] [data-search-pill]:hover {
+    border-color: var(--color-fd-border);
 }
-
-:where([data-preset="aspen"]) .prose {
-    line-height: 1.82;
+[data-preset="aspen"] #nd-sidebar {
+    border-inline-end: 1px solid var(--color-fd-border);
 }
-:where([data-preset="aspen"])
-    .prose
-    :is(h1, h2, h3):not(:where(.not-prose, .not-prose *)) {
-    font-weight: 500;
-    letter-spacing: 0.004em;
+[data-preset="aspen"] #nd-sidebar [data-radix-scroll-area-viewport] p {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-fd-border);
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
 }
-:where([data-preset="aspen"])
-    .prose
-    :is(h2, h3):not(:where(.not-prose, .not-prose *)) {
-    margin-top: 2.25em;
+[data-preset="aspen"]
+    #nd-sidebar
+    [data-radix-scroll-area-viewport]:not(:has(a[data-sidebar-anchor]))
+    p:first-of-type {
+    padding-top: 0;
+    border-top: none;
+}
+[data-preset="aspen"] [data-eyebrow] {
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
 }

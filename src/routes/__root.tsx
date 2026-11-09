@@ -216,6 +216,9 @@ const rootLoader = createServerFn({ method: "GET" }).handler(async () => {
         // data (INV-2). data-preset lives on <html> so it reaches the Radix
         // chrome fumadocs portals to <body> (mobile sidebar, TOC popover).
         layoutPreset: ctx.layoutPreset,
+        // The docs.json theme within its preset (maple vs almond, palm vs
+        // willow, mint vs linden): presets restyle per theme on it.
+        themeName: ctx.config?.theme ?? null,
         decoration: ctx.config?.background?.decoration ?? null,
         // docs.json background.image — a fixed page-wide layer; single values
         // apply to both schemes.
@@ -559,6 +562,7 @@ function SiteDocument({ data }: { data: RootLoaderData }) {
             lang={data.language}
             suppressHydrationWarning
             data-preset={data.layoutPreset}
+            data-theme-name={data.themeName ?? undefined}
             data-decoration={data.decoration ?? undefined}
             // Read by lib/base-path.ts in the browser.
             data-base-path={basePath() || undefined}

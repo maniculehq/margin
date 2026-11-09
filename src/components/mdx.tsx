@@ -1267,7 +1267,7 @@ function Prompt({
                     type="button"
                     data-component-part="prompt-action-copy-button"
                     aria-label="Copy prompt"
-                    className="inline-flex h-[26px] shrink-0 items-center gap-1 rounded-lg bg-fd-primary px-2 font-medium text-fd-primary-foreground text-xs transition-colors hover:bg-fd-primary/90"
+                    className="inline-flex h-[26px] shrink-0 items-center gap-1 rounded-lg bg-margin-button px-2 font-medium text-margin-button-foreground text-xs transition-colors hover:bg-margin-button/90"
                     onClick={() => {
                         const text = promptText()
                         if (!text) return
@@ -1351,7 +1351,7 @@ function PreviewButton({
     return (
         <a
             href={withBase(href, base)}
-            className="my-2 inline-flex items-center gap-1 rounded-full bg-fd-primary px-4 py-1.5 font-medium text-fd-primary-foreground text-sm no-underline hover:opacity-90"
+            className="my-2 inline-flex items-center gap-1 rounded-full bg-margin-button px-4 py-1.5 font-medium text-margin-button-foreground text-sm no-underline hover:opacity-90"
         >
             {children}
         </a>

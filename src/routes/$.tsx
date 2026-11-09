@@ -1764,7 +1764,10 @@ function DocContent(props: {
                     {props.eyebrow ? (
                         // Eyebrow: semibold with a ~10px gap to the title
                         // (the page container's gap-4 minus this margin).
-                        <span className="-mb-1.5 font-semibold text-fd-primary text-sm">
+                        <span
+                            data-eyebrow=""
+                            className="-mb-1.5 font-semibold text-fd-primary text-sm"
+                        >
                             {props.eyebrow}
                         </span>
                     ) : null}

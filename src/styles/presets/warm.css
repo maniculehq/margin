@@ -1,65 +1,62 @@
 /*
- * Layout preset: WARM (§4.2) — maple / almond. Softer and more generous than
- * neutral: a wider shell, a roomier sidebar, relaxed reading rhythm, gently
- * rounded active states and a faint warm wash on the sidebar drawn from the
- * (warm) resolved palette. Reads as approachable rather than clinical.
+ * Layout preset: WARM (§4.2) — maple and almond. Maple (sidenav chrome,
+ * layout.shared.tsx) puts the logo, search and tabs at the top of a 19rem
+ * sidebar with a hairline edge; its tree hangs off a rail with a 2px accent
+ * bar on the active page, group labels sit at weight 500, and the 36rem
+ * reading column is centred. Almond keeps the band with mint's tinted
+ * active rows. Both use the rail TOC (app.css).
  */
 
 [data-preset="warm"] {
-    --fd-layout-width: 1460px;
+    --fd-layout-width: 91rem;
+    --margin-measure: 36rem;
+}
+:root[data-preset="warm"] {
+    --docs-band-row: 3.5rem;
+    --docs-band-tabs: 2.75rem;
 }
 @media (min-width: 64rem) {
     [data-preset="warm"] #nd-docs-layout {
-        --fd-sidebar-width: 292px;
+        --fd-sidebar-width: 19rem;
     }
 }
 @media (min-width: 1280px) {
     [data-preset="warm"] #nd-docs-layout {
-        --fd-toc-width: 276px;
+        --fd-toc-width: 17rem;
     }
 }
 
-:where([data-preset="warm"]) #nd-sidebar {
-    background-color: color-mix(
-        in oklab,
-        var(--color-fd-primary) 4%,
-        var(--color-fd-card)
-    );
-    border-color: color-mix(in oklab, var(--color-fd-border) 70%, transparent);
+[data-preset="warm"] #nd-sidebar [data-radix-scroll-area-viewport] p {
+    font-weight: 500;
 }
-/* Softer, pill-shaped active/hover treatment on sidebar tree items. */
-:where([data-preset="warm"]) #nd-sidebar a {
-    border-radius: 0.625rem;
+[data-preset="warm"] [data-chrome="sidenav"] #nd-sidebar {
+    border-inline-end: 1px solid var(--color-fd-border);
 }
 
-/*
- * Sidenav chrome (maple): the active tree item is a flat row with an
- * orange left bar riding the depth-1 rail — the tinted pill treatment is
- * mint's. fumadocs already draws both bars as ::before pseudo-elements
- * (itemVariants highlight + SidebarFolderContent depth-1 hairline); this
- * only flattens the fill and thickens the active bar.
- */
-:where([data-preset="warm"])
+/* Maple's rail: top-level rows hang off a hairline (the geometry lives in
+   app.css beside the site-CSS containment rule it must outrank); the active
+   one is marked by the accent riding it, an inset shadow doubling the line
+   without shifting the text. */
+[data-preset="warm"]
     [data-chrome="sidenav"]
     #nd-sidebar
-    [data-active="true"] {
+    [data-radix-scroll-area-viewport]
+    > div
+    > a[data-active="true"] {
+    border-inline-start-color: var(--color-fd-primary);
+    box-shadow: inset 1px 0 0 var(--color-fd-primary);
     background-color: transparent;
 }
-:where([data-preset="warm"])
+/* Nested rows: fumadocs' own depth rail and highlight bar (::before), with
+   the fill flattened and the active bar thickened. */
+[data-preset="warm"] [data-chrome="sidenav"] #nd-sidebar [data-active="true"] {
+    background-color: transparent;
+}
+[data-preset="warm"]
     [data-chrome="sidenav"]
     #nd-sidebar
     [data-active="true"]::before {
     width: 2px;
-}
-
-/*
- * Maple's reading column is 576px: 640px minus #nd-page's 64px padding.
- * Not :where-wrapped: zero specificity would lose to app.css's later generic
- * 696px cap. This (1,1,0) rule wins; later equal-specificity page-mode rules
- * still lift it for wide/custom pages.
- */
-[data-preset="warm"] #nd-page {
-    max-width: 640px;
 }
 
 /* Maple code blocks render full height without a 600px clamp, and
@@ -70,16 +67,4 @@
 }
 :where([data-preset="warm"]) .code-tab-icon {
     display: none;
-}
-
-:where([data-preset="warm"]) .prose {
-    line-height: 1.8;
-}
-:where([data-preset="warm"]) .prose :is(p, ul, ol) {
-    margin-block: 1.15em;
-}
-:where([data-preset="warm"])
-    .prose
-    :is(h1, h2, h3):not(:where(.not-prose, .not-prose *)) {
-    font-weight: 650;
 }

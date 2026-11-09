@@ -1,5 +1,8 @@
 @import "tailwindcss";
-@import "fumadocs-ui/css/neutral.css";
+/* fumadocs' color tokens (registers the --color-fd-* utilities); the
+   framework's own base palette follows below. Not fumadocs' neutral.css: its
+   `.dark #nd-sidebar` overrides repaint every palette's sidebar grays. */
+@import "fumadocs-ui/css/lib/default-colors.css";
 @import "fumadocs-ui/css/preset.css";
 @import "fumadocs-openapi/css/preset.css";
 /* KaTeX output styling (styling.latex sites; inert for everyone else). */
@@ -30,6 +33,49 @@
 @import "./fonts.css";
 
 /*
+ * Base palette: the mint palette of src/types/docs-palettes.ts, so a site
+ * renders its zero-config look before (and without) a per-site token block.
+ * tests/theme-contrast.test.ts keeps the two in step. Every text token is
+ * scoped to its scheme: a value set on :root alone also applies in dark mode.
+ */
+:root {
+    --color-fd-background: hsl(0, 0%, 100%);
+    --color-fd-foreground: hsl(220, 10%, 10%);
+    --color-fd-card: hsl(220, 12%, 98.5%);
+    --color-fd-card-foreground: hsl(220, 10%, 10%);
+    --color-fd-popover: hsl(0, 0%, 100%);
+    --color-fd-popover-foreground: hsl(220, 10%, 10%);
+    --color-fd-muted: hsl(220, 12%, 96%);
+    --color-fd-muted-foreground: hsl(220, 6%, 39%);
+    --color-fd-secondary: hsl(220, 12%, 95%);
+    --color-fd-secondary-foreground: hsl(220, 10%, 14%);
+    --color-fd-accent: hsl(220, 12%, 94%);
+    --color-fd-accent-foreground: hsl(220, 10%, 10%);
+    --color-fd-border: hsl(220, 10%, 91%);
+    --color-fd-ring: hsl(220, 6%, 45%);
+    --color-fd-primary: hsl(220, 10%, 10%);
+    --color-fd-primary-foreground: hsl(0, 0%, 100%);
+}
+.dark {
+    --color-fd-background: hsl(220, 10%, 4.5%);
+    --color-fd-foreground: hsl(220, 6%, 92%);
+    --color-fd-card: hsl(220, 6%, 7.5%);
+    --color-fd-card-foreground: hsl(220, 6%, 92%);
+    --color-fd-popover: hsl(220, 6%, 8.5%);
+    --color-fd-popover-foreground: hsl(220, 6%, 92%);
+    --color-fd-muted: hsl(220, 6%, 9.5%);
+    --color-fd-muted-foreground: hsl(220, 6%, 64%);
+    --color-fd-secondary: hsl(220, 6%, 11.5%);
+    --color-fd-secondary-foreground: hsl(220, 6%, 90%);
+    --color-fd-accent: hsl(220, 6%, 12.5%);
+    --color-fd-accent-foreground: hsl(220, 6%, 94%);
+    --color-fd-border: hsl(220, 6%, 15.5%);
+    --color-fd-ring: hsl(220, 6%, 58%);
+    --color-fd-primary: hsl(220, 6%, 96%);
+    --color-fd-primary-foreground: hsl(220, 6%, 7.5%);
+}
+
+/*
  * Framework rendering defaults:
  * - md at 64rem: mobile chrome remains until 1024px. Tailwind's breakpoint
  *   moves the sidebar, drawer, band, and slots together. The fumadocs drawer
@@ -50,6 +96,19 @@
         Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
+/*
+ * Solid button fills: docs.json `colors.dark` (Mintlify's button and hover
+ * color, both schemes), else the accent. Ingest pairs --margin-button with a
+ * black or white --margin-button-foreground.
+ */
+@theme inline {
+    --color-margin-button: var(--margin-button, var(--color-fd-primary));
+    --color-margin-button-foreground: var(
+        --margin-button-foreground,
+        var(--color-fd-primary-foreground)
+    );
+}
+
 html {
     scrollbar-gutter: stable;
     font-feature-settings:
@@ -59,6 +118,13 @@ html {
 
 body {
     letter-spacing: normal;
+}
+
+/* Keyboard focus in the accent ring, which ingest keeps at 3:1 or more on
+   the page in both schemes (tests/theme-contrast.test.ts). */
+:where(a, button, summary, [role="tab"], [tabindex]):focus-visible {
+    outline: 2px solid var(--color-fd-ring);
+    outline-offset: 2px;
 }
 
 /*
@@ -72,26 +138,17 @@ body {
  */
 :root {
     --docs-band-height: 0px;
-    /* fumadocs' default muted foreground (45.1% grey) reads at ~4.0:1 on the
-       tinted fills the chrome uses (search pill, code titles, sidebar rows)
-       and fails WCAG AA; 40% clears 4.5:1 on every framework fill while
-       staying visibly "muted". Site tokens (data-site-css, later in the
-       cascade) still override it. */
-    --color-fd-muted-foreground: hsl(0, 0%, 40%);
+    /* Band rows: the 64px top row and 48px tab row of Mintlify's mint
+       header. Presets restate them on :root[data-preset=…]. */
+    --docs-band-row: 4rem;
+    --docs-band-tabs: 3rem;
 }
 @media (min-width: 64rem) {
     :root:has(#docs-band) {
-        --docs-band-height: 3.5rem;
+        --docs-band-height: var(--docs-band-row);
     }
     :root:has(#docs-band[data-tabs="true"]) {
-        --docs-band-height: 6rem;
-    }
-    /* luma (contrast preset): one 48px row — pill tabs ride inline. */
-    :root:has(#docs-band[data-variant="luma"]:not([data-tabs="true"])) {
-        --docs-band-height: 3rem;
-    }
-    :root:has(#docs-band[data-variant="luma"][data-tabs="true"]) {
-        --docs-band-height: 5.5rem;
+        --docs-band-height: calc(var(--docs-band-row) + var(--docs-band-tabs));
     }
     /* fumadocs' own language select at the sidebar foot duplicates the
        band's locale dropdown on desktop. */
@@ -151,21 +208,21 @@ body {
 }
 
 /*
- * Sidebar frame: ~308px column, an explicit hairline
- * border-right, and no panel tint. A transparent sidebar avoids a seam against
- * the page background, especially in dark mode. fumadocs sets the width via
- * md:layout:[--fd-sidebar-width:268px] on #nd-docs-layout; the ID rule wins.
- * Hide the default bottom gradient scroll mask for a hard clip.
+ * Sidebar (Mintlify mint): an 18rem column on the page color with no
+ * divider, 14px rows 36px tall with 12px corners, and 14px/600 group labels
+ * in the foreground with space, not rules, between groups. The active row is
+ * the accent on a 10% tint of itself (fumadocs' `bg-fd-primary/10`), which
+ * ingest fits to 4.5:1 (src/ingest/theme.ts ACCENT_TINT_*). Presets restyle
+ * these rows; the ID rules here beat fumadocs' utilities by specificity.
  */
 @media (min-width: 64rem) {
     #nd-docs-layout {
-        --fd-sidebar-width: 19.25rem;
+        --fd-sidebar-width: 18rem;
     }
 }
 #nd-sidebar {
     background-color: transparent;
-    border-right: 1px solid
-        color-mix(in oklab, var(--color-fd-foreground) 7%, transparent);
+    border-right: none;
 }
 #nd-sidebar [data-radix-scroll-area-viewport] {
     mask-image: none;
@@ -184,61 +241,63 @@ body {
     }
 }
 
-/*
- * Sidebar tree rhythm and group headers: 12px/600 group
- * labels with hairline separators between groups, denser contiguous 32px
- * rows (fumadocs adds a 2px flex gap via `*:gap-0.5!` — the ID rule wins),
- * and a higher-contrast resting color than fumadocs' muted default
- * (rgb-70-class near-foreground vs the default 109-gray). Active rows keep
- * fumadocs' pink treatment — :not() leaves them alone.
- */
-#nd-sidebar [data-radix-scroll-area-viewport] > * {
-    gap: 0 !important;
+#nd-sidebar [data-radix-scroll-area-viewport] > *,
+#nd-sidebar-mobile [data-radix-scroll-area-viewport] > * {
+    gap: 1px !important;
 }
 /* [data-active] scoping: tree rows always carry it (true/false); custom
    items (drawer nav links, the CTA button) don't and keep their own look. */
-#nd-sidebar [data-radix-scroll-area-viewport] a[data-active] {
+:is(#nd-sidebar, #nd-sidebar-mobile)
+    [data-radix-scroll-area-viewport]
+    :is(a[data-active], button[aria-expanded]) {
     padding-block: 0.375rem;
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    border-radius: 0.75rem;
 }
-#nd-sidebar [data-radix-scroll-area-viewport] a[data-active="false"] {
+/* Every theme but mint and linden sets 32px rows. */
+:root:not([data-preset="neutral"])
+    :is(#nd-sidebar, #nd-sidebar-mobile)
+    [data-radix-scroll-area-viewport]
+    :is(a[data-active], button[aria-expanded]) {
+    line-height: 1.25rem;
+}
+:is(#nd-sidebar, #nd-sidebar-mobile)
+    [data-radix-scroll-area-viewport]
+    :is(a[data-active="false"], button[aria-expanded]) {
     color: color-mix(
         in oklab,
-        var(--color-fd-foreground) 82%,
+        var(--color-fd-foreground) 72%,
         var(--color-fd-muted-foreground)
     );
 }
-#nd-sidebar [data-radix-scroll-area-viewport] p {
-    margin-top: 1.25rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid
-        color-mix(in oklab, var(--color-fd-foreground) 8%, transparent);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
+:is(#nd-sidebar, #nd-sidebar-mobile)
+    [data-radix-scroll-area-viewport]
+    :is(a[data-active="false"], button[aria-expanded]):hover {
+    color: var(--color-fd-foreground);
 }
-/* First group needs no separator — UNLESS link-only anchor rows (visible on
-   every surface, rendered above the tree) precede it; then the border marks
-   the anchors/tree boundary. The other custom copies stay
-   md:hidden, so on desktop nothing else visible precedes the first label
-   (group labels are the only <p> siblings in the list). */
-#nd-sidebar
+:is(#nd-sidebar, #nd-sidebar-mobile) [data-radix-scroll-area-viewport] p {
+    margin-top: 1.5rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.5rem;
+    color: var(--color-fd-foreground);
+}
+/* The first group needs no space above it — unless link-only anchor rows
+   (rendered above the tree) precede it. Group labels are the only <p>
+   siblings in the list. */
+:is(#nd-sidebar, #nd-sidebar-mobile)
     [data-radix-scroll-area-viewport]:not(:has(a[data-sidebar-anchor]))
     p:first-of-type {
     margin-top: 0;
-    padding-top: 0;
-    border-top: none;
 }
 
 /*
- * TOC restyle: a straight per-item left border
- * with a pink bar on the active item — fumadocs-ui 16.13 instead renders a
- * stepped jog-curve SVG (one <svg> segment inside each TOCItem anchor plus
- * the ThumbTrack overlay `div.origin-center` carrying the clipped pink path
- * and moving dot). Hide both and draw the rail as anchor pseudo-elements:
- * anchors are contiguous `relative` rows, so their ::before bars form one
- * continuous line. Also: denser rows, dimmed nested items (inline
- * `padding-inline-start` is the only depth marker fumadocs exposes), and a
- * heavier "On this page" heading.
+ * TOC (Mintlify mint): plain 14px rows, the active heading in the accent at
+ * weight 500, nested headings indented — no rail. fumadocs-ui 16.13 draws a
+ * stepped jog-curve SVG (one <svg> per TOCItem plus the ThumbTrack overlay
+ * `div.origin-center`); hide both. The warm and aspen presets add a rail.
  */
 #nd-toc a[data-active] > svg,
 #nd-toc div.origin-center {
@@ -246,35 +305,42 @@ body {
 }
 #nd-toc a[data-active] {
     padding-block: 0.25rem;
+    line-height: 1.5rem;
+    color: var(--color-fd-muted-foreground);
 }
-#nd-toc a[data-active]::before {
-    content: "";
-    position: absolute;
-    inset-inline-start: 8px;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background-color: color-mix(
-        in oklab,
-        var(--color-fd-foreground) 10%,
-        transparent
-    );
+#nd-toc a[data-active]:hover {
+    color: var(--color-fd-foreground);
 }
-#nd-toc a[data-active="true"]::before {
-    inset-inline-start: 7.5px;
-    width: 2px;
-    background-color: var(--color-fd-primary);
-}
-#nd-toc a[data-active="false"]:not([style*=":20px"]) {
-    color: color-mix(
-        in oklab,
-        var(--color-fd-muted-foreground) 72%,
-        var(--color-fd-background)
-    );
+#nd-toc a[data-active="true"] {
+    color: var(--color-fd-primary);
+    font-weight: 500;
 }
 #toc-title {
     color: var(--color-fd-foreground);
     font-weight: 500;
+}
+/* Rail TOC (maple, almond, aspen): a hairline down the left of the list
+   with a 2px accent bar on the active heading. Anchors are contiguous
+   `relative` rows, so their ::before bars join into one line. */
+:is([data-preset="warm"], [data-preset="aspen"]) #nd-toc a[data-active] {
+    padding-inline-start: 1rem;
+}
+:is([data-preset="warm"], [data-preset="aspen"])
+    #nd-toc
+    a[data-active]::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: var(--color-fd-border);
+}
+:is([data-preset="warm"], [data-preset="aspen"])
+    #nd-toc
+    a[data-active="true"]::before {
+    width: 2px;
+    background-color: var(--color-fd-primary);
 }
 
 /*
@@ -305,24 +371,6 @@ body {
     border-inline-start: none;
     border-inline-end: 1px solid var(--color-fd-border);
 }
-/* Group dividers in the drawer tree, mirroring the desktop sidebar. */
-#nd-sidebar-mobile [data-radix-scroll-area-viewport] p {
-    margin-top: 1.25rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid
-        color-mix(in oklab, var(--color-fd-foreground) 8%, transparent);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-}
-#nd-sidebar-mobile
-    [data-radix-scroll-area-viewport]:not(:has(a[data-sidebar-anchor]))
-    p:first-of-type {
-    margin-top: 0;
-    padding-top: 0;
-    border-top: none;
-}
-
 /*
  * Mobile sub-bar breadcrumb ("Get Started › Installation").
  * fumadocs-ui 16.13's PageTOCPopoverTrigger children are fixed (progress
@@ -430,58 +478,30 @@ figure[data-terminal] code .line:not(:empty)::before {
 }
 
 /*
- * Code blocks (chrome + metrics, fumadocs-ui 16.13 CodeBlock):
- * - 16px radius, no drop shadow
- * - mono at 12.8px/22.4 (fumadocs 13px/18.6 reads denser and darker)
- * - titled-block header + untitled bodies get the warm tint in light mode
- * - dark blocks get their OWN opaque background (Dracula-style) instead of
- *   falling through to the page background
- * - CodeGroup tab bodies drop fumadocs' bg-fd-secondary gray for card bg
- * - blank lines in un-highlighted blocks keep their height
- * - copy feedback turns primary-pink
+ * Code blocks (chrome + metrics, fumadocs-ui 16.13 CodeBlock), Mintlify
+ * style: a hairline frame with 16px corners on the card color, no shadow,
+ * 14px/24px mono, and a muted title bar. No accent tint: the code carries
+ * its own color. CodeGroup tab bodies drop fumadocs' bg-fd-secondary gray
+ * for the card color, blank lines keep their height, and copy feedback
+ * turns the accent.
  * Scoped :is(#nd-page, [data-rail]): the pinned-example rail renders these
  * same figures in the TOC slot, which sits OUTSIDE #nd-page.
  */
 :is(#nd-page, [data-rail]) figure.shiki {
+    border-color: var(--color-fd-border);
     border-radius: 1rem;
     box-shadow: none;
     background-color: var(--color-fd-card);
 }
 :is(#nd-page, [data-rail]) figure.shiki [role="region"] {
-    font-size: 0.8rem;
-    line-height: 1.75;
+    font-size: 0.875rem;
+    line-height: 1.5rem;
 }
 :is(#nd-page, [data-rail]) figure.shiki > div:first-child:has(figcaption) {
-    background-color: color-mix(
-        in oklab,
-        var(--color-fd-primary) 4%,
-        var(--color-fd-background)
-    );
-}
-:is(#nd-page, [data-rail]) figure.shiki:not(:has(figcaption)) {
-    background-color: color-mix(
-        in oklab,
-        var(--color-fd-primary) 3%,
-        var(--color-fd-background)
-    );
-}
-.dark :is(#nd-page, [data-rail]) figure.shiki,
-.dark :is(#nd-page, [data-rail]) figure.shiki:not(:has(figcaption)) {
-    background-color: color-mix(
-        in oklab,
-        var(--color-fd-foreground) 7%,
-        var(--color-fd-background)
-    );
-}
-.dark
-    :is(#nd-page, [data-rail])
-    figure.shiki
-    > div:first-child:has(figcaption) {
-    background-color: color-mix(
-        in oklab,
-        var(--color-fd-foreground) 4%,
-        var(--color-fd-background)
-    );
+    background-color: var(--color-fd-muted);
+    color: var(--color-fd-muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 500;
 }
 :is(#nd-page, [data-rail]) figure.shiki code .line:empty {
     display: inline-block;
@@ -616,6 +636,8 @@ figure[data-terminal] code .line:not(:empty)::before {
  */
 :is(#nd-page, [data-rail]) .prose table {
     border: none;
+    border-radius: 0;
+    background: transparent;
 }
 :is(#nd-page, [data-rail]) .prose :is(th, td) {
     border-inline: none;
@@ -630,9 +652,30 @@ figure[data-terminal] code .line:not(:empty)::before {
 }
 
 /*
- * Cards: bare primary-colored icon instead of fumadocs' gray
- * bordered tile that reads as a disabled button.
+ * Cards (Mintlify): a hairline frame with 16px corners on the page color,
+ * 20px/24px padding, a 16px/600 title and muted description; hover tints
+ * the frame with the accent. The icon is bare and accent-colored instead of
+ * fumadocs' gray bordered tile that reads as a disabled button.
  */
+/* Heading anchors also carry data-card (to skip the link underline); only
+   framed cards take the card box. */
+#nd-page [data-card]:not(:is(h1, h2, h3, h4, h5, h6) > *) {
+    border-radius: 1rem;
+    background-color: var(--color-fd-background);
+    padding: 1.25rem 1.5rem;
+}
+#nd-page a[data-card]:not(:is(h1, h2, h3, h4, h5, h6) > *):hover {
+    border-color: color-mix(in oklab, var(--color-fd-primary) 60%, transparent);
+    background-color: var(--color-fd-background);
+}
+#nd-page [data-card] :is(h2, h3) {
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: normal;
+}
+#nd-page [data-card] > div:last-child :where(p) {
+    color: var(--color-fd-muted-foreground);
+}
 #nd-page [data-card] > div.not-prose:first-child {
     border: none;
     background: transparent;
@@ -805,19 +848,17 @@ figure[data-terminal] code .line:not(:empty)::before {
 }
 
 /*
- * Article typography (fumadocs-ui 16.13
- * overrides — each rule names the default it replaces):
- * - measure: fumadocs max-w-[900px] → ~632px text column
- *   (also removes the asymmetric gutters fumadocs shows at 1200–1279px)
- * - h1 36px/600/-0.9px (fumadocs renders 28px/looser)
- * - h2 weight 600 with tighter tracking and a calmer top margin (the
- *   description→first-heading gap measured 70px vs a 32px target)
- * - inline code chips: borderless tinted fill (fumadocs draws a 1px border
- *   box that reads busy in running text)
- * - hr: fainter, warmer divider
+ * Article typography, Mintlify's scale (fumadocs-ui 16.13 overrides):
+ * - measure: --margin-measure (35rem ≈ 72 characters of 16px Inter) is the
+ *   text column; #nd-page adds fumadocs' xl 2rem side padding and stays
+ *   centred in the main area. Presets restate the measure.
+ * - h1 36/40 600 with -0.025em tracking; h2 24/32 and h3 20/28, both 600
+ *   and tightened; more space above a heading than below it
+ * - body 16/28 in a softened foreground (Mintlify's gray-700 body text)
+ * - inline code chips: borderless muted fill at 0.875em
  */
 #nd-page {
-    max-width: 696px;
+    max-width: calc(var(--margin-measure, 35rem) + 4rem);
 }
 /* Wide/custom/frame page modes zero the TOC (and sidebar) columns
    specifically to reclaim width — the measure cap must not re-narrow them.
@@ -839,57 +880,57 @@ figure[data-terminal] code .line:not(:empty)::before {
     padding-inline: 0;
     padding-top: 0;
 }
-/*
- * Default articles keep an 88px gutter from the sidebar, with surplus space
- * toward the TOC. fumadocs' mx-auto centers articles and varies both gutters.
- * Center mode keeps mx-auto; wide/frame reclaim the full column; custom omits
- * the sidebar. The 752px cap includes 88px gutter + 632px measure + 32px.
- * Below that cap, the text column compresses with available space.
- * :where keeps preset exemptions at zero specificity: warm centers a 640px
- * measure, editorial centers long-form prose, and contrast centers a 648px
- * measure between sidebar and TOC. Preset rules and site CSS still override.
- */
-@media (min-width: 64rem) {
-    :where(
-            :root:not(
-                [data-preset="warm"],
-                [data-preset="editorial"],
-                [data-preset="contrast"]
-            )
-        )
-        [data-page-mode="default"]
-        #nd-page {
-        margin-inline: 0;
-        padding-inline: 88px 32px;
-        max-width: 752px;
-    }
+#nd-page .prose {
+    --tw-prose-body: color-mix(
+        in oklab,
+        var(--color-fd-foreground) 80%,
+        var(--color-fd-background)
+    );
+    line-height: 1.75;
 }
 #nd-page article h1 {
+    text-wrap: balance;
     font-size: 2.25rem;
     font-weight: 600;
-    line-height: 1.15;
+    line-height: 2.5rem;
+    letter-spacing: -0.025em;
+}
+@media (width < 64rem) {
+    #nd-page article h1 {
+        font-size: 1.875rem;
+        line-height: 2.25rem;
+    }
 }
 :is(#nd-page, [data-rail])
     .prose
     :is(h2, h3):not(:where(.not-prose, .not-prose *)) {
     font-weight: 600;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
 }
 :is(#nd-page, [data-rail]) .prose h2:not(:where(.not-prose, .not-prose *)) {
-    margin-top: 2rem;
+    margin-top: 2.5rem;
     margin-bottom: 1rem;
+    font-size: 1.5rem;
+    line-height: 2rem;
+}
+:is(#nd-page, [data-rail]) .prose h3:not(:where(.not-prose, .not-prose *)) {
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
 }
 :is(#nd-page, [data-rail]) .prose :not(pre) > code {
     border: none;
-    background-color: color-mix(
-        in oklab,
-        var(--color-fd-foreground) 6%,
-        var(--color-fd-background)
-    );
+    border-radius: 0.375rem;
+    background-color: var(--color-fd-muted);
+    color: var(--color-fd-foreground);
     padding: 0.125rem 0.375rem;
+    font-size: 0.875em;
     font-weight: 500;
 }
-/* Flag sub-headings (`--production` on the CLI pages) render as bare pink
-   code, not chip-filled text. AFTER the chip rule — equal
+/* Flag sub-headings (`--production` on the CLI pages) render as bare
+   accent code, not chip-filled text. AFTER the chip rule — equal
    specificity, later wins. */
 :is(#nd-page, [data-rail]) .prose :is(h2, h3, h4) > code {
     background: transparent;
@@ -897,11 +938,7 @@ figure[data-terminal] code .line:not(:empty)::before {
     color: var(--color-fd-primary);
 }
 :is(#nd-page, [data-rail]) .prose hr {
-    border-color: color-mix(
-        in oklab,
-        var(--color-fd-foreground) 7%,
-        var(--color-fd-background)
-    );
+    border-color: var(--color-fd-border);
 }
 
 html > body[data-scroll-locked] {
@@ -922,6 +959,20 @@ html > body[data-scroll-locked] {
  */
 :root [data-radix-scroll-area-viewport] a {
     margin-inline: 0 !important;
+}
+/* The warm preset's maple rail (presets/warm.css): top-level rows hang
+   0.5rem in from the group label on a hairline, text 1rem past it. Both
+   lengths override inline/!important values, so they live here. */
+[data-preset="warm"]
+    [data-chrome="sidenav"]
+    #nd-sidebar
+    [data-radix-scroll-area-viewport]
+    > div
+    > a[data-active] {
+    margin-inline-start: 0.5rem !important;
+    border-inline-start: 1px solid var(--color-fd-border);
+    border-radius: 0;
+    padding-inline-start: 1rem !important;
 }
 
 /*

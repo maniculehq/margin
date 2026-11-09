@@ -1,41 +1,86 @@
 /*
- * Layout preset: VERDANT (§4.2) — palm / willow. Crisp and compact with a calm,
- * nature-adjacent restraint: a slightly narrower shell, tighter columns, full-
- * contrast hairline borders (nothing blurred), and a denser sidebar rhythm. The
- * reading measure is a touch tighter than neutral so pages feel purposeful.
+ * Layout preset: VERDANT (§4.2) — palm and willow.
+ * Palm: the band sits on the muted fill above a hairline, the sidebar
+ * keeps a hairline edge, group labels are weight 500, and the active page is
+ * the accent alone, without a fill. Willow: a single 48px header row, the
+ * sidebar on the muted canvas with small uppercase group labels, and serif
+ * headings over the sans body.
  */
 
 [data-preset="verdant"] {
-    --fd-layout-width: 1320px;
+    --fd-layout-width: 92rem;
+    --margin-measure: 36rem;
 }
 @media (min-width: 64rem) {
     [data-preset="verdant"] #nd-docs-layout {
-        --fd-sidebar-width: 248px;
+        --fd-sidebar-width: 19rem;
     }
 }
 @media (min-width: 1280px) {
     [data-preset="verdant"] #nd-docs-layout {
-        --fd-toc-width: 244px;
+        --fd-toc-width: 17rem;
     }
 }
 
-:where([data-preset="verdant"]) #nd-sidebar {
-    border-color: var(--color-fd-border);
+[data-preset="verdant"] #docs-band {
+    background-color: var(--color-fd-muted);
 }
-/* Denser sidebar: trim the vertical padding on tree links. */
-:where([data-preset="verdant"]) #nd-sidebar a {
-    padding-block: 0.3rem;
-    border-radius: 0.25rem;
+[data-preset="verdant"] #nd-sidebar {
+    border-inline-end: 1px solid var(--color-fd-border);
 }
-:where([data-preset="verdant"]) #nd-toc {
-    font-size: 0.8125rem;
+[data-preset="verdant"] #nd-sidebar [data-radix-scroll-area-viewport] p {
+    font-weight: 500;
+}
+[data-preset="verdant"]
+    #nd-sidebar
+    [data-radix-scroll-area-viewport]
+    a[data-active="true"] {
+    background-color: transparent;
 }
 
-:where([data-preset="verdant"]) .prose {
-    line-height: 1.62;
+/* willow */
+:root[data-theme-name="willow"] {
+    --docs-band-row: 3rem;
+    --docs-band-tabs: 2.5rem;
 }
-:where([data-preset="verdant"])
+[data-theme-name="willow"] #docs-band {
+    background-color: var(--color-fd-background);
+}
+[data-theme-name="willow"] #nd-sidebar {
+    background-color: var(--color-fd-muted);
+    border-inline-end: none;
+}
+[data-theme-name="willow"] #nd-sidebar [data-radix-scroll-area-viewport] p {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+[data-theme-name="willow"]
+    #nd-sidebar
+    [data-radix-scroll-area-viewport]
+    :is(a[data-active], button[aria-expanded]) {
+    border-radius: 0.25rem;
+}
+[data-theme-name="willow"] [data-eyebrow] {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+[data-theme-name="willow"] #nd-page article h1,
+[data-theme-name="willow"]
+    :is(#nd-page, [data-rail])
     .prose
-    :is(h1, h2, h3):not(:where(.not-prose, .not-prose *)) {
-    font-weight: 600;
+    :is(h2, h3):not(:where(.not-prose, .not-prose *)) {
+    font-family:
+        Iowan Old Style,
+        "Palatino Linotype",
+        Palatino,
+        Georgia,
+        Cambria,
+        "Times New Roman",
+        serif;
+    font-weight: 500;
+    letter-spacing: -0.01em;
 }
