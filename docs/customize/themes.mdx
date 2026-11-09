@@ -19,34 +19,34 @@ For example, select the `aspen` theme:
 }
 ```
 
-Use these mappings to choose a layout. Themes that share a layout can still have different starting palettes.
+Use these mappings to choose a layout. Themes that share a layout keep their own palette, and some restyle parts of it: `linden` sets monospace type, and `willow` sets serif headings on a tinted sidebar.
 
-| `theme` | Margin layout preset | Starting palette |
+| `theme` | Margin layout preset | Look |
 | --- | --- | --- |
-| `mint` | `neutral` | `neutral` |
-| `linden` | `neutral` | `neutral` |
-| `maple` | `warm` | `ruby` |
-| `almond` | `warm` | `solar` |
-| `palm` | `verdant` | `emerald` |
-| `willow` | `verdant` | `ocean` |
-| `aspen` | `aspen` | `aspen` |
-| `sequoia` | `dusk` | `dusk` |
-| `luma` | `contrast` | `black` |
+| `mint` | `neutral` | Two-row header, tinted active rows, contents without a rail |
+| `linden` | `neutral` | Mint's layout on cream, in monospace |
+| `maple` | `warm` | Header in the sidebar, a rail under each group |
+| `almond` | `warm` | Compact header, tinted active rows, contents rail |
+| `palm` | `verdant` | Tinted header, sidebar edge, accent-only active rows |
+| `willow` | `verdant` | One-row header, tinted sidebar, serif headings |
+| `aspen` | `aspen` | Rounded search, uppercase group labels with dividers |
+| `sequoia` | `dusk` | Tinted tab row, edges on sidebar and contents |
+| `luma` | `contrast` | One-row header with pill tabs |
 
-Omitting `theme` uses the `neutral` layout and palette. An unknown theme falls back to `neutral` with a diagnostic. Use the names in the first column as configuration values, not the layout or palette names.
+Omitting `theme` uses `mint`. An unknown theme falls back to `mint` with a diagnostic. Use the names in the first column as configuration values, not the layout names.
+
+Every preset keeps text readable in light and dark mode: body text, muted text, and your accent color reach at least a 4.5:1 contrast ratio against the surfaces they appear on.
 
 ## Set site colors
 
-The `colors` object controls the primary brand color. Set `primary` as a base for both modes, then optionally set `dark` and `light` for mode-specific emphasis.
-
-This configuration uses a darker green on light backgrounds and a lighter green on dark backgrounds:
+The `colors` object controls the brand color. Set `primary` as the base, then optionally set `light` and `dark`:
 
 ```json
 {
   "colors": {
     "primary": "#0F5A3C",
-    "dark": "#0F5A3C",
-    "light": "#6EE7B7"
+    "light": "#6EE7B7",
+    "dark": "#0F5A3C"
   }
 }
 ```
@@ -55,9 +55,11 @@ The `dark` and `light` names describe the color's brightness, not the page mode:
 
 | Field | Effect |
 | --- | --- |
-| `colors.primary` | Base primary color for both modes. |
-| `colors.dark` | Primary color in light mode; falls back to the base primary color when omitted. |
-| `colors.light` | Primary color in dark mode; falls back to the base primary color when omitted. |
+| `colors.primary` | Accent for links, the active page, and highlights in light mode, and the fallback for the other two fields. |
+| `colors.light` | Accent in dark mode; falls back to `primary`. |
+| `colors.dark` | Fill for buttons in both modes; falls back to `primary`. |
+
+Margin keeps your accent readable. If a color is too light for light mode or too dark for dark mode to reach a 4.5:1 contrast ratio on the page and its panels, Margin adjusts only its lightness until it does. For example, a pale yellow `primary` becomes a darker amber on white pages, and a navy `primary` becomes a lighter slate in dark mode. Colors that already pass are used as written. Button text is black or white, whichever reads better on the button color.
 
 Color values must use `#RGB` or `#RRGGBB` hex notation. Named colors, `rgb()`, and alpha hex values are not supported in these fields. Invalid values produce a `field_invalid` diagnostic rather than applying the color.
 
@@ -139,9 +141,9 @@ The supported token names are:
 
 Unknown token names are ignored. `radius`, font names, layout dimensions, and raw `--color-fd-*` names are not supported keys in `x-margin.tokens`. Token colors use the same hex formats as `colors`. Supply both members of a mode pair; a single-member object is not a supported override.
 
-For the primary color, precedence from highest to lowest is a matching site stylesheet rule, `x-margin.tokens.primary`, the applicable `colors` value, a detected logo accent, then the preset default. Direct token overrides also take precedence over corresponding settings such as `background.color`. A site stylesheet is applied after the token block and can override token values through the CSS cascade.
+For the primary color, precedence from highest to lowest is a matching site stylesheet rule, `x-margin.tokens.primary`, the applicable `colors` value, a detected logo accent, then the preset default. Margin uses `x-margin.tokens` and site stylesheet values as written, without adjusting their contrast. Direct token overrides also take precedence over corresponding settings such as `background.color`. A site stylesheet is applied after the token block and can override token values through the CSS cascade.
 
-When a single primary color is supplied, Margin can choose black or white primary foreground text automatically. When overriding primary colors as a light/dark pair, set `primary-foreground` explicitly if the preset's text color does not have enough contrast.
+Margin chooses black or white `primary-foreground` text in each mode, whichever reads better on the primary color, unless you set `primary-foreground` yourself.
 
 After deployment, switch between light and dark mode and check cards, borders, and primary-colored surfaces. For the token example above, run this expression in the browser console to check the active primary token:
 
