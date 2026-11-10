@@ -3,7 +3,7 @@ import {
     sentryGlobalRequestMiddleware,
     wrapMiddlewaresWithSentry,
 } from "@sentry/tanstackstart-react"
-import { redirect } from "@tanstack/react-router"
+import { isNotFound, redirect } from "@tanstack/react-router"
 import {
     createCsrfMiddleware,
     createMiddleware,
@@ -155,6 +155,29 @@ const shortCircuitMiddleware = createMiddleware().server(
         const { shortCircuit } = extensions.requestPolicy(request)
         if (!shortCircuit) return next()
         throw shortCircuit
+    },
+)
+
+/**
+ * A host naming no site throws notFound() from the site head (lib/source.ts).
+ * The router renders it as the 404 page for documents, but Start answers
+ * anything else thrown past a server route or middleware (robots.txt,
+ * llms.txt, .md, a trailing-slash redirect) with a 500. Server functions keep
+ * Start's own notFound reply, which the client router rethrows.
+ */
+const notFoundMiddleware = createMiddleware().server(
+    async ({ next, handlerType }) => {
+        try {
+            return await next()
+        } catch (thrown) {
+            if (handlerType !== "serverFn" && isNotFound(thrown)) {
+                throw new Response("Not Found", {
+                    status: 404,
+                    headers: { "Content-Type": "text/plain; charset=utf-8" },
+                })
+            }
+            throw thrown
+        }
     },
 )
 
@@ -648,6 +671,8 @@ export const startInstance = createStart(() => {
                 previewMiddleware,
                 assetProbeMiddleware,
                 shortCircuitMiddleware,
+                // Wraps every middleware and route below that reads the site head.
+                notFoundMiddleware,
                 discoveryMiddleware,
                 // Sees the stamped Cache-Control/Vary so the 304 carries them.
                 etagMiddleware,

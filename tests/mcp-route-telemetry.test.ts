@@ -18,6 +18,8 @@ vi.mock("@vercel/functions", () => ({ waitUntil: telemetry.waitUntil }))
 vi.mock("@/instrument-sentry", () => ({ flushTelemetry: telemetry.flush }))
 vi.mock("@/lib/agent.config", () => ({ isSurfaceEnabled: () => true }))
 vi.mock("@/lib/mcp-server", () => ({ buildMcpServer: telemetry.buildServer }))
+// handleMcp resolves the site before the SDK runs; these requests name one.
+vi.mock("@/lib/source", () => ({ resolveSiteVersion: async () => ({}) }))
 
 import { handleMcp } from "../src/routes/api/mcp"
 

@@ -72,4 +72,38 @@ describe.skipIf(
         expect(res.headers.get("content-type")).toContain("text/html")
         expect(body).toContain("Page not found")
     })
+
+    // Server routes and the trailing-slash middleware read the site head
+    // outside the router, whose notFound() used to escape as a 500.
+    it.each([
+        "/robots.txt",
+        "/sitemap.xml",
+        "/llms.txt",
+        "/quickstart.md",
+        "/quickstart/",
+        "/og/docs/quickstart",
+    ])("answers %s with a 404", async (path) => {
+        const res = await fetch(`${baseUrl}${path}`, { redirect: "manual" })
+        await res.body?.cancel()
+
+        expect(res.status).toBe(404)
+    })
+
+    it("answers an MCP request with a 404", async () => {
+        const res = await fetch(`${baseUrl}/api/mcp`, {
+            method: "POST",
+            headers: {
+                "content-type": "application/json",
+                accept: "application/json, text/event-stream",
+            },
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: 1,
+                method: "tools/list",
+            }),
+        })
+        await res.body?.cancel()
+
+        expect(res.status).toBe(404)
+    })
 })
