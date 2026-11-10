@@ -39,19 +39,18 @@ export const Route = createFileRoute("/changes.md")({
                 const body = [
                     `# Changes`,
                     "",
-                    since
-                        ? `Pages changed since ${since.toISOString()}:`
-                        : "Recently changed pages:",
+                    changed.length > 0
+                        ? since
+                            ? `Pages changed since ${since.toISOString()}:`
+                            : "Recently changed pages:"
+                        : since
+                          ? `No pages changed since ${since.toISOString()}.`
+                          : "No pages yet.",
                     "",
                     ...changed.map(
                         ({ page, at }) =>
                             `- [${page.data.pageTitle}](${siteUrl + slugsToMarkdownPath(page.slugs).url}) — ${at.toISOString().slice(0, 10)}`,
                     ),
-                    changed.length > 0
-                        ? ""
-                        : since
-                          ? `No pages changed since ${since.toISOString()}.`
-                          : "No pages yet.",
                     "",
                 ].join("\n")
 

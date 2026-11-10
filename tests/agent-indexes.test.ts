@@ -32,7 +32,13 @@ const FORUM = "https://forum.example.com/a(b)c"
 const FORUM_LINK = "https://forum.example.com/a%28b%29c"
 
 const pages = [
-    { path: "zeta.mdx", servedUrl: "/zeta", title: "Zeta first" },
+    // Changed after every other page, which keep the seed's 2026-09-01.
+    {
+        path: "zeta.mdx",
+        servedUrl: "/zeta",
+        title: "Zeta first",
+        lastModified: new Date("2026-10-01T00:00:00.000Z"),
+    },
     { path: "alpha.mdx", servedUrl: "/alpha", title: "Alpha second" },
     {
         path: "notes.mdx",
@@ -276,7 +282,9 @@ describe.skipIf(!hasDocsDb)("agent indexes", () => {
                         contents: page.contents ?? [],
                     },
                     toc: [],
-                    lastModified: new Date("2026-09-01T00:00:00.000Z"),
+                    lastModified:
+                        page.lastModified ??
+                        new Date("2026-09-01T00:00:00.000Z"),
                 })),
             )
             await transaction
@@ -660,21 +668,21 @@ describe.skipIf(!hasDocsDb)("agent indexes", () => {
             expect(await response.text()).toContain("ISO 8601")
         })
 
-        test("lists pages changed after since", async () => {
-            const response = await changesSince("2026-08-01T00:00:00Z")
+        test("lists only pages changed after since", async () => {
+            const response = await changesSince("2026-09-15T00:00:00Z")
             expect(response.status).toBe(200)
-            expect(await response.text()).toContain("[Zeta first](")
+            const body = await response.text()
+            expect(body).toContain("[Zeta first](")
+            expect(body).not.toContain("[Alpha second](")
         })
 
         test("says no pages changed when since is after every change", async () => {
             const response = await changesSince("2999-01-01T00:00:00Z")
             expect(response.status).toBe(200)
             const body = await response.text()
-            expect(body).toContain(
-                "No pages changed since 2999-01-01T00:00:00.000Z.",
+            expect(body).toBe(
+                "# Changes\n\nNo pages changed since 2999-01-01T00:00:00.000Z.\n\n",
             )
-            expect(body).not.toContain("[Zeta first](")
-            expect(body).not.toContain("git history")
         })
     })
 
