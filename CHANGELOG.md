@@ -25,12 +25,12 @@ Semantic Versioning once a stable public API is published.
   label such as `1.4.0` or `Release 7` used to get a publication date in 2000
   or 2001. An entry now gets a date only when its label includes its
   four-digit year; a bare year is dated 1 January.
-
-### Fixed
-
 - `/changes.md?since=` answers 400 for a value that is not a date instead of
   failing with a 500, and says no pages changed since that date when none
   did, instead of blaming missing git history.
+- `POST /api/agent/feedback` refuses an `incorrect`, `missing`, `outdated`,
+  `unclear` or `other` report without a `message` with HTTP `400`, matching
+  the MCP `submit_feedback` tool. Page and answer votes need no message.
 
 ### Added
 

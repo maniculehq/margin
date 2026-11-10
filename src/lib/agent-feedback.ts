@@ -17,38 +17,52 @@ import { siteScope } from "./base-path"
 import { classifyAgent } from "./observability"
 import type { SiteSource } from "./source"
 
-export const feedbackSchema = z.object({
-    url: z
-        .string()
-        .min(1)
-        .max(2048)
-        .describe("The docs page URL or .md URL the feedback is about."),
-    // helpful/not_helpful are the page thumbs widget — those
-    // votes carry no message; the agent-authored kinds still should.
-    kind: z.enum(DOCS_AGENT_FEEDBACK_KINDS),
-    message: z
-        .string()
-        .min(1)
-        .max(2000)
-        .describe("What is wrong or missing.")
-        .optional(),
-    suggestedFix: z.string().max(2000).optional(),
-    // Who is grading: the docs page thumbs widget, the Assistant's answer
-    // thumbs, the docs MCP server, or (absent — every external caller) an
-    // agent. Analytics splits human votes from agent reports on this; it is
-    // self-reported, so it labels traffic rather than authenticating it.
-    source: z
-        .enum(DOCS_AGENT_FEEDBACK_SOURCES)
-        .default("agent")
-        .describe("Leave unset when an agent submits feedback."),
-    // Chat-answer thumbs (components/ai/search.tsx) send back the id
-    // /api/chat minted for the answer. Client-supplied and unauthenticated,
-    // like `source`: it labels the row, it grants nothing.
-    answerId: z
-        .uuid()
-        .describe("Id of the Assistant answer this feedback grades.")
-        .optional(),
-})
+export const feedbackSchema = z
+    .object({
+        url: z
+            .string()
+            .min(1)
+            .max(2048)
+            .describe("The docs page URL or .md URL the feedback is about."),
+        kind: z.enum(DOCS_AGENT_FEEDBACK_KINDS),
+        message: z
+            .string()
+            .min(1)
+            .max(2000)
+            .describe(
+                "What is wrong or missing. Required unless kind is helpful or not_helpful.",
+            )
+            .optional(),
+        suggestedFix: z.string().max(2000).optional(),
+        // Who is grading: the docs page thumbs widget, the Assistant's answer
+        // thumbs, the docs MCP server, or (absent — every external caller) an
+        // agent. Analytics splits human votes from agent reports on this; it is
+        // self-reported, so it labels traffic rather than authenticating it.
+        source: z
+            .enum(DOCS_AGENT_FEEDBACK_SOURCES)
+            .default("agent")
+            .describe("Leave unset when an agent submits feedback."),
+        // Chat-answer thumbs (components/ai/search.tsx) send back the id
+        // /api/chat minted for the answer. Client-supplied and unauthenticated,
+        // like `source`: it labels the row, it grants nothing.
+        answerId: z
+            .uuid()
+            .describe("Id of the Assistant answer this feedback grades.")
+            .optional(),
+    })
+    // helpful/not_helpful are thumbs votes and carry no message; every other
+    // kind is a report that must say what is wrong, as the MCP tool requires.
+    .refine(
+        (f) =>
+            f.kind === "helpful" ||
+            f.kind === "not_helpful" ||
+            f.message !== undefined,
+        {
+            path: ["message"],
+            message:
+                "Describe the problem: incorrect, missing, outdated, unclear and other reports need a message.",
+        },
+    )
 
 // The pre-parse shape: the sink applies the `source` default itself.
 export type FeedbackInput = z.input<typeof feedbackSchema>

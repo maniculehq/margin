@@ -88,10 +88,32 @@ it.each([
 })
 
 it("refuses feedback that names no page", async () => {
-    const accepted = await submit({ url: "/guides/install", kind: "missing" })
+    const message = "The install step is stale."
+    const accepted = await submit({
+        url: "/guides/install",
+        kind: "missing",
+        message,
+    })
     expect(accepted.status).toBe(202)
-    const refused = await submit({ url: "", kind: "missing" })
+    const refused = await submit({ url: "", kind: "missing", message })
     expect(refused.status).toBe(400)
+})
+
+// Votes carry no message (the "tags feedback from" rows above); a report
+// from an agent must say what is wrong, as the MCP tool already requires.
+it("refuses an agent report that describes no problem", async () => {
+    const accepted = await submit({
+        url: "/guides/install",
+        kind: "outdated",
+        message: "The install step is stale.",
+    })
+    expect(accepted.status).toBe(202)
+    const refused = await submit({ url: "/guides/install", kind: "outdated" })
+    expect(refused.status).toBe(400)
+    expect(await refused.json()).toMatchObject({
+        error: "invalid",
+        issues: [expect.objectContaining({ path: ["message"] })],
+    })
 })
 
 // A chat panel loaded before the answer id shipped still sends the retired
