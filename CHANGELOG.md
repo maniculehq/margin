@@ -43,3 +43,9 @@ Semantic Versioning once a stable public API is published.
   Free icons with a licensed Pro opt-in, and self-hosted OFL fonts.
 - Public deployment standard, contributor guidance, license notices, and
   documentation served by the framework itself.
+
+### Fixed
+
+- Ingest now warns (`link_broken`) about a broken bare relative link such as
+  `[next](quickstart)`, as it already did for `./quickstart` and
+  `/quickstart`.
