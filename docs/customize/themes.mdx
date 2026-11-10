@@ -59,7 +59,7 @@ The `dark` and `light` names describe the color's brightness, not the page mode:
 | `colors.light` | Accent in dark mode; falls back to `primary`. |
 | `colors.dark` | Fill for buttons in both modes; falls back to `primary`. |
 
-Margin keeps your accent readable. If a color is too light for light mode or too dark for dark mode to reach a 4.5:1 contrast ratio on the page and its panels, Margin adjusts only its lightness until it does. For example, a pale yellow `primary` becomes a darker amber on white pages, and a navy `primary` becomes a lighter slate in dark mode. Colors that already pass are used as written. Button text is black or white, whichever reads better on the button color.
+Margin keeps your accent readable. If a color is too light for light mode or too dark for dark mode to reach a 4.5:1 contrast ratio on the page and its panels, Margin adjusts only its lightness until it does. For example, a pale yellow `primary` becomes a darker amber on white pages, and a navy `primary` becomes a lighter slate in dark mode. Colors that already pass are used as written. If no lightness works on both the page and its panels, for example when you set a black light-mode background, Margin makes the color readable on the page, where links appear, or keeps it as written. Button text is black or white, whichever reads better on the button color.
 
 Color values must use `#RGB` or `#RRGGBB` hex notation. Named colors, `rgb()`, and alpha hex values are not supported in these fields. Invalid values produce a `field_invalid` diagnostic rather than applying the color.
 

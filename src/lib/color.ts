@@ -182,8 +182,10 @@ function atLightness(color: Rgba, L: number): Rgba {
 
 /** Where an accent is read: the plain surfaces behind accent text, plus the
  * surfaces a translucent tint of the accent itself is laid over (the active
- * sidebar row, `bg-fd-primary/10`). */
+ * sidebar row, `bg-fd-primary/10`). `page` is the page background, where
+ * most accent text (links) sits. */
 interface AccentSurfaces {
+    page: Rgba | null
     surfaces: Rgba[]
     tintBases: Rgba[]
     tintAlpha: number
@@ -208,6 +210,12 @@ function accentContrast(accent: Rgba, on: AccentSurfaces): number {
  * to the nearest lightness that clears it, keeping hue and as much chroma
  * as the gamut allows. A pale yellow becomes a legible amber on white; a
  * navy becomes a light slate on near-black.
+ *
+ * When no lightness clears every surface (a light-mode page authored black
+ * under the preset's light panels), the accent is fitted to the page
+ * background alone, where links sit; when even that fails, or the accent
+ * already reads on the page, it is kept as authored. The result is never
+ * less readable on the page than the authored accent.
  */
 export function readableAccent(
     accent: Rgba,
@@ -219,14 +227,35 @@ export function readableAccent(
     const target = minimum + 0.05
     if (accentContrast(accent, on) >= target) return accent
     const [L0] = toOklch(accent)
-    // Lightness moves away from the surfaces; contrast grows monotonically
-    // along that direction, so a bisection finds the nearest passing step.
-    let pass = scheme === "light" ? 0 : 1
-    let fail = L0
-    for (let i = 0; i < 28; i += 1) {
-        const mid = (pass + fail) / 2
-        if (accentContrast(atLightness(accent, mid), on) >= target) pass = mid
-        else fail = mid
+    // A lightness between L0 and `end` that clears `surfaces` (the nearest
+    // when contrast grows along the way), or null when `end` itself does
+    // not. `end` passes and L0 fails, so the bisection ends on a pass.
+    const fitTo = (surfaces: AccentSurfaces, end: number): Rgba | null => {
+        if (accentContrast(atLightness(accent, end), surfaces) < target)
+            return null
+        let pass = end
+        let fail = L0
+        for (let i = 0; i < 28; i += 1) {
+            const mid = (pass + fail) / 2
+            if (accentContrast(atLightness(accent, mid), surfaces) >= target)
+                pass = mid
+            else fail = mid
+        }
+        return atLightness(accent, pass)
     }
-    return atLightness(accent, pass)
+    // Lightness moves away from the surfaces: darker in light mode.
+    const away = scheme === "light" ? 0 : 1
+    const everywhere = fitTo(on, away)
+    if (everywhere) return everywhere
+    // No colour reads on every surface: links sit on the page, so fit the
+    // page alone (either direction), or keep an accent that already reads
+    // there. Never return a colour that is worse on the page.
+    if (!on.page || contrast(accent, on.page) >= target) return accent
+    const page = {
+        page: on.page,
+        surfaces: [on.page],
+        tintBases: [],
+        tintAlpha: 0,
+    }
+    return fitTo(page, away) ?? fitTo(page, 1 - away) ?? accent
 }
