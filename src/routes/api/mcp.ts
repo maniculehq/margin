@@ -15,6 +15,10 @@ export async function handleMcp(request: Request): Promise<Response> {
     if (!isSurfaceEnabled("mcp"))
         return new Response("Not Found", { status: 404 })
 
+    // Resolved before the SDK runs: a host naming no site must 404
+    // (start.ts), and the SDK answers anything a tool throws with a 500.
+    const head = await resolveSiteVersion(request)
+
     // A plain GET (a browser, curl, an agent probing the URL it was given)
     // gets the server's description and how to connect, instead of the
     // SDK's bare 405 — only an SSE-capable MCP client asks for the stream.
@@ -22,7 +26,6 @@ export async function handleMcp(request: Request): Promise<Response> {
         request.method === "GET" &&
         !(request.headers.get("accept") ?? "").includes("text/event-stream")
     ) {
-        const head = await resolveSiteVersion(request)
         const siteUrl = siteUrlFromRequest(request)
         return discoveryJson(request, {
             ...mcpWellKnown(head, siteUrl),

@@ -33,6 +33,12 @@ Semantic Versioning once a stable public API is published.
   the MCP `submit_feedback` tool. Both trim the message first, so one of only
   whitespace is refused too. Page and answer votes need no message.
 
+### Fixed
+
+- A host that names no site answers 404 on every route. Only its HTML pages
+  did; `robots.txt`, sitemaps, `llms.txt`, `.md` pages, OG images, MCP and
+  trailing-slash URLs answered 500.
+
 ### Added
 
 - Standalone single-site TanStack Start application with Postgres-backed,

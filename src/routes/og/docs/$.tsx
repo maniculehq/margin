@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/tanstackstart-react"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, isNotFound } from "@tanstack/react-router"
 import { and, eq, inArray } from "drizzle-orm"
 import { LRUCache } from "lru-cache"
 import { z } from "zod"
@@ -486,6 +486,8 @@ export async function getDocsOgImage(input: {
             },
         })
     } catch (error) {
+        // A host naming no site is a 404 (start.ts), not a render failure.
+        if (isNotFound(error)) throw error
         // A silent 404 here hid a missing-module failure in prod
         // for months — render errors must be loud and observable.
         Sentry.captureException(error)
