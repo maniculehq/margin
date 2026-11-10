@@ -92,12 +92,15 @@ export async function getUpdatesRss(input: {
             const guid = occurrence === 0 ? link : `${link}::${occurrence}`
             // V8 invents years for labels like "1.4.0" (2000) or "Release 7"
             // (2001), so a parse counts only when its year is in the label.
-            // getFullYear matches the parse: non-ISO labels parse in local time.
+            // ISO date-only labels parse as UTC and others in local time, so
+            // either year may be the written one.
             const date = update.label ? new Date(update.label) : null
             const pubDate =
                 date &&
                 !Number.isNaN(date.getTime()) &&
-                update.label?.includes(String(date.getFullYear()))
+                [date.getFullYear(), date.getUTCFullYear()].some((year) =>
+                    update.label?.includes(String(year)),
+                )
                     ? `<pubDate>${date.toUTCString()}</pubDate>`
                     : ""
             const categories = update.tags
