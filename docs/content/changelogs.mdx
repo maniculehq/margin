@@ -69,7 +69,7 @@ To give a feed item a different title and a summary, add this attribute to its `
 rss={{ title: "API v2.4.0", description: "Webhook retries now last 24 hours." }}
 ```
 
-The feed title falls back from `rss.title` to `description`, then to the label, and finally to `Update`. The entry body is not copied into the feed description. A feed publication date is included only when the chosen label can be parsed as a date. If both `label` and `date` are supplied, the label is used for that date too.
+The feed title falls back from `rss.title` to `description`, then to the label, and finally to `Update`. The entry body is not copied into the feed description. A feed publication date is included only when the chosen label parses as a date and includes its four-digit year, such as `2026-09-01`; a label like `1.4.0` or `Oct 28 '26` gets none, and a bare year such as `Release 2026` is dated 1 January. If both `label` and `date` are supplied, the label is used for that date too.
 
 ## Configure filters
 

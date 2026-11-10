@@ -73,7 +73,7 @@ Publish through the site's existing documentation workflow.
 - Each authored entry produces one RSS item; entry tags become RSS categories.
 - RSS item titles fall back from `rss.title` to `description`, then to the chosen label, then to `Update`.
 - `rss.description` supplies the RSS item description; entry body content is not copied into the RSS description.
-- RSS publication dates require a date-parseable chosen label; when `label` and `date` are both supplied, `label` is used.
+- RSS publication dates require the chosen label to parse as a date and include its four-digit year (`2026-09-01`, not `1.4.0` or `Oct 28 '26`); a bare year such as `Release 2026` is dated 1 January of that year. When `label` and `date` are both supplied, `label` is used.
 - Browser filter selections do not change the RSS feed.
 
 ## Not supported
