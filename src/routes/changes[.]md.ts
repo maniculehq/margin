@@ -1,22 +1,35 @@
 import { createFileRoute } from "@tanstack/react-router"
+import { z } from "zod"
 import { agentConfig, isSurfaceEnabled } from "@/lib/agent.config"
 import { orderedPages, slugsToMarkdownPath } from "@/lib/agent-content"
 import { siteUrlFromRequest } from "@/lib/base-path"
 import { resolveDocsContext } from "@/lib/source"
 
 // Since-timestamp changelog feed so agents fetch only what changed.
-// Requires git history (page.data.lastModified); pages without a date are omitted.
 export const Route = createFileRoute("/changes.md")({
     server: {
         handlers: {
             GET: async ({ request }) => {
                 if (!isSurfaceEnabled("changes"))
                     return new Response("Not Found", { status: 404 })
-                const url = new URL(request.url)
+                const headers = {
+                    "Content-Type": "text/markdown; charset=utf-8",
+                    "Cache-Control": agentConfig.cache.header,
+                }
+                const sinceParam = new URL(request.url).searchParams.get(
+                    "since",
+                )
+                const sinceParse = sinceParam
+                    ? z.coerce.date().safeParse(sinceParam)
+                    : null
+                if (sinceParse && !sinceParse.success)
+                    return new Response(
+                        "# Invalid since\n\nPass an ISO 8601 date, such as 2026-01-31 or 2026-01-31T12:00:00Z.\n",
+                        { status: 400, headers },
+                    )
+                const since = sinceParse?.data ?? null
                 const siteUrl = siteUrlFromRequest(request)
                 const ctx = await resolveDocsContext(request)
-                const sinceParam = url.searchParams.get("since")
-                const since = sinceParam ? new Date(sinceParam) : null
 
                 const changed = orderedPages(ctx)
                     .map((page) => ({ page, at: page.data.lastModified }))
@@ -26,26 +39,22 @@ export const Route = createFileRoute("/changes.md")({
                 const body = [
                     `# Changes`,
                     "",
-                    since
-                        ? `Pages changed since ${since.toISOString()}:`
-                        : "Recently changed pages:",
+                    changed.length > 0
+                        ? since
+                            ? `Pages changed since ${since.toISOString()}:`
+                            : "Recently changed pages:"
+                        : since
+                          ? `No pages changed since ${since.toISOString()}.`
+                          : "No pages yet.",
                     "",
                     ...changed.map(
                         ({ page, at }) =>
                             `- [${page.data.pageTitle}](${siteUrl + slugsToMarkdownPath(page.slugs).url}) — ${at.toISOString().slice(0, 10)}`,
                     ),
-                    changed.length === 0
-                        ? "_No changes found (git history may be unavailable at build)._"
-                        : "",
                     "",
                 ].join("\n")
 
-                return new Response(body, {
-                    headers: {
-                        "Content-Type": "text/markdown; charset=utf-8",
-                        "Cache-Control": agentConfig.cache.header,
-                    },
-                })
+                return new Response(body, { headers })
             },
         },
     },

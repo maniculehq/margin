@@ -26,6 +26,12 @@ Semantic Versioning once a stable public API is published.
   or 2001. An entry now gets a date only when its label includes its
   four-digit year; a bare year is dated 1 January.
 
+### Fixed
+
+- `/changes.md?since=` answers 400 for a value that is not a date instead of
+  failing with a 500, and says no pages changed since that date when none
+  did, instead of blaming missing git history.
+
 ### Added
 
 - Standalone single-site TanStack Start application with Postgres-backed,

@@ -32,7 +32,13 @@ const FORUM = "https://forum.example.com/a(b)c"
 const FORUM_LINK = "https://forum.example.com/a%28b%29c"
 
 const pages = [
-    { path: "zeta.mdx", servedUrl: "/zeta", title: "Zeta first" },
+    // Changed after every other page, which keep the seed's 2026-09-01.
+    {
+        path: "zeta.mdx",
+        servedUrl: "/zeta",
+        title: "Zeta first",
+        lastModified: new Date("2026-10-01T00:00:00.000Z"),
+    },
     { path: "alpha.mdx", servedUrl: "/alpha", title: "Alpha second" },
     {
         path: "notes.mdx",
@@ -276,7 +282,9 @@ describe.skipIf(!hasDocsDb)("agent indexes", () => {
                         contents: page.contents ?? [],
                     },
                     toc: [],
-                    lastModified: new Date("2026-09-01T00:00:00.000Z"),
+                    lastModified:
+                        page.lastModified ??
+                        new Date("2026-09-01T00:00:00.000Z"),
                 })),
             )
             await transaction
@@ -627,6 +635,56 @@ describe.skipIf(!hasDocsDb)("agent indexes", () => {
             expect(await moved.text()).toContain("(/help/alpha)")
         },
     )
+
+    describe("/changes.md", () => {
+        async function changesSince(since: string): Promise<Response> {
+            const { Route } = await import("../src/routes/changes[.]md")
+            const handlers = Route.options.server?.handlers
+            if (!handlers || typeof handlers === "function")
+                throw new Error("/changes.md declares no handler map")
+            const get = handlers.GET
+            if (typeof get !== "function")
+                throw new Error("/changes.md declares no GET handler")
+            const result = await get({
+                request: requestFor(
+                    hostname,
+                    `/changes.md?since=${encodeURIComponent(since)}`,
+                ),
+                params: {},
+                context: undefined,
+                pathname: "/changes.md",
+                next: () => {
+                    throw new Error("/changes.md must answer itself")
+                },
+            })
+            if (!(result instanceof Response))
+                throw new Error("/changes.md did not answer with a Response")
+            return result
+        }
+
+        test("answers 400 for a since that is not a date", async () => {
+            const response = await changesSince("not-a-date")
+            expect(response.status).toBe(400)
+            expect(await response.text()).toContain("ISO 8601")
+        })
+
+        test("lists only pages changed after since", async () => {
+            const response = await changesSince("2026-09-15T00:00:00Z")
+            expect(response.status).toBe(200)
+            const body = await response.text()
+            expect(body).toContain("[Zeta first](")
+            expect(body).not.toContain("[Alpha second](")
+        })
+
+        test("says no pages changed when since is after every change", async () => {
+            const response = await changesSince("2999-01-01T00:00:00Z")
+            expect(response.status).toBe(200)
+            const body = await response.text()
+            expect(body).toBe(
+                "# Changes\n\nNo pages changed since 2999-01-01T00:00:00.000Z.\n\n",
+            )
+        })
+    })
 
     test("the document's validator names the site's address", async () => {
         const ctx = await resolveDocsContext(requestFor(hostname, "/alpha"), [
