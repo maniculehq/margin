@@ -17,6 +17,12 @@ Semantic Versioning once a stable public API is published.
   `colors.dark` the button fill, as in Mintlify.
 - The header omits its tab row when navigation has a single tab.
 
+### Fixed
+
+- Changelog RSS feeds no longer date entries whose label is not a date: a
+  label such as `1.4.0` or `Release 7` used to get a publication date in 2000
+  or 2001. An entry now gets a date only when its label includes the year.
+
 ### Added
 
 - Standalone single-site TanStack Start application with Postgres-backed,

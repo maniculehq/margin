@@ -62,6 +62,12 @@ const pages = [
                 tags: [],
                 rss: null,
             },
+            {
+                label: "1.4.0",
+                description: "Semver release",
+                tags: [],
+                rss: null,
+            },
         ],
     },
     {
@@ -537,6 +543,21 @@ describe.skipIf(!hasDocsDb)("agent indexes", () => {
             params: { _splat: "changelog" },
         })
         expect(response.status).toBe(200)
+    })
+
+    // V8 dates '1.4.0' to 4 January 2000, so a parse alone is no evidence
+    // that a label is a date.
+    test("the RSS twin dates only entries whose label is a date", async () => {
+        const response = await getUpdatesRss({
+            request: requestFor(hostname, "/changelog.rss.xml"),
+            params: { _splat: "changelog" },
+        })
+        const text = await response.text()
+        expect(text).toContain("<pubDate>Tue, 01 Sep 2026")
+        expect(text.match(/<pubDate>/g)).toHaveLength(1)
+        expect(text).toMatch(
+            /<title>Semver release<\/title><link>[^<]*<\/link><guid[^>]*>[^<]*<\/guid><\/item>/,
+        )
     })
 
     test("the RSS twin 404s a page without updates", async () => {
