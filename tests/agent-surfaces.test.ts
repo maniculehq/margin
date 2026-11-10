@@ -409,6 +409,29 @@ describe.skipIf(!hasDocsDb)("MCP server", () => {
         }
     })
 
+    test("submit_feedback refuses a message that is only whitespace", async () => {
+        const { siteId, hostname } = await seedSite(basePages)
+        const client = await connect(hostname)
+        const report = (message: string) =>
+            client.callTool({
+                name: "submit_feedback",
+                arguments: { url: "/guide", kind: "outdated", message },
+            })
+        try {
+            expect(await report("The token name changed.")).toMatchObject({
+                structuredContent: { received: true },
+            })
+            const refused = await report("   ")
+            expect(refused).toMatchObject({ isError: true })
+            expect(JSON.stringify(refused.content)).toContain(
+                "Input validation error",
+            )
+        } finally {
+            await client.close()
+            await dropSite(siteId)
+        }
+    })
+
     test("every page is a readable resource", async () => {
         const { siteId, hostname } = await seedSite(basePages)
         const client = await connect(hostname)

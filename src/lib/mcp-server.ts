@@ -548,7 +548,7 @@ export async function buildMcpServer(request: Request): Promise<McpServer> {
                         "unclear",
                         "other",
                     ]),
-                    message: z.string().min(1).max(2_000),
+                    message: z.string().trim().min(1).max(2_000),
                     suggestedFix: z.string().max(2_000).optional(),
                 }),
                 outputSchema: z.object({

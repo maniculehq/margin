@@ -116,6 +116,25 @@ it("refuses an agent report that describes no problem", async () => {
     })
 })
 
+it("refuses an agent report whose message is only whitespace", async () => {
+    const accepted = await submit({
+        url: "/guides/install",
+        kind: "outdated",
+        message: " The install step is stale. ",
+    })
+    expect(accepted.status).toBe(202)
+    const refused = await submit({
+        url: "/guides/install",
+        kind: "outdated",
+        message: "   ",
+    })
+    expect(refused.status).toBe(400)
+    expect(await refused.json()).toMatchObject({
+        error: "invalid",
+        issues: [expect.objectContaining({ path: ["message"] })],
+    })
+})
+
 // A chat panel loaded before the answer id shipped still sends the retired
 // Braintrust span id and signature with its thumbs.
 it("accepts a chat thumb from a client that predates answer ids", async () => {

@@ -30,7 +30,8 @@ Semantic Versioning once a stable public API is published.
   did, instead of blaming missing git history.
 - `POST /api/agent/feedback` refuses an `incorrect`, `missing`, `outdated`,
   `unclear` or `other` report without a `message` with HTTP `400`, matching
-  the MCP `submit_feedback` tool. Page and answer votes need no message.
+  the MCP `submit_feedback` tool. Both trim the message first, so one of only
+  whitespace is refused too. Page and answer votes need no message.
 
 ### Added
 

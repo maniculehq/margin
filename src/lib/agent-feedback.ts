@@ -27,6 +27,7 @@ export const feedbackSchema = z
         kind: z.enum(DOCS_AGENT_FEEDBACK_KINDS),
         message: z
             .string()
+            .trim()
             .min(1)
             .max(2000)
             .describe(
