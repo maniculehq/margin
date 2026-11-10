@@ -21,7 +21,8 @@ Semantic Versioning once a stable public API is published.
 
 - Changelog RSS feeds no longer date entries whose label is not a date: a
   label such as `1.4.0` or `Release 7` used to get a publication date in 2000
-  or 2001. An entry now gets a date only when its label includes the year.
+  or 2001. An entry now gets a date only when its label includes its
+  four-digit year; a bare year is dated 1 January.
 
 ### Added
 

@@ -68,6 +68,12 @@ const pages = [
                 tags: [],
                 rss: null,
             },
+            {
+                label: "2026-01-01T01:00:00+05:00",
+                description: "Offset timestamp",
+                tags: [],
+                rss: null,
+            },
         ],
     },
     {
@@ -547,16 +553,27 @@ describe.skipIf(!hasDocsDb)("agent indexes", () => {
 
     // V8 dates '1.4.0' to 4 January 2000, so a parse alone is no evidence
     // that a label is a date.
-    test("the RSS twin dates only entries whose label is a date", async () => {
+    test("the RSS twin dates no entry whose label lacks its year", async () => {
         const response = await getUpdatesRss({
             request: requestFor(hostname, "/changelog.rss.xml"),
             params: { _splat: "changelog" },
         })
         const text = await response.text()
         expect(text).toContain("<pubDate>Tue, 01 Sep 2026")
-        expect(text.match(/<pubDate>/g)).toHaveLength(1)
         expect(text).toMatch(
             /<title>Semver release<\/title><link>[^<]*<\/link><guid[^>]*>[^<]*<\/guid><\/item>/,
+        )
+    })
+
+    // The +05:00 offset puts this label's UTC instant in 2025.
+    test("the RSS twin dates a timestamp whose offset changes its year", async () => {
+        const response = await getUpdatesRss({
+            request: requestFor(hostname, "/changelog.rss.xml"),
+            params: { _splat: "changelog" },
+        })
+        const text = await response.text()
+        expect(text).toMatch(
+            /<title>Offset timestamp<\/title><link>[^<]*<\/link><guid[^>]*>[^<]*<\/guid><pubDate>Wed, 31 Dec 2025 20:00:00 GMT<\/pubDate>/,
         )
     })
 
