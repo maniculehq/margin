@@ -325,9 +325,10 @@ export function remarkDocsVariables(input: {
 
 /**
  * Validate internal links: root-relative targets (docs serve at the tenant
- * root) AND relative targets (./quickstart, ../guides/auth, optionally with
- * .mdx/.md extensions) must resolve to a page in this version. Anchors,
- * protocol-relative and external URLs pass through.
+ * root) AND relative targets (./quickstart, ../guides/auth, and bare
+ * quickstart or guides/auth.mdx, optionally with .mdx/.md extensions) must
+ * resolve to a page in this version. Anchors, protocol-relative and external
+ * URLs, and bare targets with another file extension pass through.
  */
 export function validateInternalLinks(input: {
     pages: Array<{ path: string; url: string; links: string[] }>
@@ -343,7 +344,15 @@ export function validateInternalLinks(input: {
             let target: string
             if (bare.startsWith("/") && !bare.startsWith("//")) {
                 target = bare
-            } else if (/^\.\.?\//.test(bare)) {
+            } else if (
+                /^\.\.?\//.test(bare) ||
+                // Bare relative target (quickstart, guides/auth.mdx): no
+                // scheme, not protocol-relative, and no file extension other
+                // than .md/.mdx, so me@x.com and report.pdf pass through.
+                (!/^[a-z][a-z0-9+.-]*:/i.test(bare) &&
+                    !bare.startsWith("//") &&
+                    !/\.(?!mdx?$)[^./]+$/i.test(bare))
+            ) {
                 // Resolve against the page's URL directory the way a browser
                 // resolves a relative href from the served page.
                 const baseSegments = page.url.split("/").slice(0, -1)
