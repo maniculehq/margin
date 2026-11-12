@@ -249,6 +249,40 @@ describe.skipIf(!runnable)("docs chrome layout", () => {
         }
     }, 60_000)
 
+    it("a callout icon centres on the first line at the mint theme's 20px line height", async () => {
+        const context = await browser.newContext({
+            viewport: { width: 1440, height: 900 },
+        })
+        const page = await context.newPage()
+        await page.goto(`${servers.get("gantt-tabs")?.baseUrl}/`, {
+            waitUntil: "networkidle",
+        })
+        try {
+            const callout = page.locator("#nd-page [data-callout]")
+            await callout.waitFor()
+            const copy = callout.getByText("The old deployment keeps serving")
+            // The mint theme sets callout copy at 14/20, not the default 16/28.
+            expect(
+                await copy.evaluate(
+                    (element) => getComputedStyle(element).lineHeight,
+                ),
+            ).toBe("20px")
+            const icon = await callout
+                .locator(":scope > [aria-hidden='true']")
+                .boundingBox()
+            const line = await copy.boundingBox()
+            if (!icon || !line)
+                throw new Error("callout parts are not laid out")
+            // One line of copy, so its box is the first line. The icon sat
+            // 4px low when its offset assumed the 28px line.
+            expect(
+                Math.abs(icon.y + icon.height / 2 - (line.y + line.height / 2)),
+            ).toBeLessThanOrEqual(0.5)
+        } finally {
+            await context.close()
+        }
+    }, 60_000)
+
     it("a gantt resized during a pending render redraws only the latest width", async () => {
         const context = await browser.newContext({
             viewport: { width: 1440, height: 900 },
