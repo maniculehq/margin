@@ -1,5 +1,7 @@
 import { env } from "../env"
 import { CONFIG_EXTENSION_KEY, type DocsAgents } from "../types/docs"
+import { SESSION_WINDOW_MS } from "../types/telemetry"
+import { TRAFFIC_ENTRIES } from "../types/traffic"
 import { appName, docsRoute } from "./shared"
 
 /** A single agent-surface telemetry event (see src/lib/observability.ts). */
@@ -11,79 +13,22 @@ export interface AgentEvent {
     [key: string]: unknown
 }
 
-/** Canonical registry shared by runtime User-Agent classification and
- * robots.txt generation. Some entries are robots-only tokens; `kind` and
- * `robotsToken` distinguish runtime and crawler policy. */
-export const KNOWN_AGENTS: ReadonlyArray<{
-    name: string
-    pattern?: RegExp
-    kind: "crawler" | "assistant" | "tool"
-    robotsToken?: string
-}> = [
-    {
-        name: "gptbot",
-        pattern: /GPTBot/i,
-        kind: "crawler",
-        robotsToken: "GPTBot",
-    },
-    {
-        name: "chatgpt-user",
-        pattern: /ChatGPT-User/i,
-        kind: "assistant",
-        robotsToken: "ChatGPT-User",
-    },
-    {
-        name: "oai-searchbot",
-        pattern: /OAI-SearchBot/i,
-        kind: "crawler",
-        robotsToken: "OAI-SearchBot",
-    },
-    {
-        name: "claudebot",
-        pattern: /ClaudeBot/i,
-        kind: "crawler",
-        robotsToken: "ClaudeBot",
-    },
-    {
-        name: "claude-user",
-        pattern: /Claude-User/i,
-        kind: "assistant",
-        robotsToken: "Claude-User",
-    },
-    { name: "claude-searchbot", pattern: /Claude-SearchBot/i, kind: "crawler" },
-    { name: "claude-code", pattern: /claude-cli|Claude-Code/i, kind: "tool" },
-    {
-        name: "perplexitybot",
-        pattern: /PerplexityBot/i,
-        kind: "crawler",
-        robotsToken: "PerplexityBot",
-    },
-    { name: "perplexity-user", pattern: /Perplexity-User/i, kind: "assistant" },
-    {
-        name: "google-extended",
-        kind: "crawler",
-        robotsToken: "Google-Extended",
-    },
-    {
-        name: "applebot-extended",
-        kind: "crawler",
-        robotsToken: "Applebot-Extended",
-    },
-    { name: "ccbot", pattern: /CCBot/i, kind: "crawler", robotsToken: "CCBot" },
-    {
-        name: "meta-externalagent",
-        pattern: /meta-externalagent|FacebookBot/i,
-        kind: "crawler",
-    },
-    { name: "amazonbot", pattern: /Amazonbot/i, kind: "crawler" },
-    { name: "bytespider", pattern: /Bytespider/i, kind: "crawler" },
-    { name: "cohere", pattern: /cohere-ai/i, kind: "crawler" },
-    { name: "mistral", pattern: /MistralAI-User/i, kind: "assistant" },
-    { name: "duckassist", pattern: /DuckAssistBot/i, kind: "assistant" },
-    { name: "youbot", pattern: /YouBot/i, kind: "crawler" },
-    { name: "devin", pattern: /\bDevin\b/, kind: "tool" },
-    { name: "cursor", pattern: /\bCursor\b/, kind: "tool" },
-]
+/** The AI crawlers and assistants robots.txt names. The wildcard group
+ * already allows them; a named group documents intent, survives stricter
+ * default-deny tooling, and carries the site's Content-Signal to crawlers
+ * that read only their own group. `Google-Extended` and `Applebot-Extended`
+ * are robots.txt tokens only and never appear in a request. */
+export const ROBOTS_AGENT_TOKENS = [
+    "GPTBot",
+    "ChatGPT-User",
+    "OAI-SearchBot",
+    "ClaudeBot",
+    "Claude-User",
+    "PerplexityBot",
+    "Google-Extended",
+    "Applebot-Extended",
+    "CCBot",
+] as const
 
 /**
  * THE single source of truth for the agent surface. Every discovery / manifest /
@@ -181,7 +126,7 @@ export const agentConfig = {
         /** Server-side capture goes direct — the browser ad-block proxy is unnecessary here. */
         posthogHost: env.POSTHOG_HOST,
         /** Journey window for the deterministic $session_id (30 min, PostHog's default). */
-        sessionWindowMs: 30 * 60 * 1000,
+        sessionWindowMs: SESSION_WINDOW_MS,
     },
 
     /** Distinct (non-A2A) discovery path — avoids the /.well-known/agent.json collision. */
@@ -231,18 +176,21 @@ export function contentSignalValue(
 }
 
 /**
- * Live-assistant fetchers (`kind: "assistant"`): an AI product fetching a
- * page because a user asked right now, as opposed to a training or search
- * crawler. These get markdown without asking for it — they hand the page to
- * a model either way. A Vercel route (vite.config.ts) rewrites them to
- * `?__md=assistant` BEFORE the CDN cache, so the markdown caches under its
- * own key and HTML entries never vary on User-Agent.
+ * Agents that identify themselves (assistant and coding kinds in
+ * types/traffic.ts): an AI product fetching a page because a person asked
+ * right now, as opposed to a training or search crawler. These get markdown
+ * without asking for it, since they hand the page to a model either way. A
+ * Vercel route (vite.config.ts) rewrites them to `?__md=assistant` BEFORE
+ * the CDN cache, so the markdown caches under its own key and HTML entries
+ * never vary on User-Agent.
  */
 export const ASSISTANT_MARKDOWN_PARAM = "__md"
-export const ASSISTANT_USER_AGENT_PATTERN = KNOWN_AGENTS.filter(
-    (agent) => agent.kind === "assistant" && agent.pattern,
+export const ASSISTANT_USER_AGENT_PATTERN = TRAFFIC_ENTRIES.filter(
+    (entry) =>
+        entry.category === "agent" &&
+        (entry.kind === "assistant" || entry.kind === "coding"),
 )
-    .map((agent) => agent.pattern?.source)
+    .map((entry) => entry.pattern)
     .join("|")
 
 /** Link relation URIs for agent surfaces with no IANA-registered token

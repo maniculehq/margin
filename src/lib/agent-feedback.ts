@@ -11,11 +11,12 @@ import {
     DOCS_AGENT_FEEDBACK_KINDS,
     DOCS_AGENT_FEEDBACK_SOURCES,
 } from "@/types/constants"
+import { classifyTraffic } from "@/types/traffic"
 import { env as frameworkEnv } from "../env"
 import { normalizeDocUrl } from "./agent-content"
 import { siteScope } from "./base-path"
-import { classifyAgent } from "./observability"
 import type { SiteSource } from "./source"
+import { clientAddress } from "./traffic"
 
 export const feedbackSchema = z
     .object({
@@ -111,7 +112,9 @@ export function recordFeedback(
     input: FeedbackInput,
 ): Promise<void> {
     const exists = pageExists(ctx, input.url)
-    const agent = classifyAgent(request.headers.get("user-agent") ?? "", false)
+    const traffic = classifyTraffic({
+        userAgent: request.headers.get("user-agent") ?? "",
+    })
     // Async IIFE: the db client resolves lazily and may throw synchronously
     // (no DATABASE_URL); that must land in the catch below, not the caller.
     const persisted = (async () => {
@@ -122,16 +125,8 @@ export function recordFeedback(
         // per site (the shared Postgres limiter the Ask-AI chat uses), and
         // a submission over the limit is dropped — feedback is best-effort,
         // so the caller still sees it accepted. The visitor is the caller's
-        // address — the extension's answer, else Vercel's forwarded-for —
-        // hashed.
-        const visitorIp =
-            extensions.clientIp?.(request) ||
-            request.headers
-                .get("x-vercel-forwarded-for")
-                ?.split(",")[0]
-                ?.trim() ||
-            request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-            "unknown"
+        // address (clientAddress), hashed.
+        const visitorIp = clientAddress(request)?.ip ?? "unknown"
         const visitor = createHash("sha256")
             .update(
                 `docs-feedback:${frameworkEnv.SITE_SECRET ?? resolveEnv().DATABASE_URL}:${visitorIp}`,
@@ -178,8 +173,8 @@ export function recordFeedback(
             message: input.message ?? null,
             suggestedFix: input.suggestedFix ?? null,
             answerId: input.answerId ?? null,
-            agentName: agent.agentName?.slice(0, 255) ?? null,
-            agentKind: agent.agentKind,
+            agentName: traffic.id,
+            agentKind: traffic.kind ?? traffic.category,
         })
     })().catch(async (error: unknown) => {
         Sentry.captureException(error)

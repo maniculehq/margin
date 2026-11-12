@@ -206,6 +206,36 @@ describe.skipIf(!hasDocsDb)("default extension: resolution", () => {
         expect(resolution.canonicalHost).toBeNull()
     })
 
+    test("says a proxied site on Vercel sees its visitors from one address", async () => {
+        // Vercel reports the connecting address, which is the owner's proxy.
+        const proxied = await loadDefault({
+            VERCEL_ENV: "production",
+            SITE_ORIGIN: "https://example.com/docs",
+        })
+        expect((await proxied.resolveSite(request())).sharedClientAddress).toBe(
+            true,
+        )
+        // At the root visitors connect themselves.
+        const direct = await loadDefault({
+            VERCEL_ENV: "production",
+            SITE_ORIGIN: "https://docs.example.com",
+        })
+        expect((await direct.resolveSite(request())).sharedClientAddress).toBe(
+            false,
+        )
+    })
+
+    test("keeps per-visitor addresses for a proxied site off Vercel", async () => {
+        // A self-hosted proxy forwards each visitor's address in a header,
+        // so the per-visitor rate limits still have something to key on.
+        const extensions = await loadDefault({
+            SITE_ORIGIN: "https://example.com/docs",
+        })
+        expect(
+            (await extensions.resolveSite(request())).sharedClientAddress,
+        ).toBe(false)
+    })
+
     test("DOCS_CANONICAL_REDIRECT=0 turns the production redirect off", async () => {
         const extensions = await loadDefault({
             VERCEL_ENV: "production",

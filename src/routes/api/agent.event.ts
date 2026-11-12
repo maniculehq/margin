@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { z } from "zod"
-import { emitEvent, surfaceOf } from "@/lib/observability"
+import { emitEvent } from "@/lib/observability"
 import { resolveSiteVersion } from "@/lib/source"
+import { surfaceOf } from "@/types/telemetry"
 
 /** A same-site docs path: one leading slash, no scheme, no protocol-relative
  * "//", no backslash (a URL separator that can change the host), no query or

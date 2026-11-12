@@ -4,15 +4,16 @@
  * never leaves the function. Hosts extend events through the extension's
  * telemetry hooks (extra properties, PostHog groups, an event tap). */
 
-import { createHash } from "node:crypto"
 import { waitUntil } from "@vercel/functions"
 import { PostHog } from "posthog-node"
 import { extensions } from "#docs-extensions"
 import type { DocsSite, SiteResolution } from "@/extensions/types"
-import { classifyAgentTraffic } from "@/types/docs"
+import { sessionId, surfaceOf, visitorId } from "@/types/telemetry"
+import { aiReferral, browserCheck } from "@/types/traffic"
 import { env } from "../env"
-import { type AgentEvent, agentConfig, KNOWN_AGENTS } from "./agent.config"
+import { type AgentEvent, agentConfig } from "./agent.config"
 import { wantsMarkdown } from "./agent-content"
+import { clientAddress, requestTraffic } from "./traffic"
 
 declare global {
     var __frameworkPostHogClient: PostHog | undefined
@@ -49,150 +50,12 @@ export function webmcpEnabled(site: DocsSite): boolean {
     )
 }
 
-export interface AgentIdentity {
-    isAgent: boolean
-    /** Normalized KNOWN_AGENTS name ("claudebot") or null when only Accept matched. */
-    agentName: string | null
-    agentKind: "crawler" | "assistant" | "tool" | "unknown-agent" | "human"
-    /** Which detection signal fired: UA match, Accept-markdown preference, or both. */
-    signal: "ua" | "accept" | "both" | null
-}
-
-/** An agent = known AI User-Agent AND/OR an Accept header preferring markdown. */
-export function classifyAgent(
-    ua: string,
-    acceptsMarkdown: boolean,
-): AgentIdentity {
-    const match = KNOWN_AGENTS.find((agent) => agent.pattern?.test(ua))
-    if (match) {
-        return {
-            isAgent: true,
-            agentName: match.name,
-            agentKind: match.kind,
-            signal: acceptsMarkdown ? "both" : "ua",
-        }
-    }
-    if (acceptsMarkdown) {
-        return {
-            isAgent: true,
-            agentName: null,
-            agentKind: "unknown-agent",
-            signal: "accept",
-        }
-    }
-    return { isAgent: false, agentName: null, agentKind: "human", signal: null }
-}
-
-/** Cookieless visitor identity. 32 hex chars of sha256 — raw IP is never stored. */
-export function visitorId(siteKey: string, ip: string, ua: string): string {
-    return createHash("sha256")
-        .update(`${siteKey}|${ip}|${ua}`)
-        .digest("hex")
-        .slice(0, 32)
-}
-
-/**
- * Deterministic $session_id — a valid UUIDv7 (PostHog session analytics require
- * v7): the 48-bit timestamp is the start of the visitor's 30-min bucket and the
- * remaining bits come from the visitor hash. Stateless: same visitor + bucket
- * → same id; the HogQL query in the header comment is the precise fallback for
- * journeys that straddle a bucket boundary.
- */
-export function sessionId(distinctId: string, now: number): string {
-    const windowMs = agentConfig.observability.sessionWindowMs
-    const bucket = now - (now % windowMs)
-    const bytes = Buffer.alloc(16)
-    bytes.writeUIntBE(bucket, 0, 6)
-    Buffer.from(distinctId, "hex").copy(bytes, 6, 0, 10)
-    bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x70 // version 7
-    bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80 // RFC 9562 variant
-    const hex = bytes.toString("hex")
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
-}
-
-const EXACT_SURFACES: Record<string, string> = {
-    "/llms.txt": "llms_txt",
-    "/llms-full.txt": "llms_full",
-    "/AGENTS.md": "agents_md",
-    "/.well-known/AGENTS.md": "agents_md",
-    "/skill.md": "skill_md",
-    "/.well-known/skill.md": "skill_md",
-    "/.well-known/llms-manifest.json": "discovery",
-    "/.well-known/mcp.json": "mcp_manifest",
-    "/.well-known/mcp": "mcp_manifest",
-    "/.well-known/mcp/server-card.json": "mcp_manifest",
-    "/.well-known/mcp/server-cards.json": "mcp_manifest",
-    "/api/mcp/server-card": "mcp_manifest",
-    "/.well-known/ai-catalog.json": "mcp_manifest",
-    "/.well-known/llms.txt": "llms_txt",
-    "/.well-known/llms-full.txt": "llms_full",
-    "/.well-known/api-catalog": "api_catalog",
-    "/.well-known/agent-skills/index.json": "skills_index",
-    "/.well-known/skills/index.json": "skills_index",
-    "/sitemap.xml": "sitemap_xml",
-    "/sitemap.md": "sitemap_md",
-    "/changes.md": "changes_md",
-    "/robots.txt": "robots",
-    "/api/search": "search",
-    "/api/chat": "chat",
-    "/api/mcp": "mcp",
-    "/api/agent/feedback": "feedback",
-    "/api/agent/event": "browser_event",
-}
-
-/** Path → normalized surface name stamped on every event. */
-export function surfaceOf(pathname: string): string {
-    if (
-        pathname.startsWith("/_assets/") ||
-        pathname === "/og/docs" ||
-        pathname.startsWith("/og/docs/")
-    )
-        return "other"
-    const exact = EXACT_SURFACES[pathname]
-    if (exact) return exact
-    if (pathname.startsWith("/api/agent/context")) return "context_bundle"
-    if (/^\/\.well-known\/(?:agent-)?skills\/[^/]+\/[^/]+$/.test(pathname))
-        return "skill_md"
-    // Path-scoped and split indexes (start.ts agentFilesMiddleware).
-    if (pathname.endsWith("/llms.txt") || pathname.includes("/_llms/"))
-        return "llms_txt"
-    if (pathname.endsWith("/llms-full.txt")) return "llms_full"
-    if (pathname.startsWith("/api/") || pathname.startsWith("/.well-known/"))
-        return "other"
-    // Docs serve at the root splat — every remaining path is a docs URL
-    // (including root "/" and slugged 404s, which the splat route answers).
-    // .pdf downloads are attachments, not page views — a $pageview per
-    // download would inflate HTML view counts.
-    if (pathname.endsWith(".pdf")) return "docs_pdf"
-    return pathname.endsWith(".md") ? "docs_md" : "docs_html"
-}
-
-/** Content-fetch surfaces → emitted as $pageview so PostHog Paths works natively. */
-export const PAGE_SURFACES: ReadonlySet<string> = new Set([
-    "docs_html",
-    "docs_md",
-    "llms_txt",
-    "llms_full",
-    "agents_md",
-    "skill_md",
-    "skills_index",
-    "api_catalog",
-    "discovery",
-    "mcp_manifest",
-    "sitemap_xml",
-    "sitemap_md",
-    "changes_md",
-    "robots",
-    "context_bundle",
-])
-
 /** Plain strings captured on the hot path — the Request itself is never retained. */
 interface RequestSnapshot {
     url: string
     host: string | null
     ua: string
     referer: string | null
-    ip: string
     /** Every header as plain pairs, for the extension's telemetry hooks. */
     headers: [string, string][]
     now: number
@@ -212,11 +75,6 @@ export function emitEvent(request: Request, event: AgentEvent): void {
             host: request.headers.get("host"),
             ua: request.headers.get("user-agent") ?? "",
             referer: request.headers.get("referer"),
-            ip:
-                request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-                request.headers.get("x-real-ip") ||
-                request.headers.get("x-vercel-forwarded-for") ||
-                "0.0.0.0",
             headers: [...request.headers],
             now: Date.now(),
         }
@@ -252,12 +110,14 @@ async function deliver(
         resolution?.site?.slug ??
         host
     const acceptsMarkdown = wantsMarkdown(request)
-    const identity = classifyAgent(snapshot.ua, acceptsMarkdown)
-    // The traffic taxonomy agent-traffic reports read back over HogQL:
-    // provider + citation/training/indexing per request, and AI-product
-    // referrals by referrer or utm_source. Only the referrer's host is kept.
-    const traffic = classifyAgentTraffic({
-        userAgent: snapshot.ua || null,
+    // Who is asking (human, crawler, agent or other automation), and for a
+    // human, the AI product whose answer sent them. Reports read both back
+    // over HogQL. Only the referrer's host is kept.
+    const traffic = await requestTraffic(
+        request,
+        resolution?.sharedClientAddress ?? false,
+    )
+    const referral = aiReferral({
         referer: snapshot.referer,
         requestPath: `${url.pathname}${url.search}`,
     })
@@ -265,12 +125,22 @@ async function deliver(
         snapshot.referer && URL.canParse(snapshot.referer)
             ? new URL(snapshot.referer).hostname.toLowerCase()
             : null
-    const distinctId = visitorId(siteKey, snapshot.ip, snapshot.ua)
+    // The visitor's own address (clientAddress), read here from the rebuilt
+    // request so the hot path stays header copies only.
+    const distinctId = visitorId(
+        siteKey,
+        clientAddress(request)?.ip ?? "0.0.0.0",
+        snapshot.ua,
+    )
 
     const { type, ...rest } = event
     const properties = {
         ...rest,
-        $session_id: sessionId(distinctId, snapshot.now),
+        $session_id: sessionId(
+            distinctId,
+            snapshot.now,
+            agentConfig.observability.sessionWindowMs,
+        ),
         // Query strings are inputs (?query=..., tokens): they ride along only
         // when includeInputs is on, same gate as tool args and search terms.
         $current_url: `${url.protocol}//${host}${url.pathname}${
@@ -280,14 +150,24 @@ async function deliver(
         $pathname: url.pathname,
         $raw_user_agent: snapshot.ua,
         site_id: resolution?.site?.slug ?? null,
-        is_agent: identity.isAgent,
-        agent_name: identity.agentName,
-        agent_kind: identity.agentKind,
-        agent_signal: identity.signal,
-        agent_platform: traffic.platform,
-        agent_traffic_kind: traffic.kind,
-        agent_bot_name: traffic.botName,
-        agent_detection: traffic.detectionMethod,
+        traffic_category: traffic.category,
+        traffic_kind: traffic.kind,
+        traffic_id: traffic.id,
+        traffic_name: traffic.name,
+        traffic_operator: traffic.operator,
+        traffic_verified: traffic.verified,
+        traffic_signal: traffic.signal,
+        // Recorded, not yet counted: whether a browser user agent's headers
+        // look like a browser's (types/traffic.ts browserCheck).
+        browser_check: browserCheck(snapshot.ua, (name) =>
+            request.headers.get(name),
+        ),
+        ai_referral_platform: referral?.platform ?? null,
+        ai_referral_detection: referral?.detection ?? null,
+        // The one header besides the user agent that classification reads,
+        // kept so a later rule change can be applied to stored events.
+        accept_header: request.headers.get("accept")?.slice(0, 256) ?? null,
+        classification_version: 2,
         $referring_domain: referringDomain,
         environment:
             resolution?.preview || env.VERCEL_ENV !== "production"
