@@ -659,10 +659,28 @@ describe.skipIf(!hasDocsDb)("agent indexes", () => {
             return result
         }
 
-        test("answers 400 for a since that is not a date", async () => {
-            const response = await changesSince("not-a-date")
+        test.each([
+            ["a word", "not-a-date"],
+            ["a version number", "1.4.0"],
+            ["a release label", "Release 7"],
+            ["a day its month lacks", "2026-02-30"],
+            ["a time on a day its month lacks", "2026-02-30T00:00:00Z"],
+            ["a time with no zone", "2026-09-15T00:00:00"],
+        ])("answers 400 for %s as since", async (_kind, since) => {
+            const response = await changesSince(since)
             expect(response.status).toBe(400)
             expect(await response.text()).toContain("ISO 8601")
+        })
+
+        test.each([
+            ["a date", "2026-09-15"],
+            ["a time with a numeric offset", "2026-09-15T02:00:00+02:00"],
+        ])("reads %s as since in UTC", async (_kind, since) => {
+            const response = await changesSince(since)
+            expect(response.status).toBe(200)
+            expect(await response.text()).toContain(
+                "Pages changed since 2026-09-15T00:00:00.000Z:",
+            )
         })
 
         test("lists only pages changed after since", async () => {

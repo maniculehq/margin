@@ -19,12 +19,21 @@ export const Route = createFileRoute("/changes.md")({
                 const sinceParam = new URL(request.url).searchParams.get(
                     "since",
                 )
+                // Not z.coerce.date(): `new Date` reads "1.4.0" and "Release 7"
+                // as dates, rolls 30 February into March, and reads a time
+                // with no zone in the server's own zone.
                 const sinceParse = sinceParam
-                    ? z.coerce.date().safeParse(sinceParam)
+                    ? z
+                          .union([
+                              z.iso.date(),
+                              z.iso.datetime({ offset: true }),
+                          ])
+                          .transform((value) => new Date(value))
+                          .safeParse(sinceParam)
                     : null
                 if (sinceParse && !sinceParse.success)
                     return new Response(
-                        "# Invalid since\n\nPass an ISO 8601 date, such as 2026-01-31 or 2026-01-31T12:00:00Z.\n",
+                        "# Invalid since\n\nPass an ISO 8601 date, such as 2026-01-31, or a time with its zone, such as 2026-01-31T12:00:00Z or 2026-01-31T12:00:00+02:00.\n",
                         { status: 400, headers },
                     )
                 const since = sinceParse?.data ?? null
