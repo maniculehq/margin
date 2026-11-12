@@ -625,33 +625,52 @@ export async function sanitizeCss(
                     // A selector that names the root is global unless its
                     // subject (the last compound) is a specific element:
                     // `html[data-current-path^="/api"] #banner` reads the
-                    // root's state and styles the banner, while `html > *`
-                    // and `body div` still lay out the whole shell.
+                    // root's state and styles the banner, while `html > *`,
+                    // `body div` and `html > :is(body, .shell)` still lay
+                    // out the whole shell.
                     const namesRoot = (component: SelectorComponent) =>
                         (component.type === "type" &&
                             (component.name === "html" ||
                                 component.name === "body")) ||
                         (component.type === "pseudo-class" &&
                             component.kind === "root")
+                    const subjectOf = (selector: Selector): Selector =>
+                        selector.slice(
+                            selector
+                                .map((component) => component.type)
+                                .lastIndexOf("combinator") + 1,
+                        )
+                    // :is() and :where() match whatever any branch matches.
+                    const branches = (component: SelectorComponent) =>
+                        component.type === "pseudo-class" &&
+                        (component.kind === "is" || component.kind === "where")
+                            ? component.selectors
+                            : null
+                    const reachesRoot = (compound: Selector): boolean =>
+                        compound.some(
+                            (component) =>
+                                namesRoot(component) ||
+                                (branches(component)?.some((branch) =>
+                                    reachesRoot(subjectOf(branch)),
+                                ) ??
+                                    false),
+                        )
+                    const isSpecific = (compound: Selector): boolean =>
+                        compound.some(
+                            (component) =>
+                                component.type === "id" ||
+                                component.type === "class" ||
+                                component.type === "attribute" ||
+                                (branches(component)?.every((branch) =>
+                                    isSpecific(subjectOf(branch)),
+                                ) ??
+                                    false),
+                        )
                     const targetsGlobal = rule.value.selectors.some(
                         (selector) => {
                             if (!selector.some(namesRoot)) return false
-                            const subject = selector.slice(
-                                selector
-                                    .map((component) => component.type)
-                                    .lastIndexOf("combinator") + 1,
-                            )
-                            return (
-                                subject.some(namesRoot) ||
-                                !subject.some(
-                                    (component) =>
-                                        component.type === "id" ||
-                                        component.type === "class" ||
-                                        component.type === "attribute" ||
-                                        (component.type === "pseudo-class" &&
-                                            component.kind === "is"),
-                                )
-                            )
+                            const subject = subjectOf(selector)
+                            return reachesRoot(subject) || !isSpecific(subject)
                         },
                     )
                     const allDeclarations = [...declarations, ...important]

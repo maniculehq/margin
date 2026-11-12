@@ -78,7 +78,7 @@
     line-height: 1.25rem;
 }
 /* Centre the 18px icon on the first 20px line. */
-[data-theme-name="mint"] [data-callout] > svg {
+[data-theme-name="mint"] [data-callout] > :is(svg, span):first-child {
     margin-top: 0.0625rem;
 }
 [data-theme-name="mint"] :is(#nd-page, [data-rail]) .prose :is(th, td) {

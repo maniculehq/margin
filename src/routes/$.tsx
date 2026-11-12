@@ -1659,10 +1659,12 @@ function DocContent(props: {
     // punctuation ("decision.id" → "decisionid") and numbered repeats from
     // 1. A link to one of those matches no id now, so find its heading by
     // slugging the visible headings the old way. Keyed on the router's
-    // hash: an in-page link moves it without a hashchange event.
+    // hash (an in-page link moves it without a hashchange event) and on
+    // the outline, which is replaced once a client-rendered body mounts
+    // its headings.
     const pageUrl = props.pageUrl
     const hash = useLocation({ select: (location) => location.hash })
-    // biome-ignore lint/correctness/useExhaustiveDependencies: re-runs when the page changes; the effect reads the DOM, not pageUrl
+    // biome-ignore lint/correctness/useExhaustiveDependencies: re-runs when the page or its outline changes; the effect reads the DOM, not these values
     useEffect(() => {
         if (!hash || document.getElementById(hash)) return
         const seen = new Map<string, number>()
@@ -1686,7 +1688,7 @@ function DocContent(props: {
                 return
             }
         }
-    }, [pageUrl, hash])
+    }, [pageUrl, hash, toc])
     // Server-rendered loading state for client-only bodies: shown
     // pre-hydration by ClientOnly AND during the lazy OpenAPI chunk load.
     const bodySkeleton = (

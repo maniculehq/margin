@@ -8,10 +8,17 @@ const sanitize = (...sheets: string[]) =>
     )
 
 describe("site stylesheet hooks", () => {
-    it("rewrites an ID hook to the region it names, at ID specificity", async () => {
+    it("rewrites an ID hook to the regions it names, at ID weight", async () => {
         const { css } = await sanitize("#sidebar a { color: red }")
-        expect(css).toContain(":is(#nd-sidebar, #css\\:hook) a")
+        expect(css).toContain(
+            ":where(#nd-sidebar, #nd-sidebar-mobile):not(#css\\:hook) a",
+        )
         expect(css).not.toContain("#sidebar")
+    })
+
+    it("keeps a class hook at class weight, below an ID hook", async () => {
+        const { css } = await sanitize(".toc { color: red }")
+        expect(css).toContain(":where(#nd-toc):not(.css\\:hook)")
     })
 
     it("rewrites hooks nested in :has() and :not()", async () => {
@@ -19,7 +26,7 @@ describe("site stylesheet hooks", () => {
             "main:has(#table-of-contents):not(.toc-item) { color: red }",
         )
         expect(css).toContain(
-            "main:has(:is(#nd-toc, #css\\:hook)):not(:is(#nd-toc a))",
+            "main:has(:where(#nd-toc):not(#css\\:hook)):not(:where(#nd-toc a):not(.css\\:hook))",
         )
     })
 
@@ -33,6 +40,14 @@ describe("site stylesheet hooks", () => {
     it("leaves a site's own IDs and classes alone", async () => {
         const { css } = await sanitize("#pricing .plan { color: red }")
         expect(css).toContain("#pricing .plan")
+    })
+
+    it("leaves names every object inherits alone", async () => {
+        const { css, diagnostics } = await sanitize(
+            "#constructor .toString { color: red }",
+        )
+        expect(css).toContain("#constructor .toString")
+        expect(diagnostics).toEqual([])
     })
 })
 
@@ -52,6 +67,22 @@ describe("global layout rules", () => {
         )
         expect(css).toContain(".card")
         expect(css).not.toContain("display")
+    })
+
+    it("drops a rule whose :is() can match the body", async () => {
+        const { css } = await sanitize(
+            ".card { color: red }",
+            "html > :is(body, .shell) { display: none }",
+        )
+        expect(css).toContain(".card")
+        expect(css).not.toContain("display")
+    })
+
+    it("keeps a path-scoped rule on a translated hook", async () => {
+        const { css } = await sanitize(
+            'html[data-current-path^="/api"] #banner { display: none }',
+        )
+        expect(css).toContain("display: none")
     })
 
     it("still moves a layout rule on the root itself to the docs layout", async () => {
