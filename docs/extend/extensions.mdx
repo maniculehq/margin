@@ -122,3 +122,16 @@ Use optional hooks only when the deployment needs behavior beyond the site row a
 | `clientIp` | `(request: Request): string \| undefined`. Client address for public chat and feedback rate limits and feedback keys. | Override for a trusted proxy with different address headers. An omitted hook or empty result falls back to the first `x-vercel-forwarded-for` address, then the first `x-forwarded-for` address. Trust custom proxy headers only when the request is known to come through that proxy. |
 
 The interface also accepts `headMeta?: readonly HeadMeta[]` for deployment-owned meta tags at the top of each document’s head. Each entry is `{ httpEquiv: string; content: string }` or `{ name: string; content: string }`. Omission adds no extension-owned tags.
+
+## Check page-view reports
+
+Each docs page reports its own view from the browser (`docs_page_viewed`): once on load and once per in-site navigation, never for a missing page. A person’s view is that report; a server read with a browser user agent is recorded as automation, because a script can send any user agent. `pageViewCheck?: PageViewCheck` adds a second opinion on each report. It labels the event and never blocks, challenges, or changes a response.
+
+| Member | Contract |
+| --- | --- |
+| `enabled` | `(site: DocsSite, resolution: SiteResolution, posthog: PostHog \| undefined): boolean`. Synchronous; answer from cache. Runs when a page renders; if it throws, the page renders as if it returned `false`. When `true`, the page sends its reports through the browser module’s `sendPageView`. A cached page keeps the answer it rendered with. |
+| `verify` | `(request: Request, resolution: SiteResolution \| null, posthog: PostHog \| undefined): Promise<PageViewVerdict>`. Returns `{ verdict: "human" \| "bot" \| "skipped"; properties?: Record<string, unknown> }`. `request` is the report as it arrived, with its body unread. Margin waits at most one second; a timeout or rejection records `skipped`. A `bot` verdict on a browser’s report records it as automation. |
+
+When omitted, every report records `view_verdict: "skipped"` and counts on its own.
+
+The browser half lives in a separate module, imported as `#docs-browser-extensions` and selected by `DOCS_BROWSER_EXTENSIONS` in the same way `DOCS_EXTENSIONS` selects the server module. The default, `src/extensions/browser-default.ts`, exports `browserExtensions: DocsBrowserExtensions` with no members. Its one optional member, `sendPageView(url: string, body: string): Promise<void>`, sends a report in place of Margin’s beacon. Pages import the module only when `pageViewCheck.enabled` is `true`, after the page has rendered. A rejection makes Margin send the report as a beacon instead, and so does a sender that has not settled after eight seconds. Both attempts carry the same `view_id`, so a report that arrives twice records one view.

@@ -37,6 +37,10 @@ export const TRAFFIC_KINDS = {
         "http_client",
         "headless",
         "impersonator",
+        // A page read by a browser user agent whose browser never reported
+        // the view (classification version 3): a person's view is the one
+        // their browser reports, so the read alone is a program.
+        "unreported_browser",
         "unidentified",
     ],
 } as const satisfies Record<TrafficCategory, readonly string[]>

@@ -10,6 +10,13 @@ import { createHash } from "node:crypto"
  *  default). */
 export const SESSION_WINDOW_MS = 30 * 60 * 1000
 
+/** The rules an event's `traffic_*` properties were decided by, stamped
+ *  as `classification_version` so a reader can restate older events. 3:
+ *  a person's docs page view is the one their browser reports
+ *  (`docs_page_viewed`); a page read by a browser user agent alone is not
+ *  one. */
+export const CLASSIFICATION_VERSION = 3
+
 /** Paths the analytics middleware never records: built assets, framework
  *  internals and the favicon. OPTIONS requests are skipped as well. */
 export const UNTRACKED_PATH =

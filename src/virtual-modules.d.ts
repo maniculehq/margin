@@ -36,3 +36,13 @@ declare module "virtual:sandbox-render-bundle" {
 declare module "#docs-extensions" {
     export const extensions: typeof import("./extensions/default").extensions
 }
+
+/**
+ * Build-time alias (see vite.config.ts): the browser half of the
+ * extensions, src/extensions/browser-default.ts unless
+ * DOCS_BROWSER_EXTENSIONS names another. A replacement must export
+ * `browserExtensions: DocsBrowserExtensions`.
+ */
+declare module "#docs-browser-extensions" {
+    export const browserExtensions: typeof import("./extensions/browser-default").browserExtensions
+}

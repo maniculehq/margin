@@ -8,8 +8,17 @@ import { waitUntil } from "@vercel/functions"
 import { PostHog } from "posthog-node"
 import { extensions } from "#docs-extensions"
 import type { DocsSite, SiteResolution } from "@/extensions/types"
-import { sessionId, surfaceOf, visitorId } from "@/types/telemetry"
-import { aiReferral, browserCheck } from "@/types/traffic"
+import {
+    CLASSIFICATION_VERSION,
+    sessionId,
+    surfaceOf,
+    visitorId,
+} from "@/types/telemetry"
+import {
+    aiReferral,
+    browserCheck,
+    type TrafficClassification,
+} from "@/types/traffic"
 import { env } from "../env"
 import { type AgentEvent, agentConfig } from "./agent.config"
 import { wantsMarkdown } from "./agent-content"
@@ -22,7 +31,7 @@ declare global {
 /** Groups already groupIdentify-ed this cold start (metadata, not correctness). */
 const identifiedGroups = new Set<string>()
 
-function posthogClient(): PostHog | undefined {
+export function posthogClient(): PostHog | undefined {
     const { posthogKey, posthogHost } = agentConfig.observability
     if (posthogKey === "") return undefined
     globalThis.__frameworkPostHogClient ??= new PostHog(posthogKey, {
@@ -110,13 +119,40 @@ async function deliver(
         resolution?.site?.slug ??
         host
     const acceptsMarkdown = wantsMarkdown(request)
+    const { type, uuid, ...rest } = event
+    const surface =
+        typeof rest.surface === "string"
+            ? rest.surface
+            : surfaceOf(url.pathname)
     // Who is asking (human, crawler, agent or other automation), and for a
     // human, the AI product whose answer sent them. Reports read both back
     // over HogQL. Only the referrer's host is kept.
-    const traffic = await requestTraffic(
+    const classified = await requestTraffic(
         request,
         resolution?.sharedClientAddress ?? false,
     )
+    // Since classification version 3 a person's page view is the one their
+    // browser reports (docs_page_viewed): a script that sends a browser
+    // user agent requests pages but runs none of their code, and a page
+    // the CDN serves from cache never reaches this function. A page read by
+    // a browser user agent is therefore automation unless a report counts
+    // it, and a report the extension's check judged a bot is automation
+    // too. Every other request keeps its own category, so a crawler or AI
+    // browser that runs the page's code and reports keeps its own (the API
+    // counts reports from browsers only, so it is not counted twice).
+    const traffic: TrafficClassification =
+        classified.category !== "human"
+            ? classified
+            : type === "$pageview" &&
+                (surface === "docs_html" || surface === "docs_md")
+              ? {
+                    ...classified,
+                    category: "automation",
+                    kind: "unreported_browser",
+                }
+              : type === "docs_page_viewed" && rest.view_verdict === "bot"
+                ? { ...classified, category: "automation", kind: "headless" }
+                : classified
     const referral = aiReferral({
         referer: snapshot.referer,
         requestPath: `${url.pathname}${url.search}`,
@@ -133,7 +169,6 @@ async function deliver(
         snapshot.ua,
     )
 
-    const { type, ...rest } = event
     const properties = {
         ...rest,
         $session_id: sessionId(
@@ -157,8 +192,8 @@ async function deliver(
         traffic_operator: traffic.operator,
         traffic_verified: traffic.verified,
         traffic_signal: traffic.signal,
-        // Recorded, not yet counted: whether a browser user agent's headers
-        // look like a browser's (types/traffic.ts browserCheck).
+        // A diagnostic, never counted: whether a browser user agent's
+        // headers look like a browser's (types/traffic.ts browserCheck).
         browser_check: browserCheck(snapshot.ua, (name) =>
             request.headers.get(name),
         ),
@@ -167,16 +202,13 @@ async function deliver(
         // The one header besides the user agent that classification reads,
         // kept so a later rule change can be applied to stored events.
         accept_header: request.headers.get("accept")?.slice(0, 256) ?? null,
-        classification_version: 2,
+        classification_version: CLASSIFICATION_VERSION,
         $referring_domain: referringDomain,
         environment:
             resolution?.preview || env.VERCEL_ENV !== "production"
                 ? "preview"
                 : "production",
-        surface:
-            typeof rest.surface === "string"
-                ? rest.surface
-                : surfaceOf(url.pathname),
+        surface,
         // The llmMiddleware answered a docs URL (not a .md path) with
         // markdown inline: a 200 whose content type is text/markdown on a
         // path that did not ask for it by suffix.
@@ -223,5 +255,6 @@ async function deliver(
         properties,
         ...(group ? { groups: { [group.groupType]: group.groupKey } } : {}),
         timestamp: new Date(snapshot.now),
+        ...(uuid ? { uuid } : {}),
     })
 }

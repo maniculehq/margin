@@ -13,6 +13,7 @@ const SERVER_ENTRY = ".output/server/index.mjs"
 
 const capturedEventSchema = z.looseObject({
     event: z.string(),
+    uuid: z.string().optional(),
     distinct_id: z.string().optional(),
     properties: z.record(z.string(), z.unknown()).default({}),
 })
@@ -187,11 +188,91 @@ describe.skipIf(
                 e.properties.$pathname === "/test" &&
                 e.properties.ai_referral_platform === "openai",
         )
-        expect(event.properties.traffic_category).toBe("human")
         expect(event.properties.ai_referral_detection).toBe("referrer")
         expect(event.properties.$referring_domain).toBe("chatgpt.com")
         expect(JSON.stringify(event.properties)).not.toContain("abc123")
     })
+
+    // The reader is counted by their browser's report; a page read with a
+    // browser user agent alone is what a script sending one looks like.
+    it("records a browser user agent's page read as automation that reported nothing", async () => {
+        const res = await fetch(`${baseUrl}/content-versions`, {
+            headers: { "user-agent": CHROME_UA, accept: CHROME_ACCEPT },
+        })
+        expect(res.status).toBe(200)
+
+        const event = await waitForEvent(
+            (e) =>
+                e.event === "$pageview" &&
+                e.properties.$pathname === "/content-versions" &&
+                e.properties.$raw_user_agent === CHROME_UA,
+        )
+        expect(event.properties).toMatchObject({
+            surface: "docs_html",
+            traffic_category: "automation",
+            traffic_kind: "unreported_browser",
+            traffic_signal: "browser",
+            classification_version: 3,
+        })
+    }, 15_000)
+
+    it("keeps a crawler's category on a page view it reports by running the page", async () => {
+        const res = await fetch(`${baseUrl}/api/agent/event`, {
+            method: "POST",
+            headers: { "user-agent": CLAUDEBOT_UA },
+            body: JSON.stringify({
+                type: "docs_page_viewed",
+                page_path: "/test",
+                view_id: "0d6f6b7e-5c1a-4b2e-9f3d-8a7b6c5d4e31",
+                referrer_host: null,
+                utm_source: null,
+            }),
+        })
+        expect(res.status).toBe(204)
+
+        const event = await waitForEvent(
+            (e) =>
+                e.event === "docs_page_viewed" &&
+                e.properties.$raw_user_agent === CLAUDEBOT_UA,
+        )
+        expect(event.properties).toMatchObject({
+            $pathname: "/test",
+            surface: "docs_html",
+            traffic_category: "crawler",
+            traffic_signal: "user_agent",
+        })
+    }, 15_000)
+
+    // A slow first attempt is followed by the same report as a beacon; the
+    // first may still land. PostHog keeps one event per uuid.
+    it("gives every attempt at one page view the same event uuid", async () => {
+        const report = (viewId: string) =>
+            fetch(`${baseUrl}/api/agent/event`, {
+                method: "POST",
+                headers: { "user-agent": CHROME_UA },
+                body: JSON.stringify({
+                    type: "docs_page_viewed",
+                    page_path: "/content-versions",
+                    view_id: viewId,
+                    referrer_host: null,
+                    utm_source: null,
+                }),
+            })
+        const repeated = "3a7e0c1b-2d4f-4e6a-8b9c-0d1e2f3a4b5c"
+        const other = "9c8b7a6f-5e4d-4c3b-a2f1-e0d9c8b7a6f5"
+        for (const viewId of [repeated, repeated, other])
+            expect((await report(viewId)).status).toBe(204)
+
+        const reports = () =>
+            events.filter(
+                (e) =>
+                    e.event === "docs_page_viewed" &&
+                    e.properties.$pathname === "/content-versions",
+            )
+        await expect.poll(() => reports().length).toBe(3)
+        // Two views, three sends: the repeated view's two events share one.
+        expect(new Set(reports().map((e) => e.uuid)).size).toBe(2)
+    }, 15_000)
 
     it("keeps distinct_id and $session_id stable across a journey", async () => {
         await fetch(`${baseUrl}/llms-full.txt`, {

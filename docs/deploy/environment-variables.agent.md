@@ -52,6 +52,7 @@ Configuration uses environment variables and repository commands, not an SDK.
 - `SENTRY_ENVIRONMENT`: optional runtime Sentry label, default `VERCEL_ENV`, otherwise `NODE_ENV`; explicit value also opts local development into reporting.
 - `SENTRY_RELEASE`: optional runtime Sentry release override; no application-defined fallback; SDK/platform detection may supply a release.
 - `DOCS_EXTENSIONS`: optional build-time path to a module exporting `extensions: DocsExtensions`; default is the built-in single-site module. Relative paths resolve from the repository root.
+- `DOCS_BROWSER_EXTENSIONS`: optional build-time path to a browser module exporting `browserExtensions: DocsBrowserExtensions`; default is the built-in empty module. Relative paths resolve from the repository root.
 - `NITRO_PRESET`: build target, default `vercel`; set `node-server` for the supported standalone Node deployment.
 - `PORT`: optional positive integer for Vite dev/preview startup; unset uses Vite's default. The generated Node server also accepts `PORT` at startup.
 - `NODE_ENV`: build/runtime environment supplied by tooling or user; enum `development`, `test`, `production`, default `development`.

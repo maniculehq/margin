@@ -1,6 +1,10 @@
+import { createHash } from "node:crypto"
 import { createFileRoute } from "@tanstack/react-router"
 import { z } from "zod"
-import { emitEvent } from "@/lib/observability"
+import { extensions } from "#docs-extensions"
+import type { PageViewVerdict } from "@/extensions/types"
+import { agentConfig } from "@/lib/agent.config"
+import { emitEvent, posthogClient } from "@/lib/observability"
 import { resolveSiteVersion } from "@/lib/source"
 import { surfaceOf } from "@/types/telemetry"
 
@@ -18,6 +22,26 @@ const docsPath = z
  * docs page the interaction happened on (the request's own path is always
  * this route). */
 export const browserEventSchema = z.discriminatedUnion("type", [
+    // A reader's page view: once per page load and per in-site navigation
+    // (routes/__root.tsx). On the first page of a visit it also carries the
+    // referrer's host (only the host, as every server event keeps) and the
+    // page's utm_source, which together name the AI product whose answer
+    // sent the reader; both are null afterwards.
+    z.strictObject({
+        type: z.literal("docs_page_viewed"),
+        page_path: docsPath,
+        // One id per view, made in the browser: a report sent twice (the
+        // beacon a slow first attempt falls back to) records one event.
+        view_id: z.uuid(),
+        referrer_host: z
+            .string()
+            .regex(/^[a-z0-9.-]{1,253}$/)
+            .nullable(),
+        utm_source: z
+            .string()
+            .regex(/^[a-z0-9._-]{1,64}$/)
+            .nullable(),
+    }),
     z.strictObject({
         type: z.literal("docs_search_result_clicked"),
         page_path: docsPath,
@@ -134,10 +158,65 @@ export async function handleBrowserEvent({
             { status: 400 },
         )
     await resolveSiteVersion(request)
-    emitEvent(request, {
-        ...parsed.data,
-        // The page's own surface (docs_html, docs_md, …), not this route's.
-        surface: surfaceOf(parsed.data.page_path),
+    if (parsed.data.type !== "docs_page_viewed") {
+        emitEvent(request, {
+            ...parsed.data,
+            // The page's own surface (docs_html, docs_md, …), not this route's.
+            surface: surfaceOf(parsed.data.page_path),
+        })
+        return new Response(null, { status: 204 })
+    }
+    // A page view is recorded as the page's own request: the page's path,
+    // referrer and utm_source on this request's headers, so it carries the
+    // site, path and classification a server read of the page would. The
+    // extension's check reads the report as it arrived; it can only label
+    // the event, and a slow or failing check records `skipped`.
+    const { page_path, referrer_host, utm_source, view_id } = parsed.data
+    const skipped: PageViewVerdict = { verdict: "skipped" }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const check =
+        agentConfig.observability.enabled && extensions.pageViewCheck
+            ? await Promise.race([
+                  extensions
+                      .resolveSite(request)
+                      .catch(() => null)
+                      .then((resolution) =>
+                          extensions.pageViewCheck?.verify(
+                              // This route has read the body, so the check
+                              // gets a copy that still carries it.
+                              new Request(request.url, {
+                                  method: request.method,
+                                  headers: request.headers,
+                                  body: raw,
+                              }),
+                              resolution,
+                              posthogClient(),
+                          ),
+                      )
+                      .catch(() => skipped),
+                  new Promise<PageViewVerdict>((resolve) => {
+                      timer = setTimeout(() => resolve(skipped), 1_000)
+                  }),
+              ]).finally(() => clearTimeout(timer))
+            : skipped
+    const page = new URL(page_path, request.url)
+    if (utm_source) page.searchParams.set("utm_source", utm_source)
+    const headers = new Headers(request.headers)
+    if (referrer_host) headers.set("referer", `https://${referrer_host}/`)
+    else headers.delete("referer")
+    // The event's id follows from the view's, so every attempt at one view
+    // lands on one PostHog event, and a client can name no other event's id.
+    const digest = createHash("sha1")
+        .update(`docs_page_viewed:${view_id}`)
+        .digest()
+    digest[6] = ((digest[6] ?? 0) & 0x0f) | 0x50
+    digest[8] = ((digest[8] ?? 0) & 0x3f) | 0x80
+    const hex = digest.subarray(0, 16).toString("hex")
+    emitEvent(new Request(page, { headers }), {
+        ...check?.properties,
+        uuid: `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`,
+        type: "docs_page_viewed",
+        view_verdict: check?.verdict ?? "skipped",
     })
     return new Response(null, { status: 204 })
 }
