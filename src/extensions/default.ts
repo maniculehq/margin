@@ -125,6 +125,9 @@ export const extensions: DocsExtensions = {
             canonicalHost,
             basePath,
             publicOrigin,
+            // Under a base path the owner's proxy is this server's only
+            // caller, so every visitor arrives from its address.
+            sharedClientAddress: basePath !== "",
         }
     },
     requestPolicy() {

@@ -314,6 +314,61 @@ describe("published address ranges", () => {
         expect(await ipInPublishedRanges(url, "73.12.4.9", now)).toBeNull()
     })
 
+    // Trimmed copies of the files operators served on 2026-11-12. They
+    // differ in ways a hand-written sample hides: timestamps with
+    // microseconds and no zone, extra top-level fields, IPv4-only lists.
+    it.each([
+        {
+            operator: "OpenAI",
+            file: {
+                creationTime: "2026-09-22T02:00:07.000000",
+                prefixes: [
+                    { ipv4Prefix: "132.196.86.0/24" },
+                    { ipv4Prefix: "172.182.202.0/25" },
+                ],
+            },
+            inside: "172.182.202.9",
+        },
+        {
+            operator: "Google",
+            file: {
+                creationTime: "2026-11-12T15:45:54.000000",
+                prefixes: [
+                    { ipv6Prefix: "2001:4860:4801:10::/64" },
+                    { ipv4Prefix: "192.178.4.0/27" },
+                ],
+            },
+            inside: "2001:4860:4801:10::7",
+        },
+        {
+            operator: "Common Crawl",
+            file: {
+                synctoken: "20260811134000",
+                creationTime: "2026-08-11T13:40:00Z",
+                notes: "IP ranges used by CCBot.",
+                prefixes: [
+                    { ipv6Prefix: "2600:1f28:365:8000::/56" },
+                    { ipv4Prefix: "18.97.9.168/29" },
+                ],
+            },
+            inside: "18.97.9.170",
+        },
+    ])(
+        "reads the range file $operator publishes",
+        async ({ operator, file, inside }) => {
+            vi.stubGlobal(
+                "fetch",
+                vi.fn(async () => Response.json(file)),
+            )
+            const url = `https://ranges.test/${operator}.json`
+            const checked = Date.parse("2026-11-13T00:00:00Z")
+            expect(await ipInPublishedRanges(url, inside, checked)).toBe(true)
+            expect(await ipInPublishedRanges(url, "73.12.4.9", checked)).toBe(
+                false,
+            )
+        },
+    )
+
     it("leaves the address unchecked when the file cannot be loaded", async () => {
         vi.stubGlobal(
             "fetch",

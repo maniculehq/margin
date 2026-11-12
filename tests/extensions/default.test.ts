@@ -206,6 +206,23 @@ describe.skipIf(!hasDocsDb)("default extension: resolution", () => {
         expect(resolution.canonicalHost).toBeNull()
     })
 
+    test("says a site under a base path sees its visitors from one address", async () => {
+        // The owner's proxy is the only caller there; at the root visitors
+        // connect themselves.
+        const proxied = await loadDefault({
+            SITE_ORIGIN: "https://example.com/docs",
+        })
+        expect((await proxied.resolveSite(request())).sharedClientAddress).toBe(
+            true,
+        )
+        const direct = await loadDefault({
+            SITE_ORIGIN: "https://docs.example.com",
+        })
+        expect((await direct.resolveSite(request())).sharedClientAddress).toBe(
+            false,
+        )
+    })
+
     test("DOCS_CANONICAL_REDIRECT=0 turns the production redirect off", async () => {
         const extensions = await loadDefault({
             VERCEL_ENV: "production",
