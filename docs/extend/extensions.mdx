@@ -75,7 +75,7 @@ Return every required field of `SiteResolution`:
 | `canonicalHost` | Host for a 308 redirect when the request names a different non-local host; `null` disables this redirect. Set only where the deployment should redirect. |
 | `basePath` | `""` for root serving or a prefix such as `"/docs"`, without a trailing slash. Requests outside the prefix redirect with 308; routes receive the prefix-stripped path. |
 | `publicOrigin` | Origin such as `"https://acme.com"`, without a path, or `null` to use the request origin. |
-| `sharedClientAddress` | Optional boolean, default `false`. Set `true` when an owner’s proxy hides visitor addresses; public rate limiters then apply per-site limits only. |
+| `sharedClientAddress` | Optional boolean, default `false`. Set `true` when an owner’s proxy hides visitor addresses; public rate limiters then apply per-site limits only, and crawler names are not checked against their operators’ address ranges. The built-in resolution sets it when `SITE_ORIGIN` has a path. |
 
 Margin checks the site’s live status before serving content, so a cached site lookup cannot bypass suspension. `"current"` follows the active site’s current ready version. Exact-commit selection accepts ready or superseded versions of the deployment’s kind (`preview` or `production`), so a pinned rollback can still serve its content. Preview-prefix selection requires a single ready preview match; invalid or ambiguous prefixes select no version. Prefixes must contain 1–64 lowercase hexadecimal characters.
 

@@ -59,7 +59,7 @@ Deploy the rebuilt application. Verify the temporary probe below, then remove th
 - `SiteResolution.canonicalHost` is a host string or `null`. A different non-local request host redirects with 308 when `canonicalHost` is set.
 - `SiteResolution.basePath` is `""` or a prefix such as `"/docs"` without a trailing slash. The server redirects paths outside the prefix with 308 and strips the prefix before routing.
 - `SiteResolution.publicOrigin` is an origin without a path, or `null` to use the request origin.
-- `SiteResolution.sharedClientAddress` defaults to `false`. Set `true` when a site owner’s proxy hides visitor addresses; public rate limiters then apply per-site limits only.
+- `SiteResolution.sharedClientAddress` defaults to `false`. Set `true` when a site owner’s proxy hides visitor addresses; public rate limiters then apply per-site limits only. Crawler names are then not checked against their operators’ address ranges. The built-in resolution sets it when `SITE_ORIGIN` has a path.
 - `resolveSite` can run in server base-path resolution, content-context loading, and post-response telemetry. Make custom resolution repeatable and cache expensive registry reads when appropriate.
 - The default resolves one `docs_site` row using `SITE_SLUG`, default `docs`, for every hostname.
 - The default uses `{ kind: "commit", sha: DOCS_CONTENT_SHA }` when `DOCS_CONTENT_SHA` is set, otherwise `"current"`.
