@@ -460,10 +460,6 @@ figure[data-terminal] code .line:not(:empty)::before {
     line-height: 1.75rem;
     align-items: flex-start;
 }
-/* Centre the 18px icon on the first 28px line. */
-[data-callout] > svg {
-    margin-top: 0.3125rem;
-}
 [data-callout] > div[role="none"] {
     display: none;
 }

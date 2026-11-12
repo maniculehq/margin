@@ -169,12 +169,12 @@ function iconFromName(
  * keys the per-tone CSS in app.css (tones are Mintlify's component names —
  * richer than fumadocs' type palette, e.g. Note=blue vs Info=neutral share
  * type="info"), and the icon set is outline instead of fumadocs'
- * filled glyphs. --callout-color still comes from fumadocs' type. The icon
- * is a span, so it carries app.css's `[data-callout] > svg` 5px top offset
- * itself (mt-1.25) to centre on the first 28px line.
+ * filled glyphs. --callout-color still comes from fumadocs' type. The icon's
+ * top margin is half of what one line leaves over its 18px, so it centres on
+ * the first line at whatever line height a theme gives the callout.
  */
 const calloutIconClass =
-    "mt-1.25 size-4.5 -me-0.5 shrink-0 text-(--callout-color)"
+    "mt-[calc((1lh-1.125rem)/2)] size-4.5 -me-0.5 shrink-0 text-(--callout-color)"
 const CalloutInfoIcon = chromeIcon("info")
 const CalloutTipIcon = chromeIcon("lightbulb")
 const CalloutWarningIcon = chromeIcon("triangle-alert")
