@@ -655,6 +655,9 @@ export async function sanitizeCss(
                                 ) ??
                                     false),
                         )
+                    // A branch is as narrow as any element it names: a
+                    // translated `#page-title` ends in a bare `h1`, scoped
+                    // by the region before it.
                     const isSpecific = (compound: Selector): boolean =>
                         compound.some(
                             (component) =>
@@ -662,7 +665,7 @@ export async function sanitizeCss(
                                 component.type === "class" ||
                                 component.type === "attribute" ||
                                 (branches(component)?.every((branch) =>
-                                    isSpecific(subjectOf(branch)),
+                                    isSpecific(branch),
                                 ) ??
                                     false),
                         )

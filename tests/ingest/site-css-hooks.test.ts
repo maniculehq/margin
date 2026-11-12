@@ -78,12 +78,16 @@ describe("global layout rules", () => {
         expect(css).not.toContain("display")
     })
 
-    it("keeps a path-scoped rule on a translated hook", async () => {
-        const { css } = await sanitize(
-            'html[data-current-path^="/api"] #banner { display: none }',
-        )
-        expect(css).toContain("display: none")
-    })
+    it.each(["#banner", "#page-title", ".toc-item"])(
+        "keeps a path-scoped layout rule on %s",
+        async (hook) => {
+            const { css, diagnostics } = await sanitize(
+                `html[data-current-path^="/api"] ${hook} { margin-top: 0 }`,
+            )
+            expect(css).toContain("margin-top: 0")
+            expect(diagnostics).toEqual([])
+        },
+    )
 
     it("still moves a layout rule on the root itself to the docs layout", async () => {
         const { css } = await sanitize("body { display: grid }")
