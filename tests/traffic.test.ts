@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { ASSISTANT_USER_AGENT_PATTERN } from "@/lib/agent.config"
-import { ipInPublishedRanges } from "@/lib/traffic"
+import { ipInPublishedRanges } from "@/types/published-ranges"
 import {
     aiReferral,
     BROWSER_AUTOMATION_PATTERN,

@@ -1,5 +1,6 @@
 import { env } from "../env"
 import { CONFIG_EXTENSION_KEY, type DocsAgents } from "../types/docs"
+import { SESSION_WINDOW_MS } from "../types/telemetry"
 import { TRAFFIC_ENTRIES } from "../types/traffic"
 import { appName, docsRoute } from "./shared"
 
@@ -125,7 +126,7 @@ export const agentConfig = {
         /** Server-side capture goes direct — the browser ad-block proxy is unnecessary here. */
         posthogHost: env.POSTHOG_HOST,
         /** Journey window for the deterministic $session_id (30 min, PostHog's default). */
-        sessionWindowMs: 30 * 60 * 1000,
+        sessionWindowMs: SESSION_WINDOW_MS,
     },
 
     /** Distinct (non-A2A) discovery path — avoids the /.well-known/agent.json collision. */

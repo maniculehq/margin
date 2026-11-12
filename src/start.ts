@@ -24,10 +24,11 @@ import {
 } from "@/lib/agent.config"
 import { normalizeDocUrl, wantsMarkdown } from "@/lib/agent-content"
 import { siteScope, siteUrlFromRequest, withBase } from "@/lib/base-path"
-import { emitEvent, PAGE_SURFACES, surfaceOf } from "@/lib/observability"
+import { emitEvent } from "@/lib/observability"
 import { originFromRequest, slugsToMarkdownPath } from "@/lib/shared"
 import { ssrSnapshotAdapter } from "@/lib/ssr-snapshot"
 import { getDocsMarkdown } from "@/routes/{$}[.]md"
+import { PAGE_SURFACES, surfaceOf, UNTRACKED_PATH } from "@/types/telemetry"
 
 const csrfMiddleware = createCsrfMiddleware({
     filter: (ctx) => ctx.handlerType === "serverFn",
@@ -52,12 +53,7 @@ const csrfMiddleware = createCsrfMiddleware({
 const analyticsMiddleware = createMiddleware().server(
     async ({ next, request, handlerType }) => {
         const url = new URL(request.url)
-        if (
-            /^\/(?:_margin(?:\/|$)|_build|favicon|__|_assets(?:\/|$)|_theme(?:\/|$)|og\/docs(?:\/|$))/.test(
-                url.pathname,
-            ) ||
-            request.method === "OPTIONS"
-        )
+        if (UNTRACKED_PATH.test(url.pathname) || request.method === "OPTIONS")
             return next()
 
         const started = Date.now()
