@@ -108,8 +108,9 @@ export interface PageViewCheck {
         resolution: SiteResolution,
         posthog: PostHog | undefined,
     ): boolean
-    /** Request time: the verdict on one report. The event route waits at
-     * most a second, then records `skipped`, as it does on a rejection. */
+    /** Request time: the verdict on one report. `request` is the report as
+     * it arrived, headers and body. The event route waits at most a
+     * second, then records `skipped`, as it does on a rejection. */
     verify(
         request: Request,
         resolution: SiteResolution | null,
@@ -135,8 +136,9 @@ export interface PageViewVerdict {
 export interface DocsBrowserExtensions {
     /** Sends a page-view report (the JSON `body`, POSTed to `url`) in place
      * of the framework's beacon, on pages whose site turned
-     * `pageViewCheck` on. A rejection falls back to the beacon, so it must
-     * reject only when the report was not sent. */
+     * `pageViewCheck` on. A rejection falls back to the beacon, and so
+     * does a sender still pending after eight seconds; the report's
+     * `view_id` makes the server record one view if both arrive. */
     sendPageView?(url: string, body: string): Promise<void>
 }
 

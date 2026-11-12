@@ -127,6 +127,19 @@ const rootLoader = createServerFn({ method: "GET" }).handler(async () => {
         ...versionHomeCandidates.map((candidate) => candidate.homeUrl),
     ])
     const layoutConfig = await layoutConfigPending
+    // The check only labels a page view, so a host's failing answer must
+    // never cost the reader the page: it reads as off.
+    let pageViewCheck = false
+    if (agentConfig.observability.enabled && extensions.pageViewCheck)
+        try {
+            pageViewCheck = extensions.pageViewCheck.enabled(
+                ctx.site,
+                await extensions.resolveSite(getRequest()),
+                posthogClient(),
+            )
+        } catch {
+            pageViewCheck = false
+        }
     return {
         siteName,
         language:
@@ -217,13 +230,7 @@ const rootLoader = createServerFn({ method: "GET" }).handler(async () => {
         // switch governs it, the site's analytics switch below does not.
         pageViews: {
             report: agentConfig.observability.enabled,
-            check:
-                agentConfig.observability.enabled &&
-                extensions.pageViewCheck?.enabled(
-                    ctx.site,
-                    await extensions.resolveSite(getRequest()),
-                    posthogClient(),
-                ) === true,
+            check: pageViewCheck,
         },
         // Sites that mirror third-party docs keep their GA4/PostHog keys from
         // firing on our hostnames: analyticsEnabled = false drops every
@@ -571,14 +578,25 @@ function SiteDocument({ data }: { data: RootLoaderData }) {
                 return
             }
             // The host's browser half, loaded only on these sites and only
-            // after the page is up.
+            // after the page is up. A sender that fails, or has not
+            // answered when the deadline passes, falls back to the beacon;
+            // if it delivers late as well, the shared view id makes the
+            // server record the view once.
+            let fellBack = false
+            const fallBack = () => {
+                if (fellBack) return
+                fellBack = true
+                beacon()
+            }
+            const deadline = setTimeout(fallBack, 8_000)
             void import("#docs-browser-extensions")
                 .then(({ browserExtensions }) =>
                     browserExtensions.sendPageView
                         ? browserExtensions.sendPageView(url, body)
-                        : beacon(),
+                        : fallBack(),
                 )
-                .catch(beacon)
+                .catch(fallBack)
+                .finally(() => clearTimeout(deadline))
         }
         report()
         return router.subscribe("onResolved", (event) => {

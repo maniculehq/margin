@@ -63,7 +63,7 @@ const pageViewed = {
 }
 
 /** Installs a page-view check whose verdict is `verify`'s. */
-function checkWith(verify: () => Promise<PageViewVerdict>) {
+function checkWith(verify: (request: Request) => Promise<PageViewVerdict>) {
     extensions.pageViewCheck = { enabled: () => true, verify }
 }
 
@@ -183,6 +183,20 @@ describe("reported page views", () => {
             traffic_category: "human",
             view_verdict: "human",
         })
+    })
+
+    it("hands the check the report's body, which the route has already read", async () => {
+        const read: unknown[] = []
+        checkWith(async (request) => {
+            read.push(await request.json())
+            return { verdict: "human" }
+        })
+        expect(
+            (await post(pageViewed, { "user-agent": CHROME_UA })).status,
+        ).toBe(204)
+        await vi.waitFor(() => expect(events).toHaveLength(1))
+        expect(read).toEqual([pageViewed])
+        expect(events[0]).toMatchObject({ view_verdict: "human" })
     })
 
     it.each([

@@ -169,8 +169,8 @@ export async function handleBrowserEvent({
     // A page view is recorded as the page's own request: the page's path,
     // referrer and utm_source on this request's headers, so it carries the
     // site, path and classification a server read of the page would. The
-    // extension's check reads this request as it arrived; it can only
-    // label the event, and a slow or failing check records `skipped`.
+    // extension's check reads the report as it arrived; it can only label
+    // the event, and a slow or failing check records `skipped`.
     const { page_path, referrer_host, utm_source, view_id } = parsed.data
     const skipped: PageViewVerdict = { verdict: "skipped" }
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -182,7 +182,13 @@ export async function handleBrowserEvent({
                       .catch(() => null)
                       .then((resolution) =>
                           extensions.pageViewCheck?.verify(
-                              request,
+                              // This route has read the body, so the check
+                              // gets a copy that still carries it.
+                              new Request(request.url, {
+                                  method: request.method,
+                                  headers: request.headers,
+                                  body: raw,
+                              }),
                               resolution,
                               posthogClient(),
                           ),
