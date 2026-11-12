@@ -42,6 +42,8 @@ describe.skipIf(!runnable)("docs chrome layout", () => {
                     ...process.env,
                     // A developer's DSN must not file local runs as production.
                     SENTRY_DSN: "",
+                    // Shows the Assistant trigger; no test here sends a chat.
+                    AI_GATEWAY_API_KEY: "test-gateway-key",
                     PORT: String(address.port),
                     SITE_SLUG: slug,
                     SITE_ORIGIN: `http://127.0.0.1:${address.port}`,
@@ -102,6 +104,59 @@ describe.skipIf(!runnable)("docs chrome layout", () => {
             await dialog.getByRole("button", { name: "Close Search" }).click()
             await dialog.waitFor({ state: "detached" })
             expect(await triggerFocused()).toBe(true)
+        } finally {
+            await context.close()
+        }
+    }, 60_000)
+
+    it("the open assistant panel stays between the header and the viewport's end", async () => {
+        const context = await browser.newContext({
+            // Short enough that the quickstart scrolls.
+            viewport: { width: 1440, height: 500 },
+        })
+        const page = await context.newPage()
+        await page.goto(`${servers.get("acme")?.baseUrl}/quickstart`, {
+            waitUntil: "networkidle",
+        })
+        try {
+            await page
+                .locator("#docs-band")
+                .getByRole("button", { name: /assistant/i })
+                .click()
+            const panel = page.locator("[data-assistant-panel]")
+            await panel.waitFor()
+            const edges = () =>
+                page.evaluate(() => ({
+                    headerEnd:
+                        document
+                            .querySelector("#docs-band")
+                            ?.getBoundingClientRect().bottom ?? Number.NaN,
+                    panelStart:
+                        document
+                            .querySelector("[data-assistant-panel]")
+                            ?.getBoundingClientRect().top ?? Number.NaN,
+                    inputEnd:
+                        document
+                            .querySelector("#nd-ai-input")
+                            ?.getBoundingClientRect().bottom ?? Number.NaN,
+                    scrolled: window.scrollY,
+                }))
+            // The open animation settles before the panel is measured.
+            await expect
+                .poll(async () => (await edges()).inputEnd)
+                .toBeLessThanOrEqual(500)
+
+            await page.mouse.move(600, 300)
+            await page.mouse.wheel(0, 300)
+            await expect
+                .poll(async () => (await edges()).scrolled)
+                .toBeGreaterThan(100)
+            const scrolled = await edges()
+            // 1px: the header's bottom border sits over the layout's edge.
+            expect(scrolled.panelStart).toBeGreaterThanOrEqual(
+                scrolled.headerEnd - 1,
+            )
+            expect(scrolled.inputEnd).toBeLessThanOrEqual(500)
         } finally {
             await context.close()
         }

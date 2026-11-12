@@ -657,7 +657,12 @@ export function AISearchPanel(props: {
                         expanded &&
                             "lg:[--ai-chat-width:var(--ai-chat-width-expanded)]",
                         "max-lg:fixed max-lg:inset-x-2 max-lg:inset-y-4 max-lg:border max-lg:rounded-2xl max-lg:shadow-xl",
-                        "lg:sticky lg:top-0 lg:h-dvh lg:border-s lg:ms-auto lg:in-[#nd-docs-layout]:[grid-area:toc] lg:in-[#nd-notebook-layout]:row-span-full lg:in-[#nd-notebook-layout]:col-start-5",
+                        // Under the docs header like the TOC it replaces:
+                        // --fd-docs-row-1 is the height of everything pinned
+                        // above the layout. At top-0 and full height the
+                        // panel ran past the viewport by that much, hiding
+                        // its input, and slid under the header on scroll.
+                        "lg:sticky lg:top-[var(--fd-docs-row-1,0px)] lg:h-[calc(100dvh-var(--fd-docs-row-1,0px))] lg:border-s lg:ms-auto lg:in-[#nd-docs-layout]:[grid-area:toc] lg:in-[#nd-notebook-layout]:row-span-full lg:in-[#nd-notebook-layout]:col-start-5",
                         open
                             ? "animate-fd-dialog-in lg:animate-[ask-ai-open_200ms]"
                             : "animate-fd-dialog-out lg:animate-[ask-ai-close_200ms]",

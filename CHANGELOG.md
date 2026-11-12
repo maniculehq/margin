@@ -49,6 +49,10 @@ Semantic Versioning once a stable public API is published.
 
 ### Fixed
 
+- The open assistant panel stays below the docs header and ends at the
+  bottom of the window. It used to be a header's height too tall, which hid
+  the question box until the page was scrolled, and it slid under the header
+  on scroll.
 - The `comment`, `comments` and `message` icon names render speech bubbles
   instead of a reply arrow.
 - Changelog RSS feeds no longer date entries whose label is not a date: a
