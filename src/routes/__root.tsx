@@ -640,6 +640,7 @@ function SiteDocument({ data }: { data: RootLoaderData }) {
             <SearchDeepLink />
             {data.banner ? (
                 <Banner
+                    data-layout-item="banner"
                     id={
                         data.banner.dismissible === false
                             ? undefined
@@ -687,6 +688,9 @@ function SiteDocument({ data }: { data: RootLoaderData }) {
             suppressHydrationWarning
             data-preset={data.layoutPreset}
             data-theme-name={data.themeName ?? undefined}
+            // The per-path stylesheet hook: sites scope rules to a section
+            // with html[data-current-path^="/api"].
+            data-current-path={pathname.replace(/\/+$/, "") || "/"}
             data-decoration={data.decoration ?? undefined}
             // Read by lib/base-path.ts in the browser.
             data-base-path={basePath() || undefined}

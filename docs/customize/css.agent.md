@@ -59,7 +59,13 @@ Rebuild or deploy the docs, inspect build diagnostics, and check the published p
 - The authored CSS budget is 262,144 UTF-8 bytes (256 KiB) per content version; explicitly appended files count again. Files exceeding the remaining budget are skipped.
 - HTTPS `fonts.googleapis.com` imports are extracted for font resolution; other `@import` rules are removed.
 - Local CSS asset references are rewritten to served assets when found. External assets require allowed HTTP or HTTPS hosts; `fonts.googleapis.com` and `fonts.gstatic.com` are allowed by default, and additional hosts use `x-margin.assets.allowExternal`.
-- Global layout declarations on simple `:root`, `html`, or `body` selectors are moved to `#nd-docs-layout`; complex global layout rules that cannot be safely scoped are dropped.
+- Global layout declarations on simple `:root`, `html`, or `body` selectors are moved to `#nd-docs-layout`; a more complex selector that names the root is dropped unless its last compound has an ID, class or attribute: `html[data-current-path^="/api"] #banner` is kept, and `html > *` is not.
+- Region hooks are rewritten to Margin's markup when the stylesheet is sanitized and are absent from the page markup: `#navbar`, `#sidebar`, `#sidebar-content`, `#content-area`, `#content`, `#header`, `#page-title`, `#table-of-contents`, `#pagination`, `#footer`, `#banner`, `#topbar-cta-button`, `.toc`, `.toc-item`, `.sidebar-group-header`, and `[data-layout-item="topbar|sidebar|content|toc|side-panel|search-entry"]`.
+- A rewritten ID hook keeps ID specificity and never matches a heading whose anchor has the same name.
+- Component hooks are in the page markup: `.card`, `.callout`, `.code-block`, `.code-group`, `.frame`, `.link`, `.tabs`, `.step`, `.accordion`, `.accordion-group`, `.expandable`, `.tooltip`, `.update`, `.tile`, `.icon`, `.mermaid`, `.tree`, `.field`, `.nav-logo`, `.navbar-link`, `.nav-tabs`, `.nav-tabs-item`, `.eyebrow`, `.pagination-prev`, `.pagination-next`, `.pagination-title`, and `[data-component-part]` with `card-icon`, `card-title`, `card-content`, `card-image`, `card-cta`, `code-block-root`, `code-group-tab-bar` or `code-group-tab-content`.
+- `html[data-current-path]` holds the path of the page being viewed.
+- `--rounded-sm` through `--rounded-3xl` on `:root` set the corner radius of cards, code blocks, callouts and sidebar rows.
+- A bare state selector such as `.toc-item[data-active]` matches the active item only.
 - Custom properties remain on original selectors, including `:root` and `.dark`, for inheritance by portal-mounted controls.
 
 ## Not supported

@@ -119,6 +119,40 @@ Omitted dimensions do not emit an override. The active preset, page mode, and re
 
 `tabMode` accepts only `top` and `auto`. The resolved configuration currently defaults to `auto`.
 
+## Target page regions and components
+
+A stylesheet written against the common `docs.json` hooks works without changes. Margin recognizes these selectors:
+
+| Target | Selectors |
+| --- | --- |
+| Page regions | `#navbar`, `#sidebar`, `#sidebar-content`, `#content-area`, `#content`, `#header`, `#page-title`, `#table-of-contents`, `#pagination`, `#footer`, `#banner`, and `[data-layout-item]` with `topbar`, `sidebar`, `content`, `page-header`, `toc`, `side-panel`, `pagination`, `footer`, `banner`, `search-entry` or `assistant-entry` |
+| Navigation | `.nav-logo`, `.navbar-link`, `.nav-tabs`, `.nav-tabs-item`, `#topbar-cta-button`, `.toc`, `.toc-item`, `.sidebar-group-header`, `.eyebrow`, `.pagination-prev`, `.pagination-next`, `.pagination-title` |
+| Components | `.card`, `.callout`, `.code-block`, `.code-group`, `.frame`, `.link`, `.tabs`, `.steps`, `.step`, `.accordion`, `.accordion-group`, `.expandable`, `.tooltip`, `.update`, `.tile`, `.icon`, `.mermaid`, `.tree`, `.field` |
+| Component parts | `[data-component-part="card-icon"]`, `card-title`, `card-content`, `card-image`, `card-cta`, `code-block-root`, `code-group-tab-bar`, `code-group-tab-content` |
+| Current page | `html[data-current-path]`, which holds the path of the page being viewed |
+| Corner radius | `--rounded-sm`, `--rounded-md`, `--rounded-lg`, `--rounded-xl`, `--rounded-2xl`, `--rounded-3xl` on `:root` |
+
+For example, this stylesheet squares the corners of every card, code block and callout, hides the logo image on API pages, and tightens sidebar rows:
+
+```css
+:root {
+  --rounded-xl: 0.375rem;
+  --rounded-2xl: 0.375rem;
+}
+
+html[data-current-path^="/api"] #navbar .nav-logo {
+  display: none;
+}
+
+#sidebar a {
+  border-radius: 0.125rem;
+}
+```
+
+The component selectors and `data-component-part` values are in the page markup. The ID selectors and the sidebar and table-of-contents selectors are not: Margin rewrites them to its own markup when it sanitizes the stylesheet, so inspecting the page shows different names. An ID selector keeps ID specificity after the rewrite, and it never matches a heading whose anchor has the same name, such as `## Sidebar`.
+
+State selectors match the active item only: write `.nav-tabs-item[data-active]` or `.toc-item[data-active]`.
+
 ## Stay within styling restrictions
 
 Margin parses and sanitizes stylesheets before serving them. Inspect build diagnostics when a rule disappears rather than assuming the original stylesheet is served unchanged.
@@ -129,7 +163,7 @@ Margin parses and sanitizes stylesheets before serving them. Inspect build diagn
 | Imports | HTTPS imports from `fonts.googleapis.com` are extracted for font resolution. Other `@import` rules are removed. |
 | Asset URLs | Local asset references are rewritten to served assets when found. External asset URLs require an allowed HTTP or HTTPS host. Google Fonts hosts `fonts.googleapis.com` and `fonts.gstatic.com` are allowed by default; add other hosts through `x-margin.assets.allowExternal`. |
 | Executable or unsafe declarations | `behavior`, `-moz-binding`, `expression(...)`, disallowed URLs, and declarations containing a literal `<` are removed. |
-| Global layout rules | Layout-affecting declarations targeting a simple `:root`, `html`, or `body` selector are moved to `#nd-docs-layout`. More complex global layout rules that cannot be safely scoped are dropped. |
+| Global layout rules | Layout-affecting declarations on a simple `:root`, `html`, or `body` selector are moved to `#nd-docs-layout`. A more complex selector that names the root is dropped unless it ends in a specific element: `html[data-current-path^="/api"] #banner` is kept, and `html > *` is not. |
 | Custom properties | Custom properties remain on their original selectors, including `:root` and `.dark`, so portal-mounted controls can inherit the theme. |
 | Parse failures | Recoverable syntax problems produce `css_sanitized` warnings. CSS that cannot be parsed is skipped. |
 

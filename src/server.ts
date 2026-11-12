@@ -40,7 +40,14 @@ const instrumented = Sentry.wrapFetchWithSentry({
  * drain before rethrowing.
  */
 async function serve(request: Request): Promise<Response> {
-    if (/^\/(?:_serverFn|api)(?:\/|$)/.test(new URL(request.url).pathname))
+    const url = new URL(request.url)
+    // MCP clients configured before a site moved here post to /mcp. Only
+    // the POST is taken over: a GET of /mcp may be a docs page of that name.
+    if (request.method === "POST" && url.pathname === "/mcp")
+        return instrumented.fetch(
+            new Request(new URL(`/api/mcp${url.search}`, url), request),
+        )
+    if (/^\/(?:_serverFn|api)(?:\/|$)/.test(url.pathname))
         return instrumented.fetch(request)
     try {
         return await handler(request)

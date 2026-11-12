@@ -634,6 +634,7 @@ export function PageActions(props: {
 
     return (
         <div
+            data-page-context-menu=""
             className={cn(
                 "inline-flex shrink-0 items-stretch overflow-hidden rounded-lg border text-sm",
                 props.className,

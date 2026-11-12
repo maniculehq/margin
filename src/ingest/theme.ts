@@ -1,4 +1,9 @@
-import type { Declaration, ReturnedRule } from "lightningcss"
+import type {
+    Declaration,
+    ReturnedRule,
+    Selector,
+    SelectorComponent,
+} from "lightningcss"
 import {
     composite,
     parseColor,
@@ -19,6 +24,7 @@ import {
 } from "../types/docs"
 import { PALETTE_TOKENS } from "../types/docs-palettes"
 import { isAllowedExternalAssetUrl, resolveAssetReference } from "./assets"
+import { translateCssHooks } from "./css-hooks"
 
 const MAX_CSS_BYTES = 256 * 1024
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
@@ -471,6 +477,38 @@ export async function sanitizeCss(
         })
     }
 
+    const googleFontsImport = (url: string): string | null => {
+        try {
+            const parsed = new URL(url)
+            return parsed.protocol === "https:" &&
+                parsed.hostname === "fonts.googleapis.com"
+                ? parsed.href
+                : null
+        } catch {
+            return null
+        }
+    }
+    // Margin selectors from the hook table, parsed once each.
+    const parsedSelectors = new Map<string, Selector[]>()
+    const parseSelectors = (selectorList: string): Selector[] => {
+        const known = parsedSelectors.get(selectorList)
+        if (known) return known
+        let parsed: Selector[] = []
+        transform({
+            filename: "hook.css",
+            code: Buffer.from(`${selectorList}{top:0}`),
+            visitor: {
+                Rule: {
+                    style(rule) {
+                        parsed = rule.value.selectors
+                    },
+                },
+            },
+        })
+        parsedSelectors.set(selectorList, parsed)
+        return parsed
+    }
+
     const rewrittenCss: string[] = []
     for (const file of admitted) {
         try {
@@ -480,6 +518,17 @@ export async function sanitizeCss(
                 minify: false,
                 errorRecovery: true,
                 visitor: {
+                    // Each file is its own stylesheet, so its font imports
+                    // are read here: joined to the files before it, an
+                    // @import no longer leads the sheet and is discarded.
+                    Rule: {
+                        import(rule) {
+                            const href = googleFontsImport(rule.value.url)
+                            if (href === null) return
+                            fontImports.push(href)
+                            return []
+                        },
+                    },
                     Url(url) {
                         const resolved = resolveAssetReference({
                             value: url.url,
@@ -516,19 +565,11 @@ export async function sanitizeCss(
             visitor: {
                 Rule: {
                     import(rule) {
-                        try {
-                            const parsed = new URL(rule.value.url)
-                            if (
-                                parsed.protocol === "https:" &&
-                                parsed.hostname === "fonts.googleapis.com"
-                            ) {
-                                fontImports.push(parsed.href)
-                                return []
-                            }
-                        } catch {
-                            // not an absolute URL — falls through to removal
-                        }
-                        addSanitized("Removed a CSS @import rule.")
+                        // Reached only when a file's own pass failed to
+                        // parse and its source was joined unchanged.
+                        const href = googleFontsImport(rule.value.url)
+                        if (href !== null) fontImports.push(href)
+                        else addSanitized("Removed a CSS @import rule.")
                         return []
                     },
                     "font-face"(rule) {
@@ -547,6 +588,9 @@ export async function sanitizeCss(
                         )
                         return []
                     },
+                },
+                Selector(selector) {
+                    return translateCssHooks(selector, parseSelectors)
                 },
                 Declaration(declaration) {
                     const serialized = JSON.stringify(declaration)
@@ -578,16 +622,38 @@ export async function sanitizeCss(
                     const declarations = rule.value.declarations.declarations
                     const important =
                         rule.value.declarations.importantDeclarations
+                    // A selector that names the root is global unless its
+                    // subject (the last compound) is a specific element:
+                    // `html[data-current-path^="/api"] #banner` reads the
+                    // root's state and styles the banner, while `html > *`
+                    // and `body div` still lay out the whole shell.
+                    const namesRoot = (component: SelectorComponent) =>
+                        (component.type === "type" &&
+                            (component.name === "html" ||
+                                component.name === "body")) ||
+                        (component.type === "pseudo-class" &&
+                            component.kind === "root")
                     const targetsGlobal = rule.value.selectors.some(
-                        (selector) =>
-                            selector.some(
-                                (component) =>
-                                    (component.type === "type" &&
-                                        (component.name === "html" ||
-                                            component.name === "body")) ||
-                                    (component.type === "pseudo-class" &&
-                                        component.kind === "root"),
-                            ),
+                        (selector) => {
+                            if (!selector.some(namesRoot)) return false
+                            const subject = selector.slice(
+                                selector.findLastIndex(
+                                    (component) =>
+                                        component.type === "combinator",
+                                ) + 1,
+                            )
+                            return (
+                                subject.some(namesRoot) ||
+                                !subject.some(
+                                    (component) =>
+                                        component.type === "id" ||
+                                        component.type === "class" ||
+                                        component.type === "attribute" ||
+                                        (component.type === "pseudo-class" &&
+                                            component.kind === "is"),
+                                )
+                            )
+                        },
                     )
                     const allDeclarations = [...declarations, ...important]
                     const isLayoutDeclaration = (

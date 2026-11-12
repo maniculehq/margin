@@ -7,7 +7,7 @@ const Link = getMDXComponents().a
 describe("MDX link href guard", () => {
     it("keeps a scheme-less relative path as a same-tab link", () => {
         expect(renderToStaticMarkup(<Link href="guide">Guide</Link>)).toBe(
-            '<a href="guide">Guide</a>',
+            '<a href="guide" class="link">Guide</a>',
         )
     })
 

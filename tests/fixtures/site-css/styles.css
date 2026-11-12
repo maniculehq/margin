@@ -1,0 +1,16 @@
+/* A site stylesheet written against the common docs.json hooks. */
+:root {
+    --rounded-2xl: 0.375rem;
+}
+#sidebar a {
+    border-radius: 0.125rem;
+}
+[data-component-part="card-title"] + .prose {
+    font-size: 0.875rem;
+}
+html[data-current-path^="/guides"] #page-title {
+    letter-spacing: 0.25rem;
+}
+#pagination {
+    letter-spacing: 0.0625rem;
+}
