@@ -16,6 +16,7 @@ import { env as frameworkEnv } from "../env"
 import { normalizeDocUrl } from "./agent-content"
 import { siteScope } from "./base-path"
 import type { SiteSource } from "./source"
+import { clientAddress } from "./traffic"
 
 export const feedbackSchema = z
     .object({
@@ -124,16 +125,8 @@ export function recordFeedback(
         // per site (the shared Postgres limiter the Ask-AI chat uses), and
         // a submission over the limit is dropped — feedback is best-effort,
         // so the caller still sees it accepted. The visitor is the caller's
-        // address — the extension's answer, else Vercel's forwarded-for —
-        // hashed.
-        const visitorIp =
-            extensions.clientIp?.(request) ||
-            request.headers
-                .get("x-vercel-forwarded-for")
-                ?.split(",")[0]
-                ?.trim() ||
-            request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-            "unknown"
+        // address (clientAddress), hashed.
+        const visitorIp = clientAddress(request)?.ip ?? "unknown"
         const visitor = createHash("sha256")
             .update(
                 `docs-feedback:${frameworkEnv.SITE_SECRET ?? resolveEnv().DATABASE_URL}:${visitorIp}`,

@@ -104,14 +104,41 @@ export async function ipInPublishedRanges(
 }
 
 /**
+ * The caller's address and where it came from. `extension` is the
+ * extension's answer and `platform` Vercel's forwarded address on Vercel,
+ * which Vercel overwrites, so both are the connecting client's. `header` is
+ * a forwarded header anywhere else, which the caller can forge: it still
+ * tells visitors apart for analytics and per-visitor rate limits (each
+ * site's own ceiling holds whatever it says), but never verifies anyone.
+ * The first x-forwarded-for value is not read before Vercel's: behind
+ * another proxy it is that proxy's hop, not the visitor.
+ */
+export function clientAddress(
+    request: Request,
+): { ip: string; source: "extension" | "platform" | "header" } | null {
+    const fromExtension = extensions.clientIp?.(request)
+    if (fromExtension) return { ip: fromExtension, source: "extension" }
+    const forwarded = (name: string) =>
+        request.headers.get(name)?.split(",")[0]?.trim() || undefined
+    const vercel = forwarded("x-vercel-forwarded-for")
+    if (vercel)
+        return {
+            ip: vercel,
+            source: env.VERCEL_ENV === undefined ? "header" : "platform",
+        }
+    const ip = forwarded("x-forwarded-for") ?? forwarded("x-real-ip")
+    return ip ? { ip, source: "header" } : null
+}
+
+/**
  * Classify a request, verifying a crawler's or assistant's claimed identity
  * against its operator's published ranges when the client address is
- * trustworthy: the extension's answer, else Vercel's forwarded address on
- * Vercel (which overwrites the header). Anywhere else a forwarded-for
- * header is the caller's to forge, so the identity stays unverified. So
- * does every request to a site whose visitors share one address (its
- * owner's proxy hides theirs): the forwarded address is the proxy's, and a
- * real crawler behind it must not read as an impersonator.
+ * trustworthy (clientAddress: the extension's, or the platform's). A
+ * forwarded header is the caller's to forge, so the identity stays
+ * unverified. So does every request to a site whose visitors share one
+ * address (its owner's proxy hides theirs) unless the extension names the
+ * caller: the platform's address is the proxy's, and a real crawler behind
+ * it must not read as an impersonator.
  */
 export async function requestTraffic(
     request: Request,
@@ -119,15 +146,12 @@ export async function requestTraffic(
 ): Promise<TrafficClassification> {
     const userAgent = request.headers.get("user-agent") ?? ""
     const entry = matchTrafficEntry(userAgent)
-    const address = entry?.ipRanges
-        ? (extensions.clientIp?.(request) ??
-          (sharedClientAddress || env.VERCEL_ENV === undefined
-              ? undefined
-              : request.headers
-                    .get("x-vercel-forwarded-for")
-                    ?.split(",")[0]
-                    ?.trim()))
-        : undefined
+    const client = entry?.ipRanges ? clientAddress(request) : null
+    const address =
+        client?.source === "extension" ||
+        (client?.source === "platform" && !sharedClientAddress)
+            ? client.ip
+            : undefined
     return classifyTraffic({
         userAgent,
         accept: request.headers.get("accept"),

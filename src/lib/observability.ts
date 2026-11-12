@@ -13,7 +13,7 @@ import { aiReferral, browserCheck } from "@/types/traffic"
 import { env } from "../env"
 import { type AgentEvent, agentConfig } from "./agent.config"
 import { wantsMarkdown } from "./agent-content"
-import { requestTraffic } from "./traffic"
+import { clientAddress, requestTraffic } from "./traffic"
 
 declare global {
     var __frameworkPostHogClient: PostHog | undefined
@@ -100,6 +100,7 @@ const EXACT_SURFACES: Record<string, string> = {
     "/sitemap.md": "sitemap_md",
     "/changes.md": "changes_md",
     "/robots.txt": "robots",
+    "/manifest.webmanifest": "web_manifest",
     "/api/search": "search",
     "/api/chat": "chat",
     "/api/mcp": "mcp",
@@ -131,6 +132,8 @@ export function surfaceOf(pathname: string): string {
     // .pdf downloads are attachments, not page views — a $pageview per
     // download would inflate HTML view counts.
     if (pathname.endsWith(".pdf")) return "docs_pdf"
+    // A changelog page's feed ({$}.rss.xml): a file, not a page read.
+    if (pathname.endsWith(".rss.xml")) return "rss"
     return pathname.endsWith(".md") ? "docs_md" : "docs_html"
 }
 
@@ -150,6 +153,7 @@ export const PAGE_SURFACES: ReadonlySet<string> = new Set([
     "sitemap_md",
     "changes_md",
     "robots",
+    "rss",
     "context_bundle",
 ])
 
@@ -159,7 +163,6 @@ interface RequestSnapshot {
     host: string | null
     ua: string
     referer: string | null
-    ip: string
     /** Every header as plain pairs, for the extension's telemetry hooks. */
     headers: [string, string][]
     now: number
@@ -179,11 +182,6 @@ export function emitEvent(request: Request, event: AgentEvent): void {
             host: request.headers.get("host"),
             ua: request.headers.get("user-agent") ?? "",
             referer: request.headers.get("referer"),
-            ip:
-                request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-                request.headers.get("x-real-ip") ||
-                request.headers.get("x-vercel-forwarded-for") ||
-                "0.0.0.0",
             headers: [...request.headers],
             now: Date.now(),
         }
@@ -234,7 +232,13 @@ async function deliver(
         snapshot.referer && URL.canParse(snapshot.referer)
             ? new URL(snapshot.referer).hostname.toLowerCase()
             : null
-    const distinctId = visitorId(siteKey, snapshot.ip, snapshot.ua)
+    // The visitor's own address (clientAddress), read here from the rebuilt
+    // request so the hot path stays header copies only.
+    const distinctId = visitorId(
+        siteKey,
+        clientAddress(request)?.ip ?? "0.0.0.0",
+        snapshot.ua,
+    )
 
     const { type, ...rest } = event
     const properties = {

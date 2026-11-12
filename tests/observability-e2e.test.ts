@@ -207,6 +207,53 @@ describe.skipIf(
         expect(second.properties.$session_id).toBe(first.properties.$session_id)
     }, 15_000)
 
+    it("keys the visitor on Vercel's forwarded address, not the first forwarded hop", async () => {
+        // One user agent for the three visits, so only the address differs;
+        // each visit reads its own file to tell the events apart.
+        const ua = "journey-check/1.0"
+        const visit = async (path: string, client: string, hop: string) => {
+            await fetch(`${baseUrl}${path}`, {
+                headers: {
+                    "user-agent": ua,
+                    "x-vercel-forwarded-for": client,
+                    "x-forwarded-for": `${hop}, ${client}`,
+                },
+            })
+            return waitForEvent(
+                (e) =>
+                    e.properties.$pathname === path &&
+                    e.properties.$raw_user_agent === ua,
+            )
+        }
+        const first = await visit("/llms.txt", "203.0.113.5", "54.0.0.1")
+        const otherHop = await visit("/robots.txt", "203.0.113.5", "54.0.0.2")
+        const otherClient = await visit(
+            "/sitemap.xml",
+            "203.0.113.6",
+            "54.0.0.1",
+        )
+        expect(otherHop.distinct_id).toBe(first.distinct_id)
+        expect(otherClient.distinct_id).not.toBe(first.distinct_id)
+    }, 30_000)
+
+    it.each([
+        ["/manifest.webmanifest", "api_request", "web_manifest"],
+        ["/test.rss.xml", "$pageview", "rss"],
+    ])(
+        "stamps %s as a file, not a docs page",
+        async (path, event, surface) => {
+            await fetch(`${baseUrl}${path}`, {
+                headers: { "user-agent": CHROME_UA, accept: CHROME_ACCEPT },
+            })
+            const captured = await waitForEvent(
+                (e) => e.properties.$pathname === path,
+            )
+            expect(captured.event).toBe(event)
+            expect(captured.properties.surface).toBe(surface)
+        },
+        15_000,
+    )
+
     it("records the inline markdown negotiated by the llm middleware", async () => {
         const res = await fetch(`${baseUrl}/test`, {
             headers: { "user-agent": CHROME_UA, accept: "text/markdown" },

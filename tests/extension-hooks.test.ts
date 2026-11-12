@@ -1,6 +1,7 @@
 /**
  * The optional extension hooks a host supplies are what the framework keys
- * on: `clientIp` for the public rate limiter, `telemetry.visitorKey` for the
+ * on: `clientIp` for the public rate limiter and the visitor's address,
+ * `telemetry.visitorKey` for the
  * visitor/session hash, `telemetry.groups` (also when the site lookup
  * failed). The built-in extension supplies none of them; its behaviour is
  * covered by the suites that run against it.
@@ -114,6 +115,22 @@ describe("telemetry hooks", () => {
         })
         expect(otherHost.$session_id).toBe(first.$session_id)
         expect(otherKey.$session_id).not.toBe(first.$session_id)
+    })
+
+    // Behind a host's proxy the first forwarded-for value is a proxy hop,
+    // not the visitor: keying on it gave each hop its own visitor.
+    test("clientIp, not the first forwarded hop, identifies the visitor", async () => {
+        const visit = (client: string, hop: string) =>
+            deliver({
+                "x-proxy-client": client,
+                "x-forwarded-for": `${hop}, ${client}`,
+                "user-agent": "ua",
+            })
+        const first = await visit("203.0.113.5", "54.0.0.1")
+        const otherHop = await visit("203.0.113.5", "54.0.0.2")
+        const otherClient = await visit("203.0.113.6", "54.0.0.1")
+        expect(otherHop.$session_id).toBe(first.$session_id)
+        expect(otherClient.$session_id).not.toBe(first.$session_id)
     })
 
     test("groups is consulted with a null resolution when the site lookup fails", async () => {

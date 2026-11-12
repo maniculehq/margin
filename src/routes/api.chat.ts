@@ -13,6 +13,7 @@ import { normalizeDocUrl, searchServerFor } from "@/lib/agent-content"
 import { siteScope } from "@/lib/base-path"
 import { emitEvent } from "@/lib/observability"
 import { type DocsContext, resolveDocsContext } from "@/lib/source"
+import { clientAddress } from "@/lib/traffic"
 import { CONFIG_EXTENSION_KEY, searchModeSchema } from "@/types/docs"
 import type { ChatUIMessage, SearchTool } from "../components/ai/search"
 import { assistantAvailable, env } from "../env"
@@ -154,19 +155,11 @@ export const Route = createFileRoute("/api/chat")({
                     configured.data[CONFIG_EXTENSION_KEY].search.mode !== "ai"
                 )
                     return new Response("Not Found", { status: 404 })
-                // The extension may name the caller (a host behind its own
-                // proxy); otherwise Vercel's x-vercel-forwarded-for is the
-                // address, and client-set headers such as cf-connecting-ip
+                // The caller's address (clientAddress): the extension's or
+                // Vercel's, and client-set headers such as cf-connecting-ip
                 // are never trusted. The address is only ever stored hashed,
                 // salted with SITE_SECRET (or the deployment's database URL).
-                const visitorIp =
-                    extensions.clientIp?.(req) ||
-                    req.headers
-                        .get("x-vercel-forwarded-for")
-                        ?.split(",")[0]
-                        ?.trim() ||
-                    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-                    "unknown"
+                const visitorIp = clientAddress(req)?.ip ?? "unknown"
                 const visitor = createHash("sha256")
                     .update(
                         `docs-chat:${env.SITE_SECRET ?? resolveEnv().DATABASE_URL}:${visitorIp}`,
