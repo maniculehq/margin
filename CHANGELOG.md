@@ -28,6 +28,11 @@ Semantic Versioning once a stable public API is published.
 - `/changes.md?since=` answers 400 for a value that is not a date instead of
   failing with a 500, and says no pages changed since that date when none
   did, instead of blaming missing git history.
+- `/changes.md?since=` answers 400 for a value that is not an ISO 8601 date,
+  such as `1.4.0`, `Release 7` or `2026-02-30`, instead of reading it as some
+  other date and returning the whole feed. A time must now name its zone
+  (`Z` or an offset such as `+02:00`); one without used to be read in the
+  server's zone.
 - `POST /api/agent/feedback` refuses an `incorrect`, `missing`, `outdated`,
   `unclear` or `other` report without a `message` with HTTP `400`, matching
   the MCP `submit_feedback` tool. Both trim the message first, so one of only
