@@ -637,10 +637,9 @@ export async function sanitizeCss(
                         (selector) => {
                             if (!selector.some(namesRoot)) return false
                             const subject = selector.slice(
-                                selector.findLastIndex(
-                                    (component) =>
-                                        component.type === "combinator",
-                                ) + 1,
+                                selector
+                                    .map((component) => component.type)
+                                    .lastIndexOf("combinator") + 1,
                             )
                             return (
                                 subject.some(namesRoot) ||
