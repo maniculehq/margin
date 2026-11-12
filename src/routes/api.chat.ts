@@ -1,22 +1,19 @@
-import { createHash, randomUUID } from "node:crypto"
+import { randomUUID } from "node:crypto"
 import type { GatewayProviderOptions } from "@ai-sdk/gateway"
 import * as Sentry from "@sentry/tanstackstart-react"
 import { createFileRoute } from "@tanstack/react-router"
 import { waitUntil } from "@vercel/functions"
 import { z } from "zod"
 import { extensions } from "#docs-extensions"
-import { resolveEnv } from "@/db/env"
-import { enforceRateLimits } from "@/db/rate-limit"
+import { enforceRateLimit } from "@/db/rate-limit"
 import { flushTelemetry, registerAiTelemetry } from "@/instrument-sentry"
 import { agentConfig } from "@/lib/agent.config"
 import { normalizeDocUrl, searchServerFor } from "@/lib/agent-content"
-import { siteScope } from "@/lib/base-path"
 import { emitEvent } from "@/lib/observability"
 import { type DocsContext, resolveDocsContext } from "@/lib/source"
-import { clientAddress } from "@/lib/traffic"
 import { CONFIG_EXTENSION_KEY, searchModeSchema } from "@/types/docs"
 import type { ChatUIMessage, SearchTool } from "../components/ai/search"
-import { assistantAvailable, env } from "../env"
+import { assistantAvailable } from "../env"
 
 /** The envelope only: messages are validated by the AI SDK once it loads, and
  *  their content never enters analytics. */
@@ -62,18 +59,15 @@ const searchModeConfigSchema = z.object({
 /**
  * The route is unauthenticated and every request spends a model call, so it
  * is bounded before any work: the body's size, the history the model reads,
- * and how often one visitor — and one site as a whole — may ask. The
- * site ceiling holds even when a caller rotates its forwarded address.
+ * and how many questions one site's Assistant answers a day. The ceiling is
+ * per site, not per caller, so one caller can spend a site's whole day.
  */
 const MAX_CHAT_BODY_BYTES = 512 * 1024
 /** The stream's error text. With onEnd set, the AI SDK replays every error
  * chunk through onError as `new Error(errorText)`, so this text comes back. */
 const CHAT_ERROR_TEXT = "The AI assistant hit an error — please retry."
 const MAX_CHAT_MESSAGES = 24
-const TEN_MINUTES_MS = 10 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
-const VISITOR_TEN_MINUTE_LIMIT = 20
-const VISITOR_DAILY_LIMIT = 150
 const SITE_DAILY_LIMIT = 3000
 /** Per model step (reasoning included), so one request spends at most
  *  MAX_CHAT_STEPS × this. A ceiling well above a cited docs answer, not a
@@ -155,57 +149,28 @@ export const Route = createFileRoute("/api/chat")({
                     configured.data[CONFIG_EXTENSION_KEY].search.mode !== "ai"
                 )
                     return new Response("Not Found", { status: 404 })
-                // The caller's address (clientAddress): the extension's or
-                // Vercel's, and client-set headers such as cf-connecting-ip
-                // are never trusted. The address is only ever stored hashed,
-                // salted with SITE_SECRET (or the deployment's database URL).
-                const visitorIp = clientAddress(req)?.ip ?? "unknown"
-                const visitor = createHash("sha256")
-                    .update(
-                        `docs-chat:${env.SITE_SECRET ?? resolveEnv().DATABASE_URL}:${visitorIp}`,
-                    )
-                    .digest("hex")
-                    .slice(0, 32)
-                const siteKey = `docs_chat:${extensions.rateLimitScope?.(docsCtx.site) ?? docsCtx.site.id}`
-                // Behind its owner's proxy every visitor has the proxy's
-                // address, so per-visitor limits would stop the whole site
-                // at once: there the site's daily ceiling alone applies.
-                const visitorLimits = siteScope().getStore()
-                    ?.sharedClientAddress
-                    ? []
-                    : [
-                          {
-                              bucket: "docs_chat_visitor_10min",
-                              key: `${siteKey}:${visitor}`,
-                              limit: VISITOR_TEN_MINUTE_LIMIT,
-                              windowMs: TEN_MINUTES_MS,
-                          },
-                          {
-                              bucket: "docs_chat_visitor_day",
-                              key: `${siteKey}:${visitor}`,
-                              limit: VISITOR_DAILY_LIMIT,
-                              windowMs: DAY_MS,
-                          },
-                      ]
-                const limited = await enforceRateLimits([
-                    ...visitorLimits,
-                    {
-                        bucket: "docs_chat_site_day",
-                        key: siteKey,
-                        limit: SITE_DAILY_LIMIT,
-                        windowMs: DAY_MS,
-                    },
-                ])
+                const limited = await enforceRateLimit({
+                    bucket: "docs_chat_site_day",
+                    key: `docs_chat:${extensions.rateLimitScope?.(docsCtx.site) ?? docsCtx.site.id}`,
+                    limit: SITE_DAILY_LIMIT,
+                    windowMs: DAY_MS,
+                })
                 if (!limited.allowed) {
                     const retryAfterSeconds = limited.retryAfterSeconds ?? 60
+                    // The ceiling is daily, so the wait can run to hours.
                     const minutes = Math.max(
                         1,
                         Math.ceil(retryAfterSeconds / 60),
                     )
+                    const hours = Math.ceil(retryAfterSeconds / 3600)
+                    const wait =
+                        minutes < 60
+                            ? `${minutes} ${minutes === 1 ? "minute" : "minutes"}`
+                            : `${hours} ${hours === 1 ? "hour" : "hours"}`
                     return Response.json(
                         {
                             error: "rate_limited",
-                            message: `You've asked a lot of questions in a short time. Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`,
+                            message: `This site's assistant has reached its daily limit. Try again in ${wait}.`,
                             retryAfterSeconds,
                         } satisfies z.infer<typeof chatErrorSchema>,
                         {

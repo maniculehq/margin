@@ -1,22 +1,18 @@
-import { createHash, randomUUID } from "node:crypto"
+import { randomUUID } from "node:crypto"
 import * as Sentry from "@sentry/tanstackstart-react"
 import { waitUntil } from "@vercel/functions"
 import { z } from "zod"
 import { extensions } from "#docs-extensions"
 import { db, schema } from "@/db"
-import { resolveEnv } from "@/db/env"
-import { enforceRateLimits } from "@/db/rate-limit"
+import { enforceRateLimit } from "@/db/rate-limit"
 import type { DocsSite } from "@/extensions/types"
 import {
     DOCS_AGENT_FEEDBACK_KINDS,
     DOCS_AGENT_FEEDBACK_SOURCES,
 } from "@/types/constants"
 import { classifyTraffic } from "@/types/traffic"
-import { env as frameworkEnv } from "../env"
 import { normalizeDocUrl } from "./agent-content"
-import { siteScope } from "./base-path"
 import type { SiteSource } from "./source"
-import { clientAddress } from "./traffic"
 
 export const feedbackSchema = z
     .object({
@@ -73,7 +69,6 @@ export type FeedbackInput = z.input<typeof feedbackSchema>
  * before it is parsed. */
 export const MAX_FEEDBACK_BODY_BYTES = 16 * 1024
 
-const TEN_MINUTES_MS = 10 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
 
 /** JSON Schema for GET ?schema discovery, derived from the same zod schema (no drift). */
@@ -121,46 +116,17 @@ export function recordFeedback(
         // A host naming no site serves the placeholder (source.ts
         // emptySite), whose empty id no docs_site row carries.
         if (ctx.site.id === "") return
-        // A public, unauthenticated write: rows are admitted per visitor and
-        // per site (the shared Postgres limiter the Ask-AI chat uses), and
-        // a submission over the limit is dropped — feedback is best-effort,
-        // so the caller still sees it accepted. The visitor is the caller's
-        // address (clientAddress), hashed.
-        const visitorIp = clientAddress(request)?.ip ?? "unknown"
-        const visitor = createHash("sha256")
-            .update(
-                `docs-feedback:${frameworkEnv.SITE_SECRET ?? resolveEnv().DATABASE_URL}:${visitorIp}`,
-            )
-            .digest("hex")
-            .slice(0, 32)
-        const siteKey = `docs_feedback:${extensions.rateLimitScope?.(ctx.site) ?? ctx.site.id}`
-        // Behind its owner's proxy every caller has the proxy's address:
-        // there the site's daily ceiling alone applies.
-        const visitorLimits = siteScope().getStore()?.sharedClientAddress
-            ? []
-            : [
-                  {
-                      bucket: "docs_feedback_visitor_10min",
-                      key: `${siteKey}:${visitor}`,
-                      limit: 20,
-                      windowMs: TEN_MINUTES_MS,
-                  },
-                  {
-                      bucket: "docs_feedback_visitor_day",
-                      key: `${siteKey}:${visitor}`,
-                      limit: 100,
-                      windowMs: DAY_MS,
-                  },
-              ]
-        const admitted = await enforceRateLimits([
-            ...visitorLimits,
-            {
-                bucket: "docs_feedback_site_day",
-                key: siteKey,
-                limit: 2000,
-                windowMs: DAY_MS,
-            },
-        ])
+        // A public, unauthenticated write: rows are admitted up to a daily
+        // ceiling per site (the shared Postgres limiter the Ask-AI chat
+        // uses), and a submission over it is dropped. Feedback is
+        // best-effort, so the caller still sees it accepted. The ceiling is
+        // per site, not per caller, so one caller can fill a site's day.
+        const admitted = await enforceRateLimit({
+            bucket: "docs_feedback_site_day",
+            key: `docs_feedback:${extensions.rateLimitScope?.(ctx.site) ?? ctx.site.id}`,
+            limit: 2000,
+            windowMs: DAY_MS,
+        })
         if (!admitted.allowed) return
         await db.insert(schema.docsAgentFeedback).values({
             id: randomUUID(),

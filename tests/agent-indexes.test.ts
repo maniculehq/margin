@@ -618,14 +618,11 @@ describe.skipIf(!hasDocsDb)("agent indexes", () => {
                 scope: { basePath: string; publicOrigin: string | null },
                 etag?: string,
             ) =>
-                siteScope().run(
-                    { ...scope, sharedClientAddress: false },
-                    () => {
-                        const request = requestFor(hostname, path)
-                        if (etag) request.headers.set("if-none-match", etag)
-                        return serve({ request, params: { _splat: "alpha" } })
-                    },
-                )
+                siteScope().run(scope, () => {
+                    const request = requestFor(hostname, path)
+                    if (etag) request.headers.set("if-none-match", etag)
+                    return serve({ request, params: { _splat: "alpha" } })
+                })
             const first = await fetchAt(atPlatform)
             const etag = first.headers.get("etag") ?? ""
             expect(etag).not.toBe("")

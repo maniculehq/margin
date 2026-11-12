@@ -227,7 +227,7 @@ describe.skipIf(!hasDocsDb)("default extension: resolution", () => {
 
     test("keeps per-visitor addresses for a proxied site off Vercel", async () => {
         // A self-hosted proxy forwards each visitor's address in a header,
-        // so the per-visitor rate limits still have something to key on.
+        // which still tells visitors apart in analytics.
         const extensions = await loadDefault({
             SITE_ORIGIN: "https://example.com/docs",
         })

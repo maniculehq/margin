@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { db, schema } from "@/db"
 import { htmlPageEtag, searchServerFor } from "@/lib/agent-content"
-import { siteScope, siteUrlFromRequest } from "@/lib/base-path"
+import { siteUrlFromRequest } from "@/lib/base-path"
 import { buildMcpServer, MCP_TOOL_NAMES } from "@/lib/mcp-server"
 import {
     pageBodyFor,
@@ -1221,99 +1221,24 @@ describe.skipIf(!hasDocsDb)("docs chat gate", () => {
         }
     })
 
-    test("keys a visitor on Vercel's address, never a caller's cf-connecting-ip", async () => {
+    // One caller is no longer held to a per-visitor allowance (the old one
+    // stopped the 21st question in ten minutes); only the site's day counts.
+    test("answers one caller past the old per-visitor allowance", async () => {
         const { siteId, hostname } = await seedSite()
         try {
-            for (let i = 0; i < 20; i += 1)
-                expect(
-                    (
-                        await ask(hostname, {
-                            headers: {
-                                "x-vercel-forwarded-for": "198.51.100.40",
-                                "cf-connecting-ip": `10.0.0.${i}`,
-                            },
-                        })
-                    ).status,
-                ).toBe(200)
-
-            const response = await ask(hostname, {
-                headers: {
-                    "x-vercel-forwarded-for": "198.51.100.40",
-                    "cf-connecting-ip": "10.0.0.99",
-                },
-            })
-
-            expect(response.status).toBe(429)
-        } finally {
-            await dropSite(siteId)
-        }
-    })
-
-    // Behind an organization's proxy every visitor arrives from the proxy's
-    // address: a per-visitor limit there would stop the whole site at once.
-    test("holds a shared client address to the site's limits only", async () => {
-        const { siteId, hostname } = await seedSite()
-        const askThroughProxy = () =>
-            siteScope().run(
-                { basePath: "", publicOrigin: null, sharedClientAddress: true },
-                () => ask(hostname, { ip: "198.51.100.30" }),
-            )
-        try {
-            for (let i = 0; i < 20; i += 1)
-                expect((await askThroughProxy()).status).toBe(200)
-
-            expect((await askThroughProxy()).status).toBe(200)
-            expect(
-                await db
-                    .select({ bucket: schema.publicRateLimit.bucket })
-                    .from(schema.publicRateLimit)
-                    .where(
-                        like(
-                            schema.publicRateLimit.key,
-                            `docs_chat:${siteId}%`,
-                        ),
-                    ),
-            ).toEqual([{ bucket: "docs_chat_site_day" }])
-        } finally {
-            await dropSite(siteId)
-        }
-    })
-
-    test("stops one visitor after its ten-minute allowance, not the next", async () => {
-        const { siteId, hostname } = await seedSite()
-        try {
-            for (let i = 0; i < 20; i += 1)
+            for (let i = 0; i < 21; i += 1)
                 expect(
                     (await ask(hostname, { ip: "198.51.100.20" })).status,
                 ).toBe(200)
-            streamText.mockClear()
-
-            const limited = await ask(hostname, { ip: "198.51.100.20" })
-
-            expect(limited.status).toBe(429)
-            const retryAfter = Number(limited.headers.get("retry-after"))
-            expect(retryAfter).toBeGreaterThan(0)
-            // The panel renders `message`, which names the wait in whole
-            // minutes, rounded up.
-            const minutes = Math.max(1, Math.ceil(retryAfter / 60))
-            expect(limited.headers.get("content-type")).toContain(
-                "application/json",
-            )
-            expect(await limited.json()).toEqual({
-                error: "rate_limited",
-                message: `You've asked a lot of questions in a short time. Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`,
-                retryAfterSeconds: retryAfter,
-            })
-            expect(streamText).not.toHaveBeenCalled()
-            expect((await ask(hostname, { ip: "198.51.100.21" })).status).toBe(
-                200,
-            )
+            expect(await rateLimitRows(siteId)).toEqual([
+                { key: `docs_chat:${siteId}` },
+            ])
         } finally {
             await dropSite(siteId)
         }
     })
 
-    test("holds the site's daily ceiling however the address rotates", async () => {
+    test("holds the site's daily ceiling and names the wait", async () => {
         const { siteId, hostname } = await seedSite()
         try {
             await db.insert(schema.publicRateLimit).values({
@@ -1321,13 +1246,25 @@ describe.skipIf(!hasDocsDb)("docs chat gate", () => {
                 bucket: "docs_chat_site_day",
                 key: `docs_chat:${siteId}`,
                 count: 3000,
-                resetAt: new Date(Date.now() + 86_400_000),
+                resetAt: new Date(Date.now() + 2.5 * 3_600_000),
             })
             streamText.mockClear()
 
-            const response = await ask(hostname, { ip: "192.0.2.200" })
+            const limited = await ask(hostname, { ip: "192.0.2.200" })
 
-            expect(response.status).toBe(429)
+            expect(limited.status).toBe(429)
+            const retryAfter = Number(limited.headers.get("retry-after"))
+            expect(retryAfter).toBeGreaterThan(2 * 3600)
+            expect(limited.headers.get("content-type")).toContain(
+                "application/json",
+            )
+            // The panel renders `message`; a daily wait reads in hours.
+            expect(await limited.json()).toEqual({
+                error: "rate_limited",
+                message:
+                    "This site's assistant has reached its daily limit. Try again in 3 hours.",
+                retryAfterSeconds: retryAfter,
+            })
             expect(streamText).not.toHaveBeenCalled()
         } finally {
             await dropSite(siteId)

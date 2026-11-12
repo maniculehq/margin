@@ -7,7 +7,7 @@ import {
     varchar,
 } from "drizzle-orm/pg-core"
 
-/** Fixed-window counters behind enforceRateLimits (src/db/rate-limit.ts). */
+/** Fixed-window counters behind enforceRateLimit (src/db/rate-limit.ts). */
 export const publicRateLimit = pgTable(
     "public_rate_limit",
     {

@@ -76,7 +76,6 @@ it("reads a skill the index names at the public address from the platform addres
         {
             basePath: "/docs",
             publicOrigin: PUBLIC_ORIGIN,
-            sharedClientAddress: false,
         },
         async () => {
             registerDocsTools(

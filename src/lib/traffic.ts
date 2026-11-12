@@ -16,11 +16,15 @@ import { env } from "../env"
  * The caller's address and where it came from. `extension` is the
  * extension's answer and `platform` Vercel's forwarded address on Vercel,
  * which Vercel overwrites, so both are the connecting client's. `header` is
- * a forwarded header anywhere else, which the caller can forge: it still
- * tells visitors apart for analytics and per-visitor rate limits (each
- * site's own ceiling holds whatever it says), but never verifies anyone.
- * The first x-forwarded-for value is not read before Vercel's: behind
- * another proxy it is that proxy's hop, not the visitor.
+ * any address the caller or a proxy in front could have chosen: a
+ * forwarded header off Vercel, or Vercel's address on a request that
+ * carries `CDN-Loop` (RFC 8586), which every CDN adds to what it forwards,
+ * so the connecting client was another CDN, not the caller. It still tells
+ * visitors apart for analytics, but never verifies anyone. A direct caller
+ * can send `CDN-Loop` itself; that only leaves its crawler name unverified
+ * instead of condemned, never verified. The first x-forwarded-for value is
+ * not read before Vercel's: behind another proxy it is that proxy's hop,
+ * not the visitor.
  */
 export function clientAddress(
     request: Request,
@@ -33,7 +37,10 @@ export function clientAddress(
     if (vercel)
         return {
             ip: vercel,
-            source: env.VERCEL_ENV === undefined ? "header" : "platform",
+            source:
+                env.VERCEL_ENV === undefined || request.headers.has("cdn-loop")
+                    ? "header"
+                    : "platform",
         }
     const ip = forwarded("x-forwarded-for") ?? forwarded("x-real-ip")
     return ip ? { ip, source: "header" } : null
@@ -42,12 +49,12 @@ export function clientAddress(
 /**
  * Classify a request, verifying a crawler's or assistant's claimed identity
  * against its operator's published ranges when the client address is
- * trustworthy (clientAddress: the extension's, or the platform's). A
- * forwarded header is the caller's to forge, so the identity stays
- * unverified. So does every request to a site whose visitors share one
- * address (its owner's proxy hides theirs) unless the extension names the
- * caller: the platform's address is the proxy's, and a real crawler behind
- * it must not read as an impersonator.
+ * trustworthy (clientAddress: the extension's, or the platform's). Any
+ * other address, a forwarded header or one a CDN in front connected from,
+ * leaves the identity unverified. So does every request to a site whose
+ * visitors share one address (its owner's proxy hides theirs) unless the
+ * extension names the caller: the platform's address is the proxy's, and a
+ * real crawler behind it must not read as an impersonator.
  */
 export async function requestTraffic(
     request: Request,
