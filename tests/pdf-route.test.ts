@@ -126,7 +126,7 @@ describe.skipIf(!hasDocsDb)("page pdf route", () => {
             scope: { basePath: string; publicOrigin: string | null },
             etag?: string,
         ) =>
-            siteScope().run({ ...scope, sharedClientAddress: false }, () => {
+            siteScope().run(scope, () => {
                 const request = requestFor(hostname, "/guide.pdf")
                 if (etag) request.headers.set("if-none-match", etag)
                 return getDocsPdf({ request, params: { _splat: "guide" } })

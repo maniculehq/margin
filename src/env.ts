@@ -59,8 +59,6 @@ export const env = createEnv({
          * its cache tag. The extension validates it against
          * docsSiteSlugSchema (kept out of this browser-shared module). */
         SITE_SLUG: z.string().min(1).default("docs"),
-        /** Salt for hashed visitor addresses; unset uses the database URL. */
-        SITE_SECRET: z.string().min(1).optional(),
         /** "0" stops production deployments redirecting to SITE_ORIGIN's host. */
         DOCS_CANONICAL_REDIRECT: z.enum(["0", "1"]).default("1"),
         DOCS_CHAT_MODEL: z.string().min(1).default("openai/gpt-5.6-terra"),

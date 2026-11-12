@@ -16,41 +16,27 @@ export interface RateLimitRule {
 export interface RateLimitResult {
     allowed: boolean
     retryAfterSeconds?: number
-    resetAt?: Date
 }
 
 /**
- * Counts one hit against every rule in a single multi-row upsert. Rules
- * sharing a `(bucket, key)` counter collapse to one row (Postgres refuses to
- * update a row twice in one statement), so each is judged against the same
- * count; the row's window comes from the first such rule. Each row resets at
- * its own `resetAt` to its own window via `excluded.reset_at`.
+ * Counts one hit against the rule's fixed-window counter in a single
+ * upsert. A counter past its `resetAt` starts a new window at this hit.
  */
-export async function enforceRateLimits(
-    rules: readonly RateLimitRule[],
+export async function enforceRateLimit(
+    rule: RateLimitRule,
 ): Promise<RateLimitResult> {
-    if (rules.length === 0) return { allowed: true }
     const now = new Date()
     const nowTimestamp = now.toISOString()
-    const counters = new Map<
-        string,
-        typeof schema.publicRateLimit.$inferInsert
-    >()
-    for (const rule of rules) {
-        const counterKey = `${rule.bucket}\u0000${rule.key}`
-        if (counters.has(counterKey)) continue
-        counters.set(counterKey, {
+    const table = schema.publicRateLimit
+    const [row] = await db
+        .insert(table)
+        .values({
             id: crypto.randomUUID(),
             bucket: rule.bucket,
             key: rule.key,
             count: 1,
             resetAt: new Date(now.getTime() + rule.windowMs),
         })
-    }
-    const table = schema.publicRateLimit
-    const rows = await db
-        .insert(table)
-        .values([...counters.values()])
         .onConflictDoUpdate({
             target: [table.bucket, table.key],
             set: {
@@ -59,32 +45,13 @@ export async function enforceRateLimits(
                 updatedAt: now,
             },
         })
-        .returning({
-            bucket: table.bucket,
-            key: table.key,
-            count: table.count,
-            resetAt: table.resetAt,
-        })
-    const byCounter = new Map(
-        rows.map((row) => [`${row.bucket}\u0000${row.key}`, row]),
-    )
-
-    let mostConstrained: RateLimitResult | null = null
-    for (const rule of rules) {
-        const row = byCounter.get(`${rule.bucket}\u0000${rule.key}`)
-        if (!row || row.count <= rule.limit) continue
-        const retryAfterSeconds = Math.max(
+        .returning({ count: table.count, resetAt: table.resetAt })
+    if (!row || row.count <= rule.limit) return { allowed: true }
+    return {
+        allowed: false,
+        retryAfterSeconds: Math.max(
             1,
             Math.ceil((row.resetAt.getTime() - now.getTime()) / 1000),
-        )
-        if (retryAfterSeconds > (mostConstrained?.retryAfterSeconds ?? 0)) {
-            mostConstrained = {
-                allowed: false,
-                resetAt: row.resetAt,
-                retryAfterSeconds,
-            }
-        }
+        ),
     }
-
-    return mostConstrained ?? { allowed: true }
 }

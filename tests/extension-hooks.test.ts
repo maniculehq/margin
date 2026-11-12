@@ -1,21 +1,14 @@
 /**
  * The optional extension hooks a host supplies are what the framework keys
- * on: `clientIp` for the public rate limiter and the visitor's address,
- * `telemetry.visitorKey` for the
+ * on: `clientIp` for the visitor's address, `telemetry.visitorKey` for the
  * visitor/session hash, `telemetry.groups` (also when the site lookup
  * failed). The built-in extension supplies none of them; its behaviour is
  * covered by the suites that run against it.
  */
-import { randomUUID } from "node:crypto"
-import { eq } from "drizzle-orm"
 import { afterEach, describe, expect, test, vi } from "vitest"
-import { db, schema } from "@/db"
-import type { DocsSite, SiteResolution } from "@/extensions/types"
+import type { SiteResolution } from "@/extensions/types"
 import { agentConfig } from "@/lib/agent.config"
-import { recordFeedback } from "@/lib/agent-feedback"
-import { siteScope } from "@/lib/base-path"
 import { emitEvent } from "@/lib/observability"
-import { hasDocsDb } from "./context"
 
 const state = vi.hoisted(
     (): {
@@ -142,122 +135,5 @@ describe("telemetry hooks", () => {
             { resolution: null, host: "outage.docs.test" },
         ])
         expect(state.captures[0]?.groups).toEqual({ site: "hooked" })
-    })
-})
-
-describe.skipIf(!hasDocsDb)("clientIp", () => {
-    test("keys the feedback limiter on the extension's address", async () => {
-        const id = randomUUID()
-        await db.insert(schema.docsSite).values({
-            id,
-            slug: `hooks-${id.slice(0, 8)}`,
-            name: "Hooks",
-            analyticsMode: "off",
-            status: "active",
-        })
-        const site: DocsSite = {
-            id,
-            slug: `hooks-${id.slice(0, 8)}`,
-            name: "Hooks",
-            description: "",
-            repo: null,
-            analyticsEnabled: true,
-            webmcpEnabled: false,
-        }
-        const submit = (client: string, forwarded: string) =>
-            recordFeedback(
-                {
-                    siteId: site.slug,
-                    site,
-                    versionId: null,
-                    source: { getPage: () => undefined },
-                },
-                new Request("https://docs.test.invalid/api/agent/feedback", {
-                    headers: {
-                        "x-proxy-client": client,
-                        "x-forwarded-for": forwarded,
-                    },
-                }),
-                { url: "/guide", kind: "outdated", message: "Stale." },
-            )
-        const rows = () =>
-            db
-                .select({ id: schema.docsAgentFeedback.id })
-                .from(schema.docsAgentFeedback)
-                .where(eq(schema.docsAgentFeedback.siteId, id))
-        try {
-            // A rotating forwarded address would admit every one of these;
-            // the hook's one address hits the ten-minute limit of 20.
-            for (let n = 0; n < 21; n++)
-                await submit("203.0.113.70", `192.0.2.${n}`)
-            expect(await rows()).toHaveLength(20)
-            await submit("203.0.113.71", "192.0.2.200")
-            expect(await rows()).toHaveLength(21)
-        } finally {
-            await db.delete(schema.docsSite).where(eq(schema.docsSite.id, id))
-        }
-    })
-
-    // Behind an organization's proxy every caller shares the proxy's address.
-    test("admits a shared client address up to the site's limit only", async () => {
-        const id = randomUUID()
-        const slug = `hooks-${id.slice(0, 8)}`
-        await db.insert(schema.docsSite).values({
-            id,
-            slug,
-            name: "Hooks",
-            analyticsMode: "off",
-            status: "active",
-        })
-        const site: DocsSite = {
-            id,
-            slug,
-            name: "Hooks",
-            description: "",
-            repo: null,
-            analyticsEnabled: true,
-            webmcpEnabled: false,
-        }
-        try {
-            for (let n = 0; n < 21; n++)
-                await siteScope().run(
-                    {
-                        basePath: "",
-                        publicOrigin: null,
-                        sharedClientAddress: true,
-                    },
-                    () =>
-                        recordFeedback(
-                            {
-                                siteId: slug,
-                                site,
-                                versionId: null,
-                                source: { getPage: () => undefined },
-                            },
-                            new Request(
-                                "https://docs.test.invalid/api/agent/feedback",
-                                {
-                                    headers: {
-                                        "x-proxy-client": "203.0.113.80",
-                                    },
-                                },
-                            ),
-                            {
-                                url: "/guide",
-                                kind: "outdated",
-                                message: "Stale.",
-                            },
-                        ),
-                )
-
-            expect(
-                await db
-                    .select({ id: schema.docsAgentFeedback.id })
-                    .from(schema.docsAgentFeedback)
-                    .where(eq(schema.docsAgentFeedback.siteId, id)),
-            ).toHaveLength(21)
-        } finally {
-            await db.delete(schema.docsSite).where(eq(schema.docsSite.id, id))
-        }
     })
 })

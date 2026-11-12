@@ -66,7 +66,7 @@ Choosing `static` or `off` also makes `POST /api/chat` return HTTP `404` when Ga
 
 The built-in retrieval tool searches documentation, not the public web or your application's live data. The assistant is instructed to say it does not know and suggest a better search query when retrieved content does not answer the question. This is model guidance, not a guarantee that every answer is correct or cited. There is no `docs.json` setting for a custom assistant system prompt.
 
-The server keeps only the most recent 24 messages as model context. Requests larger than 512 KiB are rejected; starting a new chat removes the accumulated history. Rate limits normally permit 20 requests per visitor per 10 minutes, 150 per visitor per day, and 3,000 per site per day. Deployments that identify all visitors through a shared proxy address apply only the site ceiling.
+The server keeps only the most recent 24 messages as model context. Requests larger than 512 KiB are rejected; starting a new chat removes the accumulated history. Each site’s assistant answers at most 3,000 requests a day. The ceiling is per site, not per visitor, so one caller can use the whole day’s allowance.
 
 | Failure | Response | Reader action |
 | --- | --- | --- |

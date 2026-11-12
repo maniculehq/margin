@@ -35,8 +35,9 @@ export interface SiteResolution {
      * request's own origin. */
     publicOrigin: string | null
     /** Every visitor reaches this host from the same address (its owner's
-     * proxy hides theirs), so the public rate limiters apply their per-site
-     * limits only. Default false. */
+     * proxy hides theirs), so a crawler's claimed name is never checked
+     * against that address: it stays unverified rather than condemned.
+     * Default false. */
     sharedClientAddress?: boolean
 }
 
@@ -82,9 +83,12 @@ export interface DocsExtensions {
     telemetry: TelemetryHooks
     /** Operator rollout of WebMCP for a site, ORed with site.webmcpEnabled. Must never block: answer from cache. */
     webmcpRollout?(site: DocsSite, posthog: PostHog | undefined): boolean
-    /** Identity string the rate limiter and feedback HMAC key on (default: site.id). */
+    /** Identity string the public rate limiters key each site's daily ceiling on (default: site.id). */
     rateLimitScope?(site: DocsSite): string
-    /** Client address for rate limits and feedback keys. Default: Vercel's forwarded address. */
+    /** The caller's address, trusted to verify a crawler's claimed name
+     * against its operator's ranges and used to tell visitors apart in
+     * analytics. Default: Vercel's forwarded address, which does not verify
+     * on a request that carries `CDN-Loop`. */
     clientIp?(request: Request): string | undefined
     /** Extra `<meta>` tags rendered at the top of every site document's
      * `<head>`, before the route's own head tags (plugin: origin-trial

@@ -120,46 +120,52 @@ describe.skipIf(!hasDocsDb)("recordFeedback → docs_agent_feedback", () => {
         expect(rows).toEqual([{ answerId }])
     })
 
-    it("drops a visitor's submissions past the ten-minute limit", async () => {
-        const submit = (ip: string) =>
-            recordFeedback(
-                {
-                    siteId: "acme",
-                    site: {
-                        id: siteId,
-                        slug: "acme",
-                        name: "Acme",
-                        description: "",
-                        repo: null,
-                        analyticsEnabled: true,
-                        webmcpEnabled: false,
-                    },
-                    versionId: null,
-                    source: { getPage: () => undefined },
+    const submitFrom = (ip: string) =>
+        recordFeedback(
+            {
+                siteId: "acme",
+                site: {
+                    id: siteId,
+                    slug: "acme",
+                    name: "Acme",
+                    description: "",
+                    repo: null,
+                    analyticsEnabled: true,
+                    webmcpEnabled: false,
                 },
-                new Request(
-                    "https://acme.docs.test.invalid/api/agent/feedback",
-                    {
-                        headers: { "x-forwarded-for": ip },
-                    },
-                ),
-                { url: "/guides/install", kind: "outdated", message: "Stale." },
-            )
-        await Promise.all(
-            Array.from({ length: 21 }, () => submit("203.0.113.7")),
+                versionId: null,
+                source: { getPage: () => undefined },
+            },
+            new Request("https://acme.docs.test.invalid/api/agent/feedback", {
+                headers: { "x-forwarded-for": ip },
+            }),
+            { url: "/guides/install", kind: "outdated", message: "Stale." },
         )
-        const admitted = await db
+    const storedRows = () =>
+        db
             .select({ id: schema.docsAgentFeedback.id })
             .from(schema.docsAgentFeedback)
             .where(eq(schema.docsAgentFeedback.siteId, siteId))
-        expect(admitted).toHaveLength(20)
-        // Another visitor on the same site is still admitted.
-        await submit("203.0.113.8")
-        const rows = await db
-            .select({ id: schema.docsAgentFeedback.id })
-            .from(schema.docsAgentFeedback)
-            .where(eq(schema.docsAgentFeedback.siteId, siteId))
-        expect(rows).toHaveLength(21)
+
+    // The old per-visitor limit dropped the 21st submission in ten minutes.
+    it("stores one caller's submissions past the old per-visitor limit", async () => {
+        await Promise.all(
+            Array.from({ length: 21 }, () => submitFrom("203.0.113.7")),
+        )
+        expect(await storedRows()).toHaveLength(21)
+    })
+
+    it("drops submissions once the site's daily ceiling is spent", async () => {
+        await submitFrom("203.0.113.7")
+        expect(await storedRows()).toHaveLength(1)
+        await db
+            .update(schema.publicRateLimit)
+            .set({ count: 2000 })
+            .where(eq(schema.publicRateLimit.key, `docs_feedback:${siteId}`))
+
+        await submitFrom("203.0.113.8")
+
+        expect(await storedRows()).toHaveLength(1)
     })
 
     // A host naming no site serves the placeholder site, whose empty id

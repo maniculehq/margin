@@ -56,7 +56,7 @@ This deployment uses repository scripts and the built Node server, not an SDK.
 - A ready content version with the same key is reused; use a new key for a normal release.
 - `DOCS_INGEST` defaults to `on`; `DOCS_INGEST=off` skips ingestion even when the build succeeds and requires the selected content version to exist already.
 - Margin derives request origins from `Host` and the first `X-Forwarded-Proto` value; server-function origin checks use these origins.
-- Off Vercel, rate-limit and feedback code use the first `X-Forwarded-For` address when forwarded client addresses are supplied.
+- Off Vercel, analytics use the first `X-Forwarded-For` address to tell visitors apart when forwarded client addresses are supplied. A forwarded address never verifies a crawler’s claimed name.
 - Built-in canonical-host redirects use HTTP `308` only when `VERCEL_ENV=production`, `DOCS_CANONICAL_REDIRECT` is not `0`, and `SITE_ORIGIN` has no base path.
 - A plain Node deployment can enforce its canonical host at the proxy; `NODE_ENV=production` alone does not enable the built-in host redirect.
 - When setting `VERCEL_ENV=production`, preserve the public upstream host or set `DOCS_CANONICAL_REDIRECT=0` to avoid proxy redirect loops.

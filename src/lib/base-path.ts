@@ -49,16 +49,13 @@ import { originFromRequest } from "./shared"
  *   document, read the base path through this context; unprovided, it falls
  *   back to `basePath()`.
  * - `siteScope()`: server only. The AsyncLocalStorage server.ts fills with
- *   the resolved site's `{ basePath, publicOrigin, sharedClientAddress }`
- *   for the request; the public rate limiters read the last. Never a request
- *   header, which a client could set.
+ *   the resolved site's `{ basePath, publicOrigin }` for the request. Never
+ *   a request header, which a client could set.
  */
 
 export interface SiteScope {
     basePath: string
     publicOrigin: string | null
-    /** SiteResolution.sharedClientAddress: per-site rate limits only. */
-    sharedClientAddress: boolean
 }
 
 // Created on first use on the server. Loaded at run time rather than

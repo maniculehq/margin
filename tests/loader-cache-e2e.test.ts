@@ -711,7 +711,7 @@ describe.skipIf(!runnable)("docs page loader cache", () => {
                     () =>
                         panelMessageCount(
                             page,
-                            "You've asked a lot of questions in a short time. Try again in 5 minutes.",
+                            "This site's assistant has reached its daily limit. Try again in 5 minutes.",
                         ),
                     { timeout: 5_000 },
                 )

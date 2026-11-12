@@ -9,12 +9,13 @@ vi.mock("@/env", async (importOriginal) => {
 
 afterEach(() => vi.unstubAllGlobals())
 
-const crawlerFrom = (address: string) =>
+const crawlerFrom = (address: string, headers: Record<string, string> = {}) =>
     new Request("https://docs.test.invalid/quickstart", {
         headers: {
             "user-agent":
                 "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.4; +https://openai.com/gptbot)",
             "x-vercel-forwarded-for": address,
+            ...headers,
         },
     })
 const publishRanges = () =>
@@ -42,4 +43,34 @@ it("does not judge a crawler by its site's proxy address", async () => {
         id: "gptbot",
         verified: null,
     })
+})
+
+it("verifies a crawler from inside its operator's ranges", async () => {
+    publishRanges()
+    expect(
+        await requestTraffic(crawlerFrom("132.196.86.7"), false),
+    ).toMatchObject({ category: "crawler", id: "gptbot", verified: true })
+})
+
+// Behind another CDN (a customer's own Cloudflare, say) Vercel's address
+// is that CDN's edge: a real crawler must not read as an impersonator.
+it("leaves a crawler that arrived through another CDN unverified", async () => {
+    publishRanges()
+    expect(
+        await requestTraffic(
+            crawlerFrom("73.12.4.9", { "cdn-loop": "cloudflare; loops=1" }),
+            false,
+        ),
+    ).toMatchObject({ category: "crawler", id: "gptbot", verified: null })
+})
+
+// A direct caller can forge the header: it must never verify anyone.
+it("never verifies a crawler on a request that carries CDN-Loop", async () => {
+    publishRanges()
+    expect(
+        await requestTraffic(
+            crawlerFrom("132.196.86.7", { "cdn-loop": "example-cdn" }),
+            false,
+        ),
+    ).toMatchObject({ category: "crawler", id: "gptbot", verified: null })
 })

@@ -49,8 +49,7 @@ Publish the changed documentation configuration through the site's existing publ
 - The Assistant shortcut is `⌘I` on macOS and `Ctrl I` elsewhere.
 - The server retains only the most recent 24 messages as model context.
 - Chat request bodies larger than 512 KiB are rejected.
-- Normal rate limits are 20 requests per visitor per 10 minutes, 150 per visitor per day, and 3,000 per site per day.
-- Deployments that identify all visitors through a shared proxy address apply only the site rate-limit ceiling.
+- The rate limit is 3,000 requests per site per day, with no per-visitor limit: one caller can use a site's whole daily allowance.
 
 ## Not supported
 
@@ -69,7 +68,7 @@ Publish the changed documentation configuration through the site's existing publ
 | `assistant_not_configured` | 503 | Gateway access is not configured. | Configure Gateway access; use ordinary documentation search meanwhile. |
 | `conversation_too_long` | 413 | Request body exceeds 512 KiB. | Start a new chat. |
 | `invalid_request` | 400 | The request could not be read. | Start a new chat and submit the question again. |
-| `rate_limited` | 429 | Visitor or site request ceiling reached. | Wait for `Retry-After`; the JSON response also includes `retryAfterSeconds`. |
+| `rate_limited` | 429 | Site's daily request ceiling reached. | Wait for `Retry-After`; the JSON response also includes `retryAfterSeconds`. |
 
 ## Verify
 

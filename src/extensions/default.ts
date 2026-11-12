@@ -127,9 +127,10 @@ export const extensions: DocsExtensions = {
             publicOrigin,
             // Under a base path the owner's proxy is this server's only
             // caller. On Vercel the one address the platform vouches for
-            // is the connecting one, the proxy's, so every visitor shares
-            // it. Anywhere else the address is read from the forwarded
-            // header the proxy sets, which still tells visitors apart.
+            // is the connecting one, the proxy's, so it must not verify a
+            // crawler's claimed name. Anywhere else the address is read
+            // from the forwarded header the proxy sets, which never
+            // verifies anyone anyway.
             sharedClientAddress:
                 basePath !== "" && env.VERCEL_ENV !== undefined,
         }

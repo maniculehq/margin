@@ -81,9 +81,8 @@ export default createServerEntry({
             ? {
                   basePath: resolution.basePath,
                   publicOrigin: resolution.publicOrigin,
-                  sharedClientAddress: resolution.sharedClientAddress ?? false,
               }
-            : { basePath: "", publicOrigin: null, sharedClientAddress: false }
+            : { basePath: "", publicOrigin: null }
         if (!scope.basePath) return siteScope().run(scope, () => serve(request))
 
         const url = new URL(request.url)
