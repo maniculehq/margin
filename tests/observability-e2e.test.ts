@@ -161,12 +161,11 @@ describe.skipIf(
                 e.properties.$pathname === "/test.md",
         )
         expect(event.properties.surface).toBe("docs_md")
-        expect(event.properties.is_agent).toBe(true)
-        expect(event.properties.agent_name).toBe("claudebot")
-        expect(event.properties.agent_kind).toBe("crawler")
-        expect(event.properties.agent_platform).toBe("anthropic")
-        expect(event.properties.agent_traffic_kind).toBe("training")
-        expect(event.properties.agent_bot_name).toBe("ClaudeBot")
+        expect(event.properties.traffic_category).toBe("crawler")
+        expect(event.properties.traffic_kind).toBe("training")
+        expect(event.properties.traffic_id).toBe("claudebot")
+        expect(event.properties.traffic_name).toBe("ClaudeBot")
+        expect(event.properties.traffic_operator).toBe("Anthropic")
         expect(event.properties.environment).toBe("preview")
         expect(event.properties.site_id).toBe("demo")
         expect(event.properties.status).toBe(200)
@@ -176,7 +175,7 @@ describe.skipIf(
     it("attributes a human click from an AI answer by its referring host only", async () => {
         const res = await fetch(`${baseUrl}/test`, {
             headers: {
-                "user-agent": "Mozilla/5.0 (Macintosh) Safari/605.1.15",
+                "user-agent": CHROME_UA,
                 referer: "https://chatgpt.com/c/abc123?secret=1",
             },
         })
@@ -186,11 +185,10 @@ describe.skipIf(
             (e) =>
                 e.event === "$pageview" &&
                 e.properties.$pathname === "/test" &&
-                e.properties.agent_traffic_kind === "human_ai_referral",
+                e.properties.ai_referral_platform === "openai",
         )
-        expect(event.properties.is_agent).toBe(false)
-        expect(event.properties.agent_platform).toBe("openai")
-        expect(event.properties.agent_detection).toBe("referrer")
+        expect(event.properties.traffic_category).toBe("human")
+        expect(event.properties.ai_referral_detection).toBe("referrer")
         expect(event.properties.$referring_domain).toBe("chatgpt.com")
         expect(JSON.stringify(event.properties)).not.toContain("abc123")
     })
@@ -224,8 +222,9 @@ describe.skipIf(
                 e.properties.markdown_negotiated === true,
         )
         expect(event.properties.surface).toBe("docs_html")
-        expect(event.properties.agent_signal).toBe("accept")
-        expect(event.properties.agent_kind).toBe("unknown-agent")
+        expect(event.properties.traffic_category).toBe("agent")
+        expect(event.properties.traffic_kind).toBe("unidentified")
+        expect(event.properties.traffic_signal).toBe("accept")
     }, 15_000)
 
     it("emits mcp_tool_called alongside the api_request envelope", async () => {
@@ -319,8 +318,8 @@ describe.skipIf(
                 e.properties.$pathname === "/llms.txt" &&
                 e.properties.$raw_user_agent === CHROME_UA,
         )
-        expect(event.properties.is_agent).toBe(false)
-        expect(event.properties.agent_kind).toBe("human")
+        expect(event.properties.traffic_category).toBe("human")
+        expect(event.properties.traffic_kind).toBeNull()
     }, 15_000)
 
     it("never blocks the response on a slow analytics sink", async () => {

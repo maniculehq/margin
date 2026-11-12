@@ -9,10 +9,11 @@ import { waitUntil } from "@vercel/functions"
 import { PostHog } from "posthog-node"
 import { extensions } from "#docs-extensions"
 import type { DocsSite, SiteResolution } from "@/extensions/types"
-import { classifyAgentTraffic } from "@/types/docs"
+import { aiReferral, browserCheck } from "@/types/traffic"
 import { env } from "../env"
-import { type AgentEvent, agentConfig, KNOWN_AGENTS } from "./agent.config"
+import { type AgentEvent, agentConfig } from "./agent.config"
 import { wantsMarkdown } from "./agent-content"
+import { requestTraffic } from "./traffic"
 
 declare global {
     var __frameworkPostHogClient: PostHog | undefined
@@ -47,40 +48,6 @@ export function webmcpEnabled(site: DocsSite): boolean {
         site.webmcpEnabled ||
         extensions.webmcpRollout?.(site, posthogClient()) === true
     )
-}
-
-export interface AgentIdentity {
-    isAgent: boolean
-    /** Normalized KNOWN_AGENTS name ("claudebot") or null when only Accept matched. */
-    agentName: string | null
-    agentKind: "crawler" | "assistant" | "tool" | "unknown-agent" | "human"
-    /** Which detection signal fired: UA match, Accept-markdown preference, or both. */
-    signal: "ua" | "accept" | "both" | null
-}
-
-/** An agent = known AI User-Agent AND/OR an Accept header preferring markdown. */
-export function classifyAgent(
-    ua: string,
-    acceptsMarkdown: boolean,
-): AgentIdentity {
-    const match = KNOWN_AGENTS.find((agent) => agent.pattern?.test(ua))
-    if (match) {
-        return {
-            isAgent: true,
-            agentName: match.name,
-            agentKind: match.kind,
-            signal: acceptsMarkdown ? "both" : "ua",
-        }
-    }
-    if (acceptsMarkdown) {
-        return {
-            isAgent: true,
-            agentName: null,
-            agentKind: "unknown-agent",
-            signal: "accept",
-        }
-    }
-    return { isAgent: false, agentName: null, agentKind: "human", signal: null }
 }
 
 /** Cookieless visitor identity. 32 hex chars of sha256 — raw IP is never stored. */
@@ -252,12 +219,14 @@ async function deliver(
         resolution?.site?.slug ??
         host
     const acceptsMarkdown = wantsMarkdown(request)
-    const identity = classifyAgent(snapshot.ua, acceptsMarkdown)
-    // The traffic taxonomy agent-traffic reports read back over HogQL:
-    // provider + citation/training/indexing per request, and AI-product
-    // referrals by referrer or utm_source. Only the referrer's host is kept.
-    const traffic = classifyAgentTraffic({
-        userAgent: snapshot.ua || null,
+    // Who is asking (human, crawler, agent or other automation), and for a
+    // human, the AI product whose answer sent them. Reports read both back
+    // over HogQL. Only the referrer's host is kept.
+    const traffic = await requestTraffic(
+        request,
+        resolution?.sharedClientAddress ?? false,
+    )
+    const referral = aiReferral({
         referer: snapshot.referer,
         requestPath: `${url.pathname}${url.search}`,
     })
@@ -280,14 +249,24 @@ async function deliver(
         $pathname: url.pathname,
         $raw_user_agent: snapshot.ua,
         site_id: resolution?.site?.slug ?? null,
-        is_agent: identity.isAgent,
-        agent_name: identity.agentName,
-        agent_kind: identity.agentKind,
-        agent_signal: identity.signal,
-        agent_platform: traffic.platform,
-        agent_traffic_kind: traffic.kind,
-        agent_bot_name: traffic.botName,
-        agent_detection: traffic.detectionMethod,
+        traffic_category: traffic.category,
+        traffic_kind: traffic.kind,
+        traffic_id: traffic.id,
+        traffic_name: traffic.name,
+        traffic_operator: traffic.operator,
+        traffic_verified: traffic.verified,
+        traffic_signal: traffic.signal,
+        // Recorded, not yet counted: whether a browser user agent's headers
+        // look like a browser's (types/traffic.ts browserCheck).
+        browser_check: browserCheck(snapshot.ua, (name) =>
+            request.headers.get(name),
+        ),
+        ai_referral_platform: referral?.platform ?? null,
+        ai_referral_detection: referral?.detection ?? null,
+        // The one header besides the user agent that classification reads,
+        // kept so a later rule change can be applied to stored events.
+        accept_header: request.headers.get("accept")?.slice(0, 256) ?? null,
+        classification_version: 2,
         $referring_domain: referringDomain,
         environment:
             resolution?.preview || env.VERCEL_ENV !== "production"

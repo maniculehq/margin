@@ -83,7 +83,7 @@ describe.skipIf(!hasDocsDb)("recordFeedback → docs_agent_feedback", () => {
                 suggestedFix: "Use `acme deploy`.",
                 answerId: null,
                 agentName: "claudebot",
-                agentKind: "crawler",
+                agentKind: "training",
             }),
         ])
     })

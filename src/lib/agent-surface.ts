@@ -1,5 +1,5 @@
 import { formatDocsPath } from "@/types/docs"
-import { KNOWN_AGENTS } from "./agent.config"
+import { ROBOTS_AGENT_TOKENS } from "./agent.config"
 import {
     type DocPage,
     externalPointer,
@@ -149,9 +149,7 @@ export function buildSitemapMarkdown(
 
 /**
  * robots.txt allowing all (incl. named AI crawlers) and advertising the sitemap.
- * The named entries derive from the canonical KNOWN_AGENTS registry (they are
- * already allowed by the wildcard; naming them documents intent and survives
- * stricter default-deny tooling). Every group carries the site's
+ * The named groups are ROBOTS_AGENT_TOKENS. Every group carries the site's
  * Content-Signal (https://contentsignals.org): a crawler obeys only the most
  * specific group naming it, so a signal on the wildcard alone would never
  * reach the named crawlers.
@@ -166,9 +164,7 @@ export function buildRobots(siteUrl: string, contentSignal: string): string {
         "",
     ]
     const lines = group("*")
-    for (const agent of KNOWN_AGENTS) {
-        if (agent.robotsToken) lines.push(...group(agent.robotsToken))
-    }
+    for (const token of ROBOTS_AGENT_TOKENS) lines.push(...group(token))
     lines.push(`Sitemap: ${siteUrl}/sitemap.xml`, "")
     return lines.join("\n")
 }

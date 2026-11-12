@@ -11,10 +11,10 @@ import {
     DOCS_AGENT_FEEDBACK_KINDS,
     DOCS_AGENT_FEEDBACK_SOURCES,
 } from "@/types/constants"
+import { classifyTraffic } from "@/types/traffic"
 import { env as frameworkEnv } from "../env"
 import { normalizeDocUrl } from "./agent-content"
 import { siteScope } from "./base-path"
-import { classifyAgent } from "./observability"
 import type { SiteSource } from "./source"
 
 export const feedbackSchema = z
@@ -111,7 +111,9 @@ export function recordFeedback(
     input: FeedbackInput,
 ): Promise<void> {
     const exists = pageExists(ctx, input.url)
-    const agent = classifyAgent(request.headers.get("user-agent") ?? "", false)
+    const traffic = classifyTraffic({
+        userAgent: request.headers.get("user-agent") ?? "",
+    })
     // Async IIFE: the db client resolves lazily and may throw synchronously
     // (no DATABASE_URL); that must land in the catch below, not the caller.
     const persisted = (async () => {
@@ -178,8 +180,8 @@ export function recordFeedback(
             message: input.message ?? null,
             suggestedFix: input.suggestedFix ?? null,
             answerId: input.answerId ?? null,
-            agentName: agent.agentName?.slice(0, 255) ?? null,
-            agentKind: agent.agentKind,
+            agentName: traffic.id,
+            agentKind: traffic.kind ?? traffic.category,
         })
     })().catch(async (error: unknown) => {
         Sentry.captureException(error)
