@@ -90,6 +90,7 @@ export function DocsFooter(props: {
     return (
         <footer
             id="footer"
+            data-layout-item="footer"
             data-footer-variant="luma"
             // Placed by fumadocs' named `main` area lines, not track numbers:
             // the implicit row after `main`, under the main track and the TOC

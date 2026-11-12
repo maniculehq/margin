@@ -3,6 +3,7 @@ import { createRequire } from "node:module"
 import { dirname, posix } from "node:path"
 import { createCompiler } from "@fumadocs/mdx-remote"
 import {
+    type RemarkHeadingOptions,
     rehypeCodeDefaultOptions,
     remarkMdxMermaid,
     remarkStructure,
@@ -81,6 +82,7 @@ import {
 } from "./config"
 import { type DocsFontInputs, MAX_FONT_IMPORTS } from "./fonts"
 import { type HastFallbackReason, prepareHastArtifact } from "./hast-artifact"
+import { headingSlug } from "./heading-slug"
 import {
     remarkResolveIconAttributes,
     transformerAuthoredIcon,
@@ -364,6 +366,10 @@ function humanize(value: string): string {
             return `${word.charAt(0).toUpperCase()}${lower.slice(1)}`
         })
         .join(" ")
+}
+
+const HEADING_OPTIONS: RemarkHeadingOptions = {
+    slug: (root, _heading, text) => headingSlug(root, text),
 }
 
 /**
@@ -1658,6 +1664,7 @@ export async function compileDocs(
         const capturedTrees: HastRoot[] = []
         const compiler = createCompiler({
             remarkImageOptions: false,
+            remarkHeadingOptions: HEADING_OPTIONS,
             rehypeCodeOptions: {
                 ...rehypeCodeDefaultOptions,
                 engine: "oniguruma",
@@ -1824,6 +1831,7 @@ export async function compileDocs(
         snippetConstants.set(file.path, constants)
         const compiler = createCompiler({
             remarkImageOptions: false,
+            remarkHeadingOptions: HEADING_OPTIONS,
             rehypeCodeOptions: {
                 ...rehypeCodeDefaultOptions,
                 // Oniguruma (WASM), not fumadocs' default "js" engine: the JS
@@ -2161,6 +2169,7 @@ export async function compileDocs(
         const pageConstants = new Map<string, StaticMdxValue>()
         const compiler = createCompiler({
             remarkImageOptions: false,
+            remarkHeadingOptions: HEADING_OPTIONS,
             rehypeCodeOptions: {
                 ...rehypeCodeDefaultOptions,
                 // Oniguruma (WASM), not fumadocs' default "js" engine: the JS

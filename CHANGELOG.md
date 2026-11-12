@@ -5,6 +5,21 @@ Semantic Versioning once a stable public API is published.
 
 ## Unreleased
 
+### Added
+
+- Site stylesheets can target page regions and components by the common
+  `docs.json` hooks: `#navbar`, `#sidebar`, `#content-area`,
+  `#table-of-contents`, `#pagination` and `#footer`; `.card`, `.callout`,
+  `.code-block`, `.code-group` and `.frame`; `data-component-part` values
+  such as `card-title`; and `html[data-current-path]`. Redefining
+  `--rounded-lg`, `--rounded-xl` or `--rounded-2xl` on `:root` reshapes
+  cards, code blocks, callouts and sidebar rows. See "Target page regions
+  and components" in the CSS guide.
+- A section prefix with no page of its own, such as `/guides`, redirects to
+  the first page under it in navigation order.
+- The MCP server also answers `POST /mcp`, for clients configured with that
+  path.
+
 ### Changed
 
 - The default theme and every layout preset now follow their Mintlify
@@ -15,12 +30,27 @@ Semantic Versioning once a stable public API is published.
   accent from `colors` or a logo that would fall below 4.5:1 is darkened or
   lightened until it passes; `colors.light` sets the dark-mode accent and
   `colors.dark` the button fill, as in Mintlify.
+- Heading anchors turn punctuation into hyphens instead of dropping it, keep
+  symbols such as `&` and `/`, and number a repeated heading from 2:
+  `decision.id` is `#decision-id`, and a second `Install` is `#install-2`.
+  A link to an anchor in the former form still scrolls to its heading.
+- A site that sets `"theme": "mint"` gets a text column up to 45rem wide,
+  white cards and code blocks in light mode, 14px callouts, baseline-aligned
+  tables with regular-weight headers, a padded `Frame`, a solid navbar
+  button and plain previous/next links.
+- A stylesheet rule that reads the root's state and styles a descendant,
+  such as `html[data-current-path^="/api"] #banner { display: none }`, is
+  kept. It used to be dropped as a global layout rule.
+- A Google Fonts `@import` at the top of any stylesheet is loaded, not only
+  one in the first file.
 - The header omits its tab row when navigation has a single content tab.
   A lone link-only or menu tab, such as a `navigation.global.tabs` link to
   support, keeps the row.
 
 ### Fixed
 
+- The `comment`, `comments` and `message` icon names render speech bubbles
+  instead of a reply arrow.
 - Changelog RSS feeds no longer date entries whose label is not a date: a
   label such as `1.4.0` or `Release 7` used to get a publication date in 2000
   or 2001. An entry now gets a date only when its label includes its

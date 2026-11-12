@@ -1,0 +1,12 @@
+{
+    "theme": "mint",
+    "name": "Site CSS",
+    "colors": { "primary": "#2563eb" },
+    "background": { "color": { "light": "#f8f6f1", "dark": "#0f0f0f" } },
+    "navigation": {
+        "groups": [
+            { "group": "Start", "pages": ["index"] },
+            { "group": "Guides", "pages": ["guides/first", "guides/second"] }
+        ]
+    }
+}

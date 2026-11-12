@@ -654,7 +654,7 @@ export function baseOptions(input: BaseOptionsInput): BaseLayoutProps & {
                         src={withBase(logoSources.light)}
                         alt={logoAlt}
                         {...logoSize}
-                        className="h-7 w-auto dark:hidden"
+                        className="nav-logo h-7 w-auto dark:hidden"
                     />
                 ) : null}
                 {logoSources.dark.startsWith("/_assets/") ? (
@@ -663,7 +663,7 @@ export function baseOptions(input: BaseOptionsInput): BaseLayoutProps & {
                         src={withBase(logoSources.dark)}
                         alt={logoAlt}
                         {...logoSize}
-                        className="hidden h-7 w-auto dark:block"
+                        className="nav-logo hidden h-7 w-auto dark:block"
                     />
                 ) : null}
             </span>

@@ -199,7 +199,9 @@ function TintedCallout({
     return (
         <Callout
             {...props}
+            className={cn("callout", props.className)}
             data-callout={key}
+            data-callout-type={key}
             icon={CALLOUT_ICONS[key] ?? CALLOUT_ICONS.info}
         />
     )
@@ -259,11 +261,17 @@ function IconCard({
     const showArrow = arrow === undefined ? external : flagProp(arrow)
     const Root = href === undefined ? "div" : FumaLink
     const body = (
-        <div className={cn("min-w-0", isHorizontal && "flex-1")}>
+        <div
+            data-component-part="card-content-container"
+            className={cn("min-w-0", isHorizontal && "flex-1")}
+        >
             {title !== undefined && title !== null && title !== "" ? (
                 // Card title: 16px/600 (an h2 upstream); the
                 // description and body copy read 16px in the muted tone.
-                <span className="not-prose mb-1 block font-semibold text-base">
+                <span
+                    data-component-part="card-title"
+                    className="not-prose mb-1 block font-semibold text-base"
+                >
                     {title}
                 </span>
             ) : null}
@@ -272,7 +280,10 @@ function IconCard({
                     {description}
                 </p>
             ) : null}
-            <div className="prose-no-margin text-base text-fd-muted-foreground empty:hidden">
+            <div
+                data-component-part="card-content"
+                className="prose prose-no-margin text-base text-fd-muted-foreground leading-6 empty:hidden"
+            >
                 {typeof img === "string" &&
                 img.startsWith("/_assets/") &&
                 !isHorizontal ? (
@@ -281,12 +292,16 @@ function IconCard({
                     <img
                         src={withBase(img, base)}
                         alt=""
+                        data-component-part="card-image"
                         className="-mx-4 -mt-4 mb-3 w-[calc(100%+2rem)] max-w-none rounded-t-xl object-cover"
                     />
                 ) : null}
                 {children}
                 {cta ? (
-                    <span className="mt-auto flex items-center gap-1 pt-2 font-medium text-fd-foreground text-sm">
+                    <span
+                        data-component-part="card-cta"
+                        className="mt-auto flex items-center gap-1 pt-2 font-medium text-fd-foreground text-sm"
+                    >
                         {cta}
                         <span
                             aria-hidden
@@ -308,7 +323,7 @@ function IconCard({
             // instead of fumadocs' gray wash. Horizontal cards swap to a
             // compact icon-beside-text row.
             className={cn(
-                "@max-lg:col-span-full block rounded-xl border bg-fd-card p-4 text-fd-card-foreground transition-colors",
+                "card @max-lg:col-span-full block rounded-xl border bg-fd-card p-4 text-fd-card-foreground transition-colors",
                 "group relative flex",
                 isHorizontal ? "flex-row items-start gap-3" : "flex-col",
                 href !== undefined &&
@@ -321,6 +336,7 @@ function IconCard({
             ) : null}
             {resolvedIcon ? (
                 <div
+                    data-component-part="card-icon"
                     className={cn(
                         "not-prose w-fit rounded-lg border bg-fd-muted p-1.5 text-fd-muted-foreground shadow-md [&_svg]:size-4",
                         isHorizontal ? "shrink-0" : "mb-2",
@@ -376,7 +392,7 @@ function CodeBlockActions(props: {
         // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: observes clicks bubbling from native buttons, which keyboard activation also fires; the div itself is not interactive
         <div
             className={cn(
-                "flex items-center gap-0.5 empty:hidden",
+                "code-block-actions flex items-center gap-0.5 empty:hidden",
                 props.className,
             )}
             // fumadocs' copy button (the slot children) is the one button
@@ -487,9 +503,14 @@ function DocsCodeBlock({ children, ...props }: ComponentProps<"pre">) {
     const Actions = (slot: { className?: string; children?: ReactNode }) => (
         <CodeBlockActions {...slot} code={children} language={language} />
     )
+    const hooked = {
+        ...props,
+        "data-component-part": "code-block-root",
+        className: cn("code-block", props.className),
+    }
     if (!("data-expandable" in props))
         return (
-            <CodeBlock {...props} Actions={Actions}>
+            <CodeBlock {...hooked} Actions={Actions}>
                 <Pre>{children}</Pre>
             </CodeBlock>
         )
@@ -505,7 +526,7 @@ function DocsCodeBlock({ children, ...props }: ComponentProps<"pre">) {
         : 0
     return (
         <CodeBlock
-            {...props}
+            {...hooked}
             Actions={Actions}
             viewportProps={{
                 className: expanded ? "max-h-none" : "max-h-80",
@@ -638,7 +659,7 @@ function Columns({
         Number.isInteger(count) && count >= 1 && count <= 4 ? count : 2
     return (
         <div className="@container my-4">
-            <div className={`grid gap-4 ${COLUMN_CLASSES[columns]}`}>
+            <div className={`columns grid gap-4 ${COLUMN_CLASSES[columns]}`}>
                 {children}
             </div>
         </div>
@@ -649,7 +670,10 @@ function Badge({ children }: { children?: ReactNode }) {
     // Neutral gray pill — the pink tint made "Required" badges
     // read as links.
     return (
-        <span className="inline-flex items-center rounded-full border bg-fd-muted px-2 py-0.5 font-medium text-fd-muted-foreground text-xs">
+        <span
+            data-badge=""
+            className="inline-flex items-center rounded-full border bg-fd-muted px-2 py-0.5 font-medium text-fd-muted-foreground text-xs"
+        >
             {children}
         </span>
     )
@@ -686,7 +710,7 @@ function ParamField({
     const paramName = path ?? query ?? body ?? header ?? name ?? ""
     const defaultValue = rest.default
     return (
-        <div className="my-4 border-fd-border border-b pb-4 last:border-b-0">
+        <div className="field my-4 border-fd-border border-b pb-4 last:border-b-0">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 {/* Emphasis: the flag NAME is bare primary mono;
                     the type sits in the gray chip (we had it reversed). */}
@@ -737,7 +761,7 @@ function Frame({
     // media fills the frame (videos get playback attributes via the `video`
     // intrinsic override below).
     return (
-        <figure className="my-6">
+        <figure className="frame my-6">
             <div className="overflow-hidden rounded-xl [&_img]:my-0 [&_img]:w-full [&_video]:my-0 [&_video]:w-full">
                 {children}
             </div>
@@ -758,7 +782,7 @@ function Frame({
 function Tooltip({ children, tip }: { children?: ReactNode; tip: string }) {
     return (
         <span
-            className="group relative inline-flex border-b border-dotted"
+            className="tooltip group relative inline-flex border-b border-dotted"
             // biome-ignore lint/a11y/noNoninteractiveTabindex: the tooltip opens on focus — keyboard users need the trigger tabbable
             tabIndex={0}
         >
@@ -806,7 +830,7 @@ function Update({
             // JSON, not comma-joined: tags may legitimately contain commas
             // and the Filters rail must round-trip them as single tags.
             data-update-tags={JSON.stringify(parsedTags)}
-            className="my-8 flex scroll-mt-[calc(7rem+var(--fd-banner-height,0px))] flex-col gap-4 border-b pb-8 last:border-b-0 md:flex-row md:gap-8"
+            className="update my-8 flex scroll-mt-[calc(7rem+var(--fd-banner-height,0px))] flex-col gap-4 border-b pb-8 last:border-b-0 md:flex-row md:gap-8"
         >
             <div className="shrink-0 md:w-40">
                 <div className="flex flex-row flex-wrap items-center gap-2 md:sticky md:top-24 md:flex-col md:items-start md:gap-3">
@@ -908,14 +932,16 @@ function Tabs({ children, items, ...props }: ComponentProps<typeof FumaTabs>) {
             persist
             {...props}
             defaultValue={slugOf(props.defaultValue) ?? tabs[0]?.value}
-            className={cn("docs-tabs", props.className)}
+            className={cn("tabs docs-tabs", props.className)}
         >
             <TabsList>
                 {tabs.map((tab) => (
                     <TabsTrigger key={tab.value} value={tab.value}>
                         {tab.icon ? (
                             <span className="inline-flex items-center gap-1.5 [&_svg]:size-4">
-                                {tab.icon}
+                                <span className="tab-icon contents">
+                                    {tab.icon}
+                                </span>
                                 {tab.label}
                             </span>
                         ) : (
@@ -969,7 +995,7 @@ function Step({
     const TitleTag = titleSize === "h2" || titleSize === "h3" ? titleSize : "p"
     return (
         <div
-            className="fd-step"
+            className="step fd-step"
             {...(resolvedIcon ? { "data-step-icon": "" } : {})}
             style={
                 Number.isFinite(parsedNumber) && parsedNumber > 0
@@ -1036,6 +1062,7 @@ function SafeLink({ href, children, ...props }: ComponentProps<"a">) {
                 ? { target: "_blank", rel: "noreferrer noopener" }
                 : {})}
             {...props}
+            className={cn("link", props.className)}
         >
             {children}
         </a>
@@ -1050,7 +1077,10 @@ const InsideAccordionGroup = createContext(false)
 function AccordionGroup(props: ComponentProps<typeof Accordions>) {
     return (
         <InsideAccordionGroup.Provider value={true}>
-            <Accordions {...props} />
+            <Accordions
+                {...props}
+                className={cn("accordion-group", props.className)}
+            />
         </InsideAccordionGroup.Provider>
     )
 }
@@ -1077,7 +1107,11 @@ function AccordionEntry({
 }) {
     const resolvedValue = value ?? String(title)
     return (
-        <AccordionItem value={resolvedValue} {...props}>
+        <AccordionItem
+            value={resolvedValue}
+            {...props}
+            className={cn("accordion", props.className)}
+        >
             <AccordionHeader asChild>
                 <div id={id} data-accordion-value={resolvedValue}>
                     <AccordionTrigger>{title}</AccordionTrigger>
@@ -1161,7 +1195,7 @@ function Expandable({
 }) {
     return (
         <details
-            className="group my-3 rounded-lg border border-fd-border"
+            className="expandable group my-3 rounded-lg border border-fd-border"
             open={defaultOpen === true}
         >
             <summary className="cursor-pointer select-none px-3 py-2 font-medium text-fd-muted-foreground text-sm group-open:border-fd-border group-open:border-b">
@@ -1213,7 +1247,7 @@ function DocsIcon({
     if (!svg) return null
     return (
         <span
-            className="inline-flex shrink-0 align-[-0.125em] [&>svg]:size-full"
+            className="icon inline-flex shrink-0 align-[-0.125em] [&>svg]:size-full"
             style={{ width: dimension, height: dimension, color }}
             // biome-ignore lint/security/noDangerouslySetInnerHtml: SVGs come from the committed icon map, not site input
             dangerouslySetInnerHTML={{ __html: svg }}
@@ -1317,14 +1351,26 @@ function TreeFile({
     name,
     ...props
 }: Omit<ComponentProps<typeof FumaFile>, "name"> & { name?: string }) {
-    return <FumaFile name={name ?? ""} {...props} />
+    return (
+        <FumaFile
+            name={name ?? ""}
+            {...props}
+            className={cn("tree-file", props.className)}
+        />
+    )
 }
 
 function TreeFolder({
     name,
     ...props
 }: Omit<ComponentProps<typeof FumaFolder>, "name"> & { name?: string }) {
-    return <FumaFolder name={name ?? ""} {...props} />
+    return (
+        <FumaFolder
+            name={name ?? ""}
+            {...props}
+            className={cn("tree-folder", props.className)}
+        />
+    )
 }
 
 /**
@@ -1333,7 +1379,7 @@ function TreeFolder({
  */
 const Tree = Object.assign(
     function Tree({ children }: { children?: ReactNode }) {
-        return <FumaFiles className="my-6">{children}</FumaFiles>
+        return <FumaFiles className="tree my-6">{children}</FumaFiles>
     },
     { File: TreeFile, Folder: TreeFolder },
 )
@@ -1392,7 +1438,7 @@ function Tile({
         <Root
             {...(linked ? { href: normalizedHref } : {})}
             data-card
-            className="group block min-w-0 overflow-hidden rounded-xl border bg-fd-card text-fd-card-foreground transition-colors hover:border-fd-primary/50"
+            className="tile group block min-w-0 overflow-hidden rounded-xl border bg-fd-card text-fd-card-foreground transition-colors hover:border-fd-primary/50"
         >
             <div className="flex h-40 items-center justify-center overflow-hidden border-b bg-fd-muted/40 p-4 [&_img]:my-0 [&_img]:max-h-full [&_img]:w-auto [&_svg]:max-h-full">
                 {children}
@@ -1570,9 +1616,22 @@ const Color = Object.assign(
  * authoring allow-list rejects them.
  */
 const pipelineComponents = {
-    CodeBlockTab,
-    CodeBlockTabs,
-    CodeBlockTabsList,
+    // The code-group hooks site stylesheets target.
+    CodeBlockTab: (props: ComponentProps<typeof CodeBlockTab>) => (
+        <CodeBlockTab data-component-part="code-group-tab-content" {...props} />
+    ),
+    CodeBlockTabs: (props: ComponentProps<typeof CodeBlockTabs>) => (
+        <CodeBlockTabs
+            {...props}
+            className={cn("code-group", props.className)}
+        />
+    ),
+    CodeBlockTabsList: (props: ComponentProps<typeof CodeBlockTabsList>) => (
+        <CodeBlockTabsList
+            data-component-part="code-group-tab-bar"
+            {...props}
+        />
+    ),
     CodeBlockTabsTrigger: CodeTabTrigger,
     // remark-view-groups (ingest) wraps consecutive <View> runs in this
     // synthetic selector group; an authored <ViewGroup> never survives the

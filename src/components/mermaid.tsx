@@ -88,5 +88,11 @@ export function Mermaid({ chart }: { chart?: string }) {
             </pre>
         )
     }
-    return <div ref={containerRef} className="my-4 flex justify-center" />
+    return (
+        <div
+            ref={containerRef}
+            data-component-name="mermaid-container"
+            className="mermaid my-4 flex justify-center"
+        />
+    )
 }

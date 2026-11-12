@@ -353,6 +353,7 @@ function tabClass(
     alignEnd: boolean,
 ) {
     return cn(
+        "nav-tabs-item",
         variant === "pill"
             ? "inline-flex h-9 items-center gap-2 rounded-full px-4 font-medium text-fd-muted-foreground text-sm text-nowrap transition-colors hover:bg-fd-foreground/[0.03] hover:text-fd-foreground"
             : "inline-flex h-full items-center gap-2 border-b-2 border-transparent font-medium text-fd-muted-foreground text-sm text-nowrap transition-colors hover:text-fd-foreground",
@@ -685,7 +686,7 @@ export function DocsHeader(props: {
                 {pillRow ? (
                     <nav
                         aria-label="Documentation tabs"
-                        className="flex items-center gap-1"
+                        className="nav-tabs flex items-center gap-1"
                     >
                         {tabs.map((tab) => (
                             <TabLink
@@ -720,6 +721,7 @@ export function DocsHeader(props: {
                                         // a loud brand fill.
                                         <a
                                             href={withBase(link.href)}
+                                            data-primary=""
                                             {...(link.external
                                                 ? {
                                                       rel: "noreferrer noopener",
@@ -786,7 +788,7 @@ export function DocsHeader(props: {
                 <nav
                     aria-label="Documentation tabs"
                     className={cn(
-                        "mx-auto flex h-[var(--docs-band-tabs)] w-full max-w-[var(--fd-layout-width,97rem)] overflow-x-auto px-9",
+                        "nav-tabs mx-auto flex h-[var(--docs-band-tabs)] w-full max-w-[var(--fd-layout-width,97rem)] overflow-x-auto px-9",
                         luma ? "items-center gap-1" : "gap-6",
                     )}
                 >

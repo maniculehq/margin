@@ -4,10 +4,12 @@ import {
     getRouteApi,
     notFound,
     redirect,
+    useLocation,
 } from "@tanstack/react-router"
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start"
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server"
 import { getCache, waitUntil } from "@vercel/functions"
+import { flattenTree } from "fumadocs-core/page-tree"
 import { deserializePageTree } from "fumadocs-core/source/client"
 import type { TOCItemType } from "fumadocs-core/toc"
 import { fetchRepositoryInfo } from "fumadocs-ui/components/github-info"
@@ -681,6 +683,23 @@ const serverLoader = createServerFn({
                     href: withBase(`${canonical}${requestSearch}`),
                     reloadDocument: true,
                     statusCode: 308,
+                })
+            }
+            // A section prefix with no page of its own (/guides) goes to the
+            // first page under it in navigation order. Temporary: the
+            // target moves when the navigation is reordered.
+            const firstUnderPrefix = flattenTree(
+                source.getPageTree().children,
+            ).find(
+                (node) =>
+                    node.external !== true &&
+                    node.url.startsWith(`${pathname}/`),
+            )
+            if (firstUnderPrefix && pathname !== "/") {
+                throw redirect({
+                    href: withBase(`${firstUnderPrefix.url}${requestSearch}`),
+                    reloadDocument: true,
+                    statusCode: 307,
                 })
             }
             // docs.json errors.404.redirect: unknown paths go home instead of
@@ -1636,6 +1655,40 @@ function DocContent(props: {
                 : { source: sourceToc, clone: [...sourceToc] },
         )
     }, [sourceToc])
+    // Anchors made before headings took their current slug form dropped
+    // punctuation ("decision.id" → "decisionid") and numbered repeats from
+    // 1. A link to one of those matches no id now, so find its heading by
+    // slugging the visible headings the old way. Keyed on the router's
+    // hash (an in-page link moves it without a hashchange event) and on
+    // the outline, which is replaced once a client-rendered body mounts
+    // its headings.
+    const pageUrl = props.pageUrl
+    const hash = useLocation({ select: (location) => location.hash })
+    // biome-ignore lint/correctness/useExhaustiveDependencies: re-runs when the page or its outline changes; the effect reads the DOM, not these values
+    useEffect(() => {
+        if (!hash || document.getElementById(hash)) return
+        const seen = new Map<string, number>()
+        for (const heading of document.querySelectorAll(
+            "#nd-page :is(h2, h3, h4, h5, h6)[id]",
+        )) {
+            // The heading's own link holds its text; the copy button
+            // beside it adds a label.
+            const base = (
+                (heading.querySelector(":scope > a") ?? heading).textContent ??
+                ""
+            )
+                .trim()
+                .toLowerCase()
+                .replace(/[^\p{L}\p{M}\p{N}\p{Pc}\- ]/gu, "")
+                .replace(/ /g, "-")
+            const count = seen.get(base) ?? 0
+            seen.set(base, count + 1)
+            if ((count === 0 ? base : `${base}-${count}`) === hash) {
+                heading.scrollIntoView()
+                return
+            }
+        }
+    }, [pageUrl, hash, toc])
     // Server-rendered loading state for client-only bodies: shown
     // pre-hydration by ClientOnly AND during the lazy OpenAPI chunk load.
     const bodySkeleton = (
@@ -1760,13 +1813,18 @@ function DocContent(props: {
                 rendered. */}
             {props.pageMode === "frame" ||
             props.pageMode === "custom" ? null : (
-                <>
+                // One box for the title area (the `#header` stylesheet hook), spaced
+                // like the page container it sits in.
+                <div
+                    data-layout-item="page-header"
+                    className="flex flex-col gap-4"
+                >
                     {props.eyebrow ? (
                         // Eyebrow: semibold with a ~10px gap to the title
                         // (the page container's gap-4 minus this margin).
                         <span
                             data-eyebrow=""
-                            className="-mb-1.5 font-semibold text-fd-primary text-sm"
+                            className="eyebrow -mb-1.5 font-semibold text-fd-primary text-sm"
                         >
                             {props.eyebrow}
                         </span>
@@ -1893,12 +1951,12 @@ function DocContent(props: {
                                 )}
                         </DocsDescription>
                     ) : null}
-                </>
+                </div>
             )}
             {/* Code block "Report issue" actions extend this page's
                 prefilled GitHub issue URL (null → action hidden). */}
             <CodeIssueContext value={props.issueUrl}>
-                <DocsBody>
+                <DocsBody className="mdx-content">
                     <ArticleImages>
                         {props.body?.kind === "hast" ? (
                             // SSR renders pure-data bodies without site code. Key
@@ -2019,11 +2077,14 @@ function DocContent(props: {
             props.chrome === "sidenav" ? (
                 // maple pagination: a plain muted "Previous" text
                 // link beside ONE prominent Next card, right-aligned.
-                <div className="mt-10 flex items-center justify-end gap-5 text-sm">
+                <div
+                    data-layout-item="pagination"
+                    className="mt-10 flex items-center justify-end gap-5 text-sm"
+                >
                     {props.pagination.previous ? (
                         <ChromeLink
                             href={props.pagination.previous.url}
-                            className="inline-flex items-center gap-1 text-fd-muted-foreground transition-colors hover:text-fd-accent-foreground"
+                            className="pagination-prev inline-flex items-center gap-1 text-fd-muted-foreground transition-colors hover:text-fd-accent-foreground"
                         >
                             <ChevronLeftIcon className="-ms-1 size-3.5" />
                             {strings.previous}
@@ -2032,13 +2093,13 @@ function DocContent(props: {
                     {props.pagination.next ? (
                         <ChromeLink
                             href={props.pagination.next.url}
-                            className="flex w-1/2 flex-col items-end gap-1.5 rounded-xl border p-4 text-end transition-colors hover:bg-fd-accent/50"
+                            className="pagination-next flex w-1/2 flex-col items-end gap-1.5 rounded-xl border p-4 text-end transition-colors hover:bg-fd-accent/50"
                         >
                             <span className="inline-flex items-center gap-1 text-fd-muted-foreground text-xs">
                                 {strings.next}
                                 <ChevronRightIcon className="-me-1 size-3.5" />
                             </span>
-                            <span className="font-medium">
+                            <span className="pagination-title font-medium">
                                 {props.pagination.next.name}
                             </span>
                         </ChromeLink>
@@ -2051,14 +2112,17 @@ function DocContent(props: {
                 // title first, then the muted "Previous"/"Next" caption with
                 // its chevron — no description line. 12/16 padding, 12px
                 // radius.
-                <div className="mt-10 grid grid-cols-2 gap-4 text-sm">
+                <div
+                    data-layout-item="pagination"
+                    className="mt-10 grid grid-cols-2 gap-4 text-sm"
+                >
                     {props.pagination.previous ? (
                         <ChromeLink
                             href={props.pagination.previous.url}
                             rel="prev"
-                            className="flex flex-col gap-1 rounded-xl border px-4 py-3 transition-colors hover:bg-fd-accent/50"
+                            className="pagination-prev flex flex-col gap-1 rounded-xl border px-4 py-3 transition-colors hover:bg-fd-accent/50"
                         >
-                            <span className="truncate font-medium">
+                            <span className="pagination-title truncate font-medium">
                                 {props.pagination.previous.name}
                             </span>
                             <span className="inline-flex items-center gap-1 text-fd-muted-foreground text-sm">
@@ -2073,9 +2137,9 @@ function DocContent(props: {
                         <ChromeLink
                             href={props.pagination.next.url}
                             rel="next"
-                            className="flex flex-col items-end gap-1 rounded-xl border px-4 py-3 text-end transition-colors hover:bg-fd-accent/50"
+                            className="pagination-next flex flex-col items-end gap-1 rounded-xl border px-4 py-3 text-end transition-colors hover:bg-fd-accent/50"
                         >
-                            <span className="truncate font-medium">
+                            <span className="pagination-title truncate font-medium">
                                 {props.pagination.next.name}
                             </span>
                             <span className="inline-flex items-center gap-1 text-fd-muted-foreground text-sm">
@@ -2087,14 +2151,19 @@ function DocContent(props: {
                 </div>
             ) : null}
             {props.luma ? null : (
-                <>
+                // One box for the page end (the `#footer` stylesheet hook), spaced like
+                // the page container it sits in.
+                <div
+                    data-layout-item="footer"
+                    className="flex flex-col gap-4 empty:hidden"
+                >
                     {/* Socials sit at the very bottom of the page column,
                         left-aligned. */}
                     <FooterSocials socials={props.socials} />
                     {/* Multi-column footer from docs.json footer.links —
                         official page ends, not sidebar menus. */}
                     <DocsFooter links={props.footerLinks} />
-                </>
+                </div>
             )}
             {props.luma?.assistant ? <AssistantDock /> : null}
         </DocsPage>
@@ -2209,6 +2278,7 @@ function Page() {
         searchMode === "ai" ? (
             luma ? (
                 <AISearchTrigger
+                    data-layout-item="assistant-entry"
                     aria-label={strings.assistant}
                     title={`${strings.assistant} (${hotkey})`}
                     className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-fd-foreground/[0.03] text-fd-foreground transition-colors hover:bg-fd-foreground/[0.07]"
@@ -2217,6 +2287,7 @@ function Page() {
                 </AISearchTrigger>
             ) : (
                 <AISearchTrigger
+                    data-layout-item="assistant-entry"
                     className={cn(
                         buttonVariants({
                             variant: "secondary",

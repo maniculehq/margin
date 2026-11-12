@@ -50,3 +50,122 @@
 [data-theme-name="linden"] #nd-page article h1 {
     letter-spacing: -0.04em;
 }
+
+/*
+ * mint, when a site names the theme: the theme's own metrics where they
+ * differ from the shared look in app.css.
+ * - the text column grows with the viewport up to 45rem
+ * - cards and code blocks sit on white in light mode, whatever
+ *   background.color the page uses
+ * - callout copy is 14/20
+ * - tables: regular-weight headers, 8px cells aligned to the text baseline,
+ *   the first column flush with the text edge
+ * - Frame pads its media inside a tinted, hairlined box
+ * - the navbar primary button is a solid fill
+ * - pagination is two plain links, chevron beside the page title
+ */
+[data-theme-name="mint"] {
+    --margin-measure: 45rem;
+}
+[data-theme-name="mint"]:not(.dark)
+    #nd-page
+    [data-card]:not(:is(h1, h2, h3, h4, h5, h6) > *),
+[data-theme-name="mint"]:not(.dark) :is(#nd-page, [data-rail]) figure.shiki {
+    background-color: #fff;
+}
+[data-theme-name="mint"] [data-callout] {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+/* Centre the 18px icon on the first 20px line. */
+[data-theme-name="mint"] [data-callout] > :is(svg, span):first-child {
+    margin-top: 0.0625rem;
+}
+[data-theme-name="mint"] :is(#nd-page, [data-rail]) .prose :is(th, td) {
+    padding: 0.5rem;
+    line-height: 1.25rem;
+    vertical-align: baseline;
+}
+[data-theme-name="mint"] :is(#nd-page, [data-rail]) .prose th {
+    padding-top: 0;
+    font-weight: 400;
+    vertical-align: bottom;
+}
+[data-theme-name="mint"]
+    :is(#nd-page, [data-rail])
+    .prose
+    :is(th, td):first-child {
+    padding-inline-start: 0;
+}
+[data-theme-name="mint"] .frame > div:first-child {
+    border-radius: var(--radius-2xl);
+    background-color: color-mix(
+        in oklab,
+        var(--color-fd-muted) 50%,
+        transparent
+    );
+    box-shadow: inset 0 0 0 1px
+        color-mix(in oklab, var(--color-fd-foreground) 5%, transparent);
+    padding: 0.5rem;
+}
+[data-theme-name="mint"] .frame > div:first-child :is(img, video) {
+    border-radius: var(--radius-xl);
+}
+[data-theme-name="mint"] #docs-band .navbar-link > a[data-primary] {
+    background-color: var(--color-margin-button);
+    color: var(--color-margin-button-foreground);
+}
+[data-theme-name="mint"] #docs-band .navbar-link > a[data-primary]:hover {
+    background-color: color-mix(
+        in oklab,
+        var(--color-margin-button) 90%,
+        transparent
+    );
+}
+[data-theme-name="mint"] [data-layout-item="pagination"] {
+    display: flex;
+    justify-content: space-between;
+    gap: 1.5rem;
+}
+[data-theme-name="mint"]
+    [data-layout-item="pagination"]
+    :is(.pagination-prev, .pagination-next) {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0;
+    color: var(--color-fd-muted-foreground);
+}
+[data-theme-name="mint"]
+    [data-layout-item="pagination"]
+    :is(.pagination-prev, .pagination-next):hover {
+    background-color: transparent;
+    color: var(--color-fd-foreground);
+}
+[data-theme-name="mint"] [data-layout-item="pagination"] .pagination-prev {
+    flex-direction: row-reverse;
+}
+[data-theme-name="mint"] [data-layout-item="pagination"] .pagination-next {
+    margin-inline-start: auto;
+}
+/* The caption keeps its chevron and its text for screen readers; only the
+   visible "Previous"/"Next" word goes. */
+[data-theme-name="mint"]
+    [data-layout-item="pagination"]
+    .pagination-title
+    + span {
+    font-size: 0;
+    gap: 0;
+}
+/* Card icons are 24px. */
+[data-theme-name="mint"]
+    #nd-page
+    [data-card]
+    > [data-component-part="card-icon"]
+    :is(span, svg) {
+    width: 1.5rem;
+    height: 1.5rem;
+}

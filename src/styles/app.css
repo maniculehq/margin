@@ -89,6 +89,14 @@
  */
 @theme {
     --breakpoint-md: 64rem;
+    /* Site stylesheets restyle every surface by redefining the --rounded-*
+       variables, so the corner utilities read them. */
+    --radius-sm: var(--rounded-sm, 0.25rem);
+    --radius-md: var(--rounded-md, 0.375rem);
+    --radius-lg: var(--rounded-lg, 0.5rem);
+    --radius-xl: var(--rounded-xl, 0.75rem);
+    --radius-2xl: var(--rounded-2xl, 1rem);
+    --radius-3xl: var(--rounded-3xl, 1.5rem);
     --font-sans:
         "InterVariable", "InterFallback", ui-sans-serif, system-ui, sans-serif;
     --font-mono:
@@ -253,7 +261,13 @@ body {
     padding-block: 0.375rem;
     font-size: 0.875rem;
     line-height: 1.5rem;
-    border-radius: 0.75rem;
+}
+/* The row radius stays below ID specificity, so a site stylesheet's
+   `#sidebar a { border-radius }` overrides it. */
+:where(#nd-sidebar, #nd-sidebar-mobile)
+    :where([data-radix-scroll-area-viewport])
+    :is(a[data-active], button[aria-expanded]) {
+    border-radius: var(--radius-xl);
 }
 /* Every theme but mint and linden sets 32px rows. */
 :root:not([data-preset="neutral"])
@@ -433,7 +447,7 @@ figure[data-terminal] code .line:not(:empty)::before {
 }
 [data-callout] {
     border: 1px solid color-mix(in oklab, var(--callout-color) 28%, transparent);
-    border-radius: 1rem;
+    border-radius: var(--radius-2xl);
     background-color: color-mix(
         in oklab,
         var(--callout-color) 8%,
@@ -489,7 +503,7 @@ figure[data-terminal] code .line:not(:empty)::before {
  */
 :is(#nd-page, [data-rail]) figure.shiki {
     border-color: var(--color-fd-border);
-    border-radius: 1rem;
+    border-radius: var(--radius-2xl);
     box-shadow: none;
     background-color: var(--color-fd-card);
 }
@@ -660,7 +674,7 @@ figure[data-terminal] code .line:not(:empty)::before {
 /* Heading anchors also carry data-card (to skip the link underline); only
    framed cards take the card box. */
 #nd-page [data-card]:not(:is(h1, h2, h3, h4, h5, h6) > *) {
-    border-radius: 1rem;
+    border-radius: var(--radius-2xl);
     background-color: var(--color-fd-background);
     padding: 1.25rem 1.5rem;
 }
@@ -880,7 +894,9 @@ figure[data-terminal] code .line:not(:empty)::before {
     padding-inline: 0;
     padding-top: 0;
 }
-#nd-page .prose {
+/* Not the prose box inside a card (the card-content hook), which
+   keeps the card's own text color and line height. */
+#nd-page .prose:not([data-component-part]) {
     --tw-prose-body: color-mix(
         in oklab,
         var(--color-fd-foreground) 80%,
