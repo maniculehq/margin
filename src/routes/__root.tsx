@@ -11,7 +11,7 @@ import { getRequest } from "@tanstack/react-start/server"
 import { Banner } from "fumadocs-ui/components/banner"
 import { useSearchContext } from "fumadocs-ui/contexts/search"
 import { RootProvider } from "fumadocs-ui/provider/tanstack"
-import { type ComponentProps, lazy, useEffect } from "react"
+import { type ComponentProps, lazy, useEffect, useRef } from "react"
 import {
     boolean,
     catch as fallback,
@@ -31,6 +31,7 @@ import { DecorationWindows } from "@/components/decoration-windows"
 import { HastBody } from "@/components/hast-body"
 import { Toaster } from "@/components/ui/toast"
 import { assistantAvailable } from "@/env"
+import { agentConfig } from "@/lib/agent.config"
 import { basePath, withBase } from "@/lib/base-path"
 import {
     ChromeLocaleContext,
@@ -43,6 +44,7 @@ import {
 import { cn } from "@/lib/cn"
 import { faviconLinks } from "@/lib/favicon"
 import { resolveThemeOptions, searchModeOf } from "@/lib/layout.shared"
+import { posthogClient } from "@/lib/observability"
 import { appName, GENERATOR_NAME } from "@/lib/shared"
 import {
     resolveDocsContext,
@@ -50,6 +52,7 @@ import {
     serveLayoutConfig,
 } from "@/lib/source"
 import { renderThemeStyle } from "@/lib/theme-render"
+import type { BrowserEvent } from "@/routes/api/agent.event"
 import appCss from "@/styles/app.css?url"
 import { matchRedirect } from "@/types/docs-shared"
 
@@ -208,6 +211,20 @@ const rootLoader = createServerFn({ method: "GET" }).handler(async () => {
         // Deployment-level literal metas from the extensions module (a host's
         // origin-trial tokens); rendered ahead of HeadContent.
         headMeta: extensions.headMeta ?? [],
+        // Whether pages report their views (SiteDocument), and whether
+        // through the extension's page-view check, which must answer from
+        // cache. First-party like the server's events: the observability
+        // switch governs it, the site's analytics switch below does not.
+        pageViews: {
+            report: agentConfig.observability.enabled,
+            check:
+                agentConfig.observability.enabled &&
+                extensions.pageViewCheck?.enabled(
+                    ctx.site,
+                    await extensions.resolveSite(getRequest()),
+                    posthogClient(),
+                ) === true,
+        },
         // Sites that mirror third-party docs keep their GA4/PostHog keys from
         // firing on our hostnames: analyticsEnabled = false drops every
         // configured integration (server-side telemetry is unaffected).
@@ -479,6 +496,95 @@ function SiteDocument({ data }: { data: RootLoaderData }) {
                 })
         })
     }, [router, intercom])
+    // A reader's page views, reported by the browser: a page served from
+    // the CDN cache and a client-side navigation never reach the server,
+    // and a script that only fetches pages never runs this. Once for the
+    // first page and once per navigation to another page; never for a
+    // 404 or an error page. The last path is kept in a ref, so a remount
+    // under strict mode or a navigation that resolves twice reports once.
+    const { report: reportViews, check: checkViews } = data.pageViews
+    const lastViewedPath = useRef<string | null>(null)
+    useEffect(() => {
+        if (!reportViews) return
+        const report = () => {
+            const { location, matches } = router.state
+            if (location.pathname === lastViewedPath.current) return
+            const first = lastViewedPath.current === null
+            lastViewedPath.current = location.pathname
+            if (
+                matches.some(
+                    (match) =>
+                        match.status === "notFound" || match.status === "error",
+                )
+            )
+                return
+            // Where the visit came from, on its first page only: the
+            // referrer's host when it is another site, and the utm_source
+            // some AI products add instead. Values the event schema would
+            // refuse are dropped, never sent.
+            const referrer =
+                first && URL.canParse(document.referrer)
+                    ? new URL(document.referrer)
+                    : null
+            const referrerHost =
+                referrer && referrer.host !== window.location.host
+                    ? referrer.hostname.toLowerCase()
+                    : null
+            const utmSource = first
+                ? (new URLSearchParams(window.location.search)
+                      .get("utm_source")
+                      ?.toLowerCase() ?? null)
+                : null
+            // One id per view (a version 4 UUID), sent with every attempt
+            // at it so the server records it once. getRandomValues, unlike
+            // randomUUID, also runs on a plain-http site.
+            const bytes = crypto.getRandomValues(new Uint8Array(16))
+            bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40
+            bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80
+            const hex = Array.from(bytes, (byte) =>
+                byte.toString(16).padStart(2, "0"),
+            ).join("")
+            const body = JSON.stringify({
+                type: "docs_page_viewed",
+                page_path: location.pathname,
+                view_id: `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`,
+                referrer_host:
+                    referrerHost && /^[a-z0-9.-]{1,253}$/.test(referrerHost)
+                        ? referrerHost
+                        : null,
+                utm_source:
+                    utmSource && /^[a-z0-9._-]{1,64}$/.test(utmSource)
+                        ? utmSource
+                        : null,
+            } satisfies BrowserEvent)
+            const url = withBase("/api/agent/event")
+            const beacon = () => {
+                if (!navigator.sendBeacon(url, body))
+                    void fetch(url, {
+                        method: "POST",
+                        body,
+                        keepalive: true,
+                    }).catch(() => {})
+            }
+            if (!checkViews) {
+                beacon()
+                return
+            }
+            // The host's browser half, loaded only on these sites and only
+            // after the page is up.
+            void import("#docs-browser-extensions")
+                .then(({ browserExtensions }) =>
+                    browserExtensions.sendPageView
+                        ? browserExtensions.sendPageView(url, body)
+                        : beacon(),
+                )
+                .catch(beacon)
+        }
+        report()
+        return router.subscribe("onResolved", (event) => {
+            if (event.pathChanged) report()
+        })
+    }, [router, reportViews, checkViews])
     const segmentSnippet = segment
         ? `!function(){var i="analytics",analytics=window[i]=window[i]||[];if(!analytics.initialize)if(analytics.invoked)window.console&&console.error&&console.error("Segment snippet included twice.");else{analytics.invoked=!0;analytics.methods=["trackSubmit","trackClick","trackLink","trackForm","pageview","identify","reset","group","track","ready","alias","debug","page","screen","once","off","on","addSourceMiddleware","addIntegrationMiddleware","setAnonymousId","addDestinationMiddleware","register"];analytics.factory=function(e){return function(){if(window[i].initialized)return window[i][e].apply(window[i],arguments);var n=Array.prototype.slice.call(arguments);if(["track","screen","alias","group","page","identify"].indexOf(e)>-1){var c=document.querySelector("link[rel='canonical']");n.push({__t:"bpc",c:c&&c.getAttribute("href")||void 0,p:location.pathname,u:location.href,s:location.search,t:document.title,r:document.referrer})}n.unshift(e);analytics.push(n);return analytics}};for(var n=0;n<analytics.methods.length;n++){var key=analytics.methods[n];analytics[key]=analytics.factory(key)}analytics.load=function(key,n){var t=document.createElement("script");t.type="text/javascript";t.async=!0;t.src="https://cdn.segment.com/analytics.js/v1/"+key+"/analytics.min.js";var r=document.getElementsByTagName("script")[0];r.parentNode.insertBefore(t,r);analytics._loadOptions=n};analytics._writeKey=${escapeKey(segment)};analytics.SNIPPET_VERSION="5.2.0";analytics.load(${escapeKey(segment)});analytics.page()}}();`
         : null

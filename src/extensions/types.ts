@@ -90,6 +90,54 @@ export interface DocsExtensions {
      * `<head>`, before the route's own head tags (plugin: origin-trial
      * tokens registered to its domain). Default: none. */
     headMeta?: readonly HeadMeta[]
+    /** A second opinion on a reader's report of a page view
+     * (`docs_page_viewed`), recorded on the event and never acted on:
+     * nothing is refused or answered differently because of it. Default:
+     * none, and every report records `skipped`. */
+    pageViewCheck?: PageViewCheck
+}
+
+export interface PageViewCheck {
+    /** Render time: whether the site's pages send their reports through
+     * the browser extension's `sendPageView`. A cached page keeps the
+     * answer for as long as the CDN keeps the page, so `verify` must cope
+     * with reports from pages rendered either way. Must answer from
+     * cache, never block. */
+    enabled(
+        site: DocsSite,
+        resolution: SiteResolution,
+        posthog: PostHog | undefined,
+    ): boolean
+    /** Request time: the verdict on one report. The event route waits at
+     * most a second, then records `skipped`, as it does on a rejection. */
+    verify(
+        request: Request,
+        resolution: SiteResolution | null,
+        posthog: PostHog | undefined,
+    ): Promise<PageViewVerdict>
+}
+
+export interface PageViewVerdict {
+    /** `skipped`: not checked, or the check could not tell. A report
+     * judged `bot` is automation; the other two count as the reader's. */
+    verdict: "human" | "bot" | "skipped"
+    /** Extra event properties (plugin: the verified bot's name and
+     * category). */
+    properties?: Record<string, unknown>
+}
+
+/**
+ * The browser half of a host's extensions: `#docs-browser-extensions`,
+ * aliased at build time like `#docs-extensions` (DOCS_BROWSER_EXTENSIONS;
+ * default src/extensions/browser-default.ts). Pages import it lazily and
+ * only when they need it, so it never weighs on a page's first load.
+ */
+export interface DocsBrowserExtensions {
+    /** Sends a page-view report (the JSON `body`, POSTed to `url`) in place
+     * of the framework's beacon, on pages whose site turned
+     * `pageViewCheck` on. A rejection falls back to the beacon, so it must
+     * reject only when the report was not sent. */
+    sendPageView?(url: string, body: string): Promise<void>
 }
 
 /** One literal `<meta>` tag: `http-equiv` (e.g. `origin-trial`) or `name`. */

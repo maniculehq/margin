@@ -51,6 +51,7 @@ Empty strings count as unset in Margin's validated application, database, and in
 | `SENTRY_ENVIRONMENT` | Sentry environment label; explicit opt-in for local development reporting | Optional | `VERCEL_ENV`, otherwise `NODE_ENV` | Runtime; user |
 | `SENTRY_RELEASE` | Sentry release override | Optional | No application-defined fallback; SDK/platform detection may supply a release | Runtime; user |
 | `DOCS_EXTENSIONS` | Module exporting `extensions: DocsExtensions` | Optional | Built-in single-site extension; relative paths resolve from the repository root | Build; user |
+| `DOCS_BROWSER_EXTENSIONS` | Browser module exporting `browserExtensions: DocsBrowserExtensions` | Optional | Built-in empty browser module; relative paths resolve from the repository root | Build; user |
 | `NITRO_PRESET` | Server build target | Set `node-server` for the supported self-hosted Node deployment | `vercel` | Build; user |
 | `PORT` | Listening port | Optional | Vite's default for `dev` and `start`; a configured value must be a positive integer. The generated Node server also accepts `PORT` | Dev/preview startup and Node server startup; user |
 | `NODE_ENV` | Application environment | Optional; normally set by tooling | `development`; accepts `development`, `test`, `production` | Build and runtime; tool or user |

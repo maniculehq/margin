@@ -10,6 +10,10 @@ export interface AgentEvent {
     route?: string
     tool?: string
     durationMs?: number
+    /** The captured event's own id, not a property: PostHog keeps one
+     *  event per id, so sending one twice records it once. Default: a
+     *  fresh id per capture. */
+    uuid?: string
     [key: string]: unknown
 }
 

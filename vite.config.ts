@@ -286,6 +286,17 @@ export default defineConfig({
             "#docs-extensions": process.env.DOCS_EXTENSIONS
                 ? resolve(import.meta.dirname, process.env.DOCS_EXTENSIONS)
                 : resolve(import.meta.dirname, "src/extensions/default.ts"),
+            // Its browser half (DocsBrowserExtensions), swapped in the
+            // same way and imported lazily by the pages that use it.
+            "#docs-browser-extensions": process.env.DOCS_BROWSER_EXTENSIONS
+                ? resolve(
+                      import.meta.dirname,
+                      process.env.DOCS_BROWSER_EXTENSIONS,
+                  )
+                : resolve(
+                      import.meta.dirname,
+                      "src/extensions/browser-default.ts",
+                  ),
         },
     },
 })

@@ -17,7 +17,8 @@
         "forceConsistentCasingInFileNames": true,
         "paths": {
             "@/*": ["./src/*"],
-            "#docs-extensions": ["./src/extensions/default.ts"]
+            "#docs-extensions": ["./src/extensions/default.ts"],
+            "#docs-browser-extensions": ["./src/extensions/browser-default.ts"]
         },
         "noEmit": true
     }
