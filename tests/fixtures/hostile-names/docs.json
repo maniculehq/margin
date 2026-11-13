@@ -1,0 +1,13 @@
+{
+    "$schema": "https://mintlify.com/docs.json",
+    "theme": "mint",
+    "name": "Hostile <3 </script><script>alert(1)</script>",
+    "colors": { "primary": "#2563eb" },
+    "integrations": {
+        "ga4": { "measurementId": "G-</script><script>alert(3)</script>" },
+        "intercom": { "appId": "</script><script>alert(4)</script>" }
+    },
+    "navigation": {
+        "groups": [{ "group": "Start", "pages": ["index", "guide"] }]
+    }
+}

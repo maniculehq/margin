@@ -2,7 +2,11 @@ import { execFileSync } from "node:child_process"
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { runInNewContext } from "node:vm"
+import { fromHtml } from "hast-util-from-html"
+import { visit } from "unist-util-visit"
 import { describe, expect, it } from "vitest"
+import { inlineScriptJson } from "@/lib/shared"
 
 /**
  * Every inline analytics snippet the root route emits must parse: a single
@@ -78,4 +82,45 @@ describe("inline analytics snippets", () => {
             ).not.toThrow()
         },
     )
+})
+
+describe("inlineScriptJson", () => {
+    it.each([
+        ["a script end tag", "</script><script>alert(1)</script>"],
+        ["an uppercase end tag", "</SCRIPT ><script>alert(1)</script>"],
+        ["a comment opener", "<!--"],
+        ["a comment opener before a script tag", "<!--<script>"],
+        ["a CDATA end", "]]>"],
+        ["U+2028", "a\u2028b"],
+        ["U+2029", "a\u2029b"],
+        ["an entity as text", "&lt;"],
+        ["emoji and right-to-left text", "Docs \u{1F4D8} \u202Eمرحبا"],
+        ["a heart", "Docs <3"],
+        ["a comparison", "a < b"],
+    ])("keeps %s as data", (_label, name) => {
+        const json = inlineScriptJson({ name })
+        // Parsed the way a browser parses the page: the value stays in one
+        // script, and the element after it is still an element.
+        const tree = fromHtml(
+            // nosemgrep: javascript.lang.security.audit.unknown-value-with-script-tag.unknown-value-with-script-tag -- the test parses this string; it never reaches a browser, and `json` is the serializer output under test
+            `<!doctype html><head><script type="application/ld+json">${json}</script><meta name="after"></head>`,
+        )
+        const scripts: string[] = []
+        let metaParsed = false
+        visit(tree, "element", (element) => {
+            if (element.tagName === "meta") metaParsed = true
+            if (element.tagName !== "script") return
+            scripts.push(
+                element.children
+                    .map((child) => (child.type === "text" ? child.value : ""))
+                    .join(""),
+            )
+        })
+        expect(scripts.map((text) => JSON.parse(text))).toEqual([{ name }])
+        expect(metaParsed).toBe(true)
+        // As a JavaScript expression, the way the analytics snippets embed it.
+        expect(runInNewContext(`(${json}).name`)).toBe(name)
+        // What an XHTML parser or a pre-ES2019 engine would still act on.
+        expect(json).not.toMatch(/[<>&\u2028\u2029]/)
+    })
 })

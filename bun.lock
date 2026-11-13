@@ -8936,6 +8936,12 @@
       },
       "sha512-brv7p5WgH0jmQJr1ZDDfKDOSeWWg+OVypG99A/5vYGPqJ6pxiaHLy8nxtFjBA7oMa01ebA9gfh1uMCFqOuXxvA=="
     ],
+    "source-map": [
+      "source-map@0.7.6",
+      "",
+      {},
+      "sha512-i5uvt8C3ikiWeNZSVZNWcfZPItFQOsYTUAOkcUPGd8DqDy1uOUikjt5dG+uRlwyvR108Fb9DOd4GvXfT0N2/uQ=="
+    ],
     "source-map-js": [
       "source-map-js@1.2.2",
       "",
@@ -10033,12 +10039,6 @@
       },
       "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="
     ],
-    "@mdx-js/mdx/source-map": [
-      "source-map@0.7.6",
-      "",
-      {},
-      "sha512-i5uvt8C3ikiWeNZSVZNWcfZPItFQOsYTUAOkcUPGd8DqDy1uOUikjt5dG+uRlwyvR108Fb9DOd4GvXfT0N2/uQ=="
-    ],
     "@react-pdf/layout/emoji-regex-xs": [
       "emoji-regex-xs@1.0.0",
       "",
@@ -10265,12 +10265,6 @@
         }
       },
       "sha512-WCsemW40Cpc6gouC1SrY6PBaZ+oLRlEVY9XBvZBI7il/HyUrb2nJ505wE1MHEFyDZNnrWDEuy4jL50WVHfTTSQ=="
-    ],
-    "@tanstack/start-plugin-core/source-map": [
-      "source-map@0.7.6",
-      "",
-      {},
-      "sha512-i5uvt8C3ikiWeNZSVZNWcfZPItFQOsYTUAOkcUPGd8DqDy1uOUikjt5dG+uRlwyvR108Fb9DOd4GvXfT0N2/uQ=="
     ],
     "@vercel/blob/@vercel/oidc": [
       "@vercel/oidc@3.8.10",
@@ -10511,12 +10505,6 @@
         }
       },
       "sha512-bbPBYYrtZbkt6Os6FiTLCTFxvq4tt3JKall1vRwshA3fdVztsLAatFaZobhkBC8/BrPetoa0oksYoKXoG4ryJg=="
-    ],
-    "estree-util-to-js/source-map": [
-      "source-map@0.7.6",
-      "",
-      {},
-      "sha512-i5uvt8C3ikiWeNZSVZNWcfZPItFQOsYTUAOkcUPGd8DqDy1uOUikjt5dG+uRlwyvR108Fb9DOd4GvXfT0N2/uQ=="
     ],
     "fumadocs-openapi/chokidar": [
       "chokidar@5.0.0",

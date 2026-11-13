@@ -53,6 +53,10 @@ Semantic Versioning once a stable public API is published.
   bottom of the window. It used to be a header's height too tall, which hid
   the question box until the page was scrolled, and it slid under the header
   on scroll.
+- A site name, page title or analytics key containing `</script>` no longer
+  ends the page's JSON-LD or analytics script early. Both write `<`, `>`,
+  `&`, U+2028 and U+2029 as `\u` escapes, which JSON and JavaScript read
+  back as the same characters.
 - The `comment`, `comments` and `message` icon names render speech bubbles
   instead of a reply arrow.
 - Changelog RSS feeds no longer date entries whose label is not a date: a
