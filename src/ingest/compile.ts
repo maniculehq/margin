@@ -384,6 +384,31 @@ function preprocessMdxSource(source: string): string {
     )
 }
 
+function withoutFencedCode(source: string): string {
+    let fence = ""
+    return source
+        .split("\n")
+        .map((line) => {
+            const delimiter = /^ {0,3}(`{3,}|~{3,})(.*)\r?$/.exec(line)
+            const marker = delimiter?.[1]
+            if (fence) {
+                if (
+                    marker?.[0] === fence[0] &&
+                    marker.length >= fence.length &&
+                    /^[ \t]*$/.test(delimiter?.[2] ?? "")
+                )
+                    fence = ""
+                return ""
+            }
+            if (marker && (marker[0] === "~" || !delimiter[2]?.includes("`"))) {
+                fence = marker
+                return ""
+            }
+            return line
+        })
+        .join("\n")
+}
+
 function collectLinks(tree: Root): string[] {
     const links: string[] = []
     visit(tree, (node) => {
@@ -2142,7 +2167,7 @@ export async function compileDocs(
         )
         if (
             /(^|\n)---\r?\n(?:[A-Za-z_][\w-]*:[^\n]*\r?\n)+---(\r?\n|$)/.test(
-                pastFrontmatter,
+                withoutFencedCode(pastFrontmatter),
             )
         ) {
             parsedConfig.diagnostics.push({
