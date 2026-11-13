@@ -2,6 +2,7 @@ import { getBreadcrumbItems } from "fumadocs-core/breadcrumb"
 import { DEFAULT_DOCS_TITLE_TEMPLATE, formatDocsPath } from "@/types/docs"
 import { type DocPage, slugsToMarkdownPath } from "./agent-content"
 import { siteUrlOf } from "./base-path"
+import { inlineScriptJson } from "./shared"
 import type { DocsContext, SiteSource } from "./source"
 
 export interface PageSeoAlternate {
@@ -35,7 +36,8 @@ export interface PageSeo {
     /** X/Twitter handle from footer.socials, for twitter:site. */
     twitterSite?: string
     provenance?: PageSeoProvenance
-    /** Pre-stringified JSON-LD so the server-function result stays serializable. */
+    /** JSON-LD for the head `<script>`, already escaped for it. A string so
+     * the server-function result stays serializable. */
     jsonLd: string
 }
 
@@ -368,6 +370,6 @@ export function buildPageSeo(input: {
         alternates: input.alternates ?? [],
         ...(xHandle ? { twitterSite: `@${xHandle}` } : {}),
         ...(provenance ? { provenance } : {}),
-        jsonLd: JSON.stringify(jsonLd),
+        jsonLd: inlineScriptJson(jsonLd),
     }
 }

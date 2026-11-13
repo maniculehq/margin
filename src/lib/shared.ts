@@ -11,6 +11,18 @@ export const GENERATOR_NAME = "margin"
 export const docsRoute = ""
 export const docsImageRoute = "/og/docs"
 
+/** JSON for the body of an inline `<script>`. The HTML parser ends a script
+ * at the first `</script`, whatever the JSON means, so `<`, `>` and `&` go
+ * out as `\u` escapes; so do U+2028 and U+2029, which end a line in older
+ * JavaScript engines. JSON.parse and JavaScript both read the escapes back
+ * as the original characters. */
+export function inlineScriptJson(value: unknown): string {
+    return JSON.stringify(value).replace(
+        /[<>&\u2028\u2029]/g,
+        (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
+    )
+}
+
 /** Use the visitor's Host header: on Vercel, `request.url` may contain the
  * internal deployment hostname. This module is in the browser bundle
  * (`start.ts` exposes it to client-shared middleware, the chrome reads
