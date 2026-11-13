@@ -27,6 +27,46 @@ describe("mid-document frontmatter warning", () => {
         expect(suspects[0]?.path).toBe("page.mdx")
     })
 
+    it("warns after an unclosed fence ends with its list item", async () => {
+        const compiled = await compileDocs([
+            {
+                path: "docs.json",
+                kind: "text",
+                content: JSON.stringify({
+                    name: "Frontmatter",
+                    navigation: { pages: ["page"] },
+                }),
+            },
+            {
+                path: "page.mdx",
+                kind: "text",
+                content: [
+                    "---",
+                    "title: Page",
+                    "---",
+                    "",
+                    "- Example",
+                    "",
+                    "  ```yaml",
+                    "  example: value",
+                    "",
+                    "Outside.",
+                    "",
+                    "---",
+                    "title: Stray",
+                    "---",
+                    "",
+                ].join("\n"),
+            },
+        ])
+        if (!compiled.ok) throw new Error(JSON.stringify(compiled.violations))
+        const suspects = compiled.diagnostics.filter(
+            (diagnostic) => diagnostic.code === "content_suspect",
+        )
+        expect(suspects).toHaveLength(1)
+        expect(suspects[0]?.path).toBe("page.mdx")
+    })
+
     it.each(["```", "~~~"])(
         "warns about stray frontmatter after a closed %s fence",
         async (fence) => {

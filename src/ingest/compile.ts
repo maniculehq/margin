@@ -22,6 +22,7 @@ import { type MdxJsxTextElement, mdxJsxToMarkdown } from "mdast-util-mdx-jsx"
 import { phrasing } from "mdast-util-phrasing"
 import { type Handle, toMarkdown } from "mdast-util-to-markdown"
 import rehypeKatex from "rehype-katex"
+import { remark } from "remark"
 import remarkMath from "remark-math"
 import remarkSmartypants from "remark-smartypants"
 // Type-only: loads the unified `Data.toMarkdownExtensions` declaration.
@@ -385,28 +386,12 @@ function preprocessMdxSource(source: string): string {
 }
 
 function withoutFencedCode(source: string): string {
-    let fence = ""
-    return source
-        .split("\n")
-        .map((line) => {
-            const delimiter = /^ {0,3}(`{3,}|~{3,})(.*)\r?$/.exec(line)
-            const marker = delimiter?.[1]
-            if (fence) {
-                if (
-                    marker?.[0] === fence[0] &&
-                    marker.length >= fence.length &&
-                    /^[ \t]*$/.test(delimiter?.[2] ?? "")
-                )
-                    fence = ""
-                return ""
-            }
-            if (marker && (marker[0] === "~" || !delimiter[2]?.includes("`"))) {
-                fence = marker
-                return ""
-            }
-            return line
-        })
-        .join("\n")
+    const lines = source.split("\n")
+    visit(remark().parse(source), "code", (node) => {
+        if (!node.position) return
+        lines.fill("", node.position.start.line - 1, node.position.end.line)
+    })
+    return lines.join("\n")
 }
 
 function collectLinks(tree: Root): string[] {
