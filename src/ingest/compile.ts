@@ -22,6 +22,7 @@ import { type MdxJsxTextElement, mdxJsxToMarkdown } from "mdast-util-mdx-jsx"
 import { phrasing } from "mdast-util-phrasing"
 import { type Handle, toMarkdown } from "mdast-util-to-markdown"
 import rehypeKatex from "rehype-katex"
+import { remark } from "remark"
 import remarkMath from "remark-math"
 import remarkSmartypants from "remark-smartypants"
 // Type-only: loads the unified `Data.toMarkdownExtensions` declaration.
@@ -382,6 +383,15 @@ function preprocessMdxSource(source: string): string {
         /^(#{1,6}[^\n]*?)\s*\{#([^}\s]+)\}[ \t]*$/gm,
         "$1 [#$2]",
     )
+}
+
+function withoutFencedCode(source: string): string {
+    const lines = source.split("\n")
+    visit(remark().parse(source), "code", (node) => {
+        if (!node.position) return
+        lines.fill("", node.position.start.line - 1, node.position.end.line)
+    })
+    return lines.join("\n")
 }
 
 function collectLinks(tree: Root): string[] {
@@ -2142,7 +2152,7 @@ export async function compileDocs(
         )
         if (
             /(^|\n)---\r?\n(?:[A-Za-z_][\w-]*:[^\n]*\r?\n)+---(\r?\n|$)/.test(
-                pastFrontmatter,
+                withoutFencedCode(pastFrontmatter),
             )
         ) {
             parsedConfig.diagnostics.push({
