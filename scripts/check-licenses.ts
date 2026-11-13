@@ -73,7 +73,14 @@ const REVIEWED: Array<{ names: string[]; license: string; reason: string }> = [
         reason: "Zlib is permissive (OSI-approved); no copyleft",
     },
     {
-        names: ["glob", "lru-cache", "minimatch", "minipass", "path-scurry"],
+        names: [
+            "glob",
+            "lru-cache",
+            "minimatch",
+            "minipass",
+            "path-scurry",
+            "@isaacs/nonrecursive-glob-match",
+        ],
         license: "BlueOak-1.0.0",
         reason: "Blue Oak Model License: permissive, OSI-approved",
     },

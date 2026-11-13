@@ -1,5 +1,5 @@
 diff --git a/dist/components/sidebar/base.js b/dist/components/sidebar/base.js
-index 023cd061e7118ebf3042eac10c273deadf7d9963..5894d0d4f6d152d502e61b8c284498bceb172010 100644
+index 0eac396..e59ba06 100644
 --- a/dist/components/sidebar/base.js
 +++ b/dist/components/sidebar/base.js
 @@ -42,7 +42,7 @@ function SidebarProvider({ defaultOpenLevel = 0, prefetch, collapsible = true, c
