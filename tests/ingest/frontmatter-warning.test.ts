@@ -27,6 +27,49 @@ describe("mid-document frontmatter warning", () => {
         expect(suspects[0]?.path).toBe("page.mdx")
     })
 
+    it.each(["```", "~~~"])(
+        "warns about stray frontmatter after a closed %s fence",
+        async (fence) => {
+            const compiled = await compileDocs([
+                {
+                    path: "docs.json",
+                    kind: "text",
+                    content: JSON.stringify({
+                        name: "Frontmatter",
+                        navigation: { pages: ["page"] },
+                    }),
+                },
+                {
+                    path: "page.mdx",
+                    kind: "text",
+                    content: [
+                        "---",
+                        "title: Page",
+                        "---",
+                        "",
+                        `${fence}yaml`,
+                        "---",
+                        "title: Example",
+                        "---",
+                        fence,
+                        "",
+                        "---",
+                        "title: Stray",
+                        "---",
+                        "",
+                    ].join("\n"),
+                },
+            ])
+            if (!compiled.ok)
+                throw new Error(JSON.stringify(compiled.violations))
+            const suspects = compiled.diagnostics.filter(
+                (diagnostic) => diagnostic.code === "content_suspect",
+            )
+            expect(suspects).toHaveLength(1)
+            expect(suspects[0]?.path).toBe("page.mdx")
+        },
+    )
+
     it.each(["\n", "\r\n"])(
         "ignores frontmatter examples inside backtick and tilde fences with %j line endings",
         async (newline) => {
