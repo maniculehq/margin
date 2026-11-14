@@ -215,7 +215,13 @@ export interface DocsPageData {
     hidden: boolean
     searchable: boolean
     frontmatter: DocsFrontmatter
-    getText: (type: "raw" | "processed") => Promise<string>
+    /**
+     * raw: the human rendition (PDF). processed: the Markdown derived from
+     * the page (the no-JS HTML fallback). agent: what every agent read
+     * serves, the page's `.agent.md` rendition when it has one, else
+     * processed.
+     */
+    getText: (type: "raw" | "processed" | "agent") => Promise<string>
 }
 
 export interface DocsTocItem {
@@ -224,14 +230,17 @@ export interface DocsTocItem {
     depth: number
 }
 
+/** The agent body of a page row: its rendition, else the derived Markdown. */
+export const agentBody = sql<string>`coalesce(${schema.docsPage.agentMarkdown}, ${schema.docsPage.processedMarkdown})`
+
 /**
- * Processed agent markdown for an explicit page set — llms-full assembles
+ * Agent markdown (agentBody) for an explicit page set — llms-full assembles
  * the corpus in tree-ordered chunks so it never loads pages past its char
  * budget (the old whole-version cache pinned ~16MB per large version to
  * emit a 600k file). Single-page readers (.md route, MCP read_page) go
- * through getText("processed")'s one-row query instead.
+ * through getText("agent")'s one-row query instead.
  */
-export async function processedMarkdownForPages(
+export async function agentMarkdownForPages(
     versionId: string,
     paths: readonly string[],
 ): Promise<Map<string, string>> {
@@ -239,7 +248,7 @@ export async function processedMarkdownForPages(
     const rows = await db
         .select({
             path: schema.docsPage.path,
-            processedMarkdown: schema.docsPage.processedMarkdown,
+            body: agentBody,
         })
         .from(schema.docsPage)
         .where(
@@ -248,7 +257,7 @@ export async function processedMarkdownForPages(
                 inArray(schema.docsPage.path, [...paths]),
             ),
         )
-    return new Map(rows.map((r) => [r.path, r.processedMarkdown]))
+    return new Map(rows.map((r) => [r.path, r.body]))
 }
 
 function buildPageData(
@@ -282,9 +291,11 @@ function buildPageData(
         async getText(type) {
             const rows = await db
                 .select(
-                    type === "processed"
-                        ? { text: schema.docsPage.processedMarkdown }
-                        : { text: schema.docsPage.source },
+                    type === "agent"
+                        ? { text: agentBody }
+                        : type === "processed"
+                          ? { text: schema.docsPage.processedMarkdown }
+                          : { text: schema.docsPage.source },
                 )
                 .from(schema.docsPage)
                 .where(

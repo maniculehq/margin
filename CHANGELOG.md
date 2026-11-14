@@ -7,6 +7,17 @@ Semantic Versioning once a stable public API is published.
 
 ### Added
 
+- A page's `<page>.agent.md` sibling is its agent rendition. The `.md` URL,
+  `Accept: text/markdown`, `?format=markdown`, `llms-full.txt`, Copy page
+  and the MCP server's `read_page` return it in place of the Markdown
+  derived from the page, under the same title line, frontmatter and index
+  preamble. It never becomes a page, and one with no page beside it raises
+  an `agent_rendition_orphaned` ingest warning. See "Write an agent
+  rendition" in the Markdown guide. An existing `.agent.md` takes effect at
+  the site's next ingest; `bun run ingest --force` re-ingests the current
+  commit.
+- `<Prompt>` takes `claude` and `codex` actions beside `copy` and `cursor`,
+  which open the prompt in Claude Code and Codex.
 - Site stylesheets can target page regions and components by the common
   `docs.json` hooks: `#navbar`, `#sidebar`, `#content-area`,
   `#table-of-contents`, `#pagination` and `#footer`; `.card`, `.callout`,

@@ -1255,13 +1255,25 @@ function DocsIcon({
     )
 }
 
+/** Prompt's deep-link actions: label and URL prefix, the prompt appended
+ * URL-encoded. */
+const PROMPT_DEEP_LINKS = {
+    cursor: {
+        label: "Open in Cursor",
+        href: "cursor://anysphere.cursor-deeplink/prompt?text=",
+    },
+    claude: { label: "Open in Claude Code", href: "claude://code/new?q=" },
+    codex: { label: "Open in Codex", href: "codex://threads/new?prompt=" },
+} as const
+
 /**
  * Prompt — a compact AI-prompt card (the mirror dumped
  * entire agent-setup prompts inline, 2.5× the official body length). The
  * body clamps to a preview with a fade + explicit expand control; Copy is
- * always present and an `actions` `"cursor"` entry adds Cursor's prompt
- * deep link. The full text stays in the (overflow-clipped) DOM, so Copy and
- * the deep link always carry the whole prompt.
+ * always present, and `actions` entries `"cursor"`, `"claude"` and
+ * `"codex"` add each client's prompt deep link, in the authored order. The
+ * full text stays in the (overflow-clipped) DOM, so Copy and the deep links
+ * always carry the whole prompt.
  */
 function Prompt({
     description,
@@ -1275,9 +1287,10 @@ function Prompt({
     const bodyRef = useRef<HTMLDivElement>(null)
     const clipboard = useCopyToClipboard(1_500)
     const copied = clipboard.state === "copied"
-    const parsedActions = zodCatch(array(zodEnum(["copy", "cursor"])), [
-        "copy",
-    ]).parse(actions ?? ["copy"])
+    const parsedActions = zodCatch(
+        array(zodEnum(["copy", "cursor", "claude", "codex"])),
+        ["copy"],
+    ).parse(actions ?? ["copy"])
     // Prompt never shows the prompt text: one row with the
     // description and the actions; the body stays in the DOM (hidden) so
     // copy/deeplink read the authored text with its line structure.
@@ -1288,13 +1301,13 @@ function Prompt({
             data-component-part="prompt"
         >
             <div
-                className="not-prose flex min-w-0 flex-1 items-start gap-2 text-sm"
+                className="not-prose flex min-w-0 flex-1 basis-56 items-start gap-2 text-sm"
                 data-component-part="prompt-description"
             >
                 {description ?? "Prompt"}
             </div>
             <div
-                className="ms-auto flex shrink-0 items-center gap-1.5 print:hidden"
+                className="ms-auto flex flex-wrap items-center gap-1.5 print:hidden"
                 data-component-part="prompt-actions-wrapper"
             >
                 <button
@@ -1317,20 +1330,23 @@ function Prompt({
                 >
                     {copied ? "Copied" : "Copy prompt"}
                 </button>
-                {parsedActions.includes("cursor") ? (
-                    <button
-                        type="button"
-                        data-component-part="prompt-action-cursor-button"
-                        className="inline-flex h-[26px] shrink-0 items-center gap-1 rounded-lg border border-fd-border px-2 font-medium text-fd-foreground text-xs transition-colors hover:bg-fd-accent"
-                        onClick={() => {
-                            const text = promptText()
-                            if (!text) return
-                            window.location.href = `cursor://anysphere.cursor-deeplink/prompt?text=${encodeURIComponent(text)}`
-                        }}
-                    >
-                        Open in Cursor
-                    </button>
-                ) : null}
+                {[...new Set(parsedActions)].map((action) =>
+                    action === "copy" ? null : (
+                        <button
+                            key={action}
+                            type="button"
+                            data-component-part={`prompt-action-${action}-button`}
+                            className="inline-flex h-[26px] shrink-0 items-center gap-1 rounded-lg border border-fd-border px-2 font-medium text-fd-foreground text-xs transition-colors hover:bg-fd-accent"
+                            onClick={() => {
+                                const text = promptText()
+                                if (!text) return
+                                window.location.href = `${PROMPT_DEEP_LINKS[action].href}${encodeURIComponent(text)}`
+                            }}
+                        >
+                            {PROMPT_DEEP_LINKS[action].label}
+                        </button>
+                    ),
+                )}
             </div>
             {/* innerText of a display:none subtree collapses to textContent
                 (no line breaks), so hide it off-canvas instead — inert, so
