@@ -163,6 +163,13 @@ export const docsPage = pgTable(
          */
         railHast: jsonb("rail_hast"),
         processedMarkdown: text("processed_markdown").notNull(),
+        /**
+         * The page's `<page>.agent.md` sibling, verbatim. Every agent read of
+         * the page (`.md`, negotiated markdown, llms-full, MCP) serves it in
+         * place of processedMarkdown; null when the page has no sibling.
+         * processedMarkdown stays the human no-JS fallback either way.
+         */
+        agentMarkdown: text("agent_markdown"),
         /** DocsCodeExample[] precomputed at ingest — MCP/agent surfaces read this. */
         codeExamples: jsonb("code_examples").notNull().default([]),
         /**

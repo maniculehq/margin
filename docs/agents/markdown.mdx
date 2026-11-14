@@ -26,6 +26,21 @@ Markdown responses include `Vary: Accept`, an `ETag`, and a canonical `Link` to 
 
 A missing Markdown page returns `404` with a Markdown body headed `Page not found`, similar-page suggestions, and a link to the documentation index when available.
 
+## Write an agent rendition
+
+By default, a page's Markdown is derived from its MDX: `<Agent>` and `<Human>` blocks shape it, and the rest is shared with the human page. To give agents a page written for them instead, such as a numbered procedure with the facts and checks an agent needs, add a file named after the page with `.agent.md` in place of its extension:
+
+```text
+quickstart.mdx         # the human page
+quickstart.agent.md    # what agents read for /quickstart
+```
+
+When a page has an agent rendition, every agent read of the page returns it in place of the derived Markdown: `/quickstart.md`, `Accept: text/markdown` and `?format=markdown` on `/quickstart`, `llms-full.txt`, the page menu's Copy page, and the MCP server's `read_page`. The title line, agent signals, frontmatter and index preamble still wrap it. A page without one keeps the derived Markdown.
+
+The file is plain Markdown and is served as written: snippets, `{{variables}}`, and components are not processed, and links are not rewritten for versions or locales, so write links to their published paths. An agent rendition never becomes a page or a navigation entry. One with no page beside it, such as `guide.agent.md` without `guide.mdx` or `guide.md`, is not served and raises an `agent_rendition_orphaned` warning at ingest.
+
+Keep the rendition current with its page. Agents read it instead of the page, so a stale rendition misleads them.
+
 ## Download a PDF
 
 Append `.pdf` to the human page path. The root page uses `/index.pdf`. This request saves the download locally:

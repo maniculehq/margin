@@ -292,6 +292,8 @@ export async function persistDocsVersion(
                       // The compiled rendition changes when an imported
                       // snippet does even though the page source does not.
                       renditionMd5: sql<string>`md5(${schema.docsPage.processedMarkdown})`,
+                      // So does the agent rendition, edited on its own.
+                      agentMd5: sql<string>`md5(coalesce(${schema.docsPage.agentMarkdown}, ''))`,
                       lastModified: schema.docsPage.lastModified,
                   })
                   .from(schema.docsPage)
@@ -409,7 +411,8 @@ export async function persistDocsVersion(
             (page) =>
                 (page.source.length +
                     (page.compiledJs?.length ?? 0) +
-                    page.processedMarkdown.length) *
+                    page.processedMarkdown.length +
+                    (page.agentMarkdown?.length ?? 0)) *
                     2 +
                 (hastWeights.get(page) ?? 0),
         )) {
@@ -437,6 +440,7 @@ export async function persistDocsVersion(
                         hast: page.hast,
                         railHast: page.railHast,
                         processedMarkdown: page.processedMarkdown,
+                        agentMarkdown: page.agentMarkdown,
                         codeExamples: page.codeExamples,
                         updates: page.updates,
                         structuredData: page.structuredData,
@@ -452,6 +456,10 @@ export async function persistDocsVersion(
                             previous.renditionMd5 ===
                                 createHash("md5")
                                     .update(page.processedMarkdown, "utf8")
+                                    .digest("hex") &&
+                            previous.agentMd5 ===
+                                createHash("md5")
+                                    .update(page.agentMarkdown ?? "", "utf8")
                                     .digest("hex")
                                 ? previous.lastModified
                                 : stampedAt),

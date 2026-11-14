@@ -5,6 +5,10 @@ description: Inspect the snapshot behind a deployment and check retention before
 
 The version selection, database inspection, retention settings, and Vercel rollback procedures below are your responsibility when self-hosting; [Manicule-hosted sites](/deploy/manicule) require no servers or environment variables and include the database and latest Margin release.
 
+<Prompt description="Do this with your agent" actions={["copy", "claude", "codex", "cursor"]}>
+Roll my docs back to an earlier content version. Fetch https://margin.manicule.com/docs/deploy/rollbacks.md and follow it.
+</Prompt>
+
 Restore earlier documentation by directing production traffic to a deployment built with the desired content key. This procedure uses Vercel Instant Rollback: it restores the application deployment and its selected content together, not the database.
 
 ## Understand immutable content versions

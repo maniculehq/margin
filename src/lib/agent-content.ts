@@ -19,10 +19,10 @@ import { agentConfig } from "./agent.config"
 import { basePath, stripBase, withBase, withBaseInMarkdown } from "./base-path"
 import { docsRoute, slugsToMarkdownPath } from "./shared"
 import {
+    agentMarkdownForPages,
     type DocPage,
     type DocsContext,
     isPageIndexable,
-    processedMarkdownForPages,
     type SiteSource,
     searchSourceForActiveVersion,
     structuredDataFor,
@@ -233,11 +233,12 @@ export function normalizeDocUrl(
 }
 
 /**
- * Single content-resolution choke-point: returns the fumadocs-processed
- * markdown. Every surface reads through here.
+ * Single content-resolution choke-point: the page's agent rendition
+ * (`<page>.agent.md`) when it has one, else the Markdown derived from the
+ * page. Every agent surface reads through here or agentMarkdownForPages.
  */
 export function resolveAgentText(page: DocPage): Promise<string> {
-    return page.data.getText("processed")
+    return page.data.getText("agent")
 }
 
 function readingTimeMinutes(text: string): number {
@@ -650,7 +651,7 @@ export function buildLlmsFull(
             for (let start = 0; start < pages.length; start += CHUNK) {
                 const chunk = pages.slice(start, start + CHUNK)
                 const bodies = ctx.versionId
-                    ? await processedMarkdownForPages(
+                    ? await agentMarkdownForPages(
                           ctx.versionId,
                           chunk.map((page) => page.data.sourcePath),
                       )
@@ -659,7 +660,7 @@ export function buildLlmsFull(
                     const body = bodies.get(page.data.sourcePath)
                     if (body === undefined)
                         throw new Error(
-                            `no processed markdown for ${page.data.sourcePath}`,
+                            `no agent markdown for ${page.data.sourcePath}`,
                         )
                     yield await getLLMText(ctx, page, body)
                 }

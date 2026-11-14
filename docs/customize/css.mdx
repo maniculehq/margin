@@ -5,6 +5,10 @@ description: Control stylesheet loading and layout dimensions without replacing 
 
 Use custom CSS when theme settings do not cover the change you need. Set layout dimensions in `docs.json` rather than applying global positioning rules, because Margin sanitizes CSS that could disrupt the navigation shell.
 
+<Prompt description="Do this with your agent" actions={["copy", "claude", "codex", "cursor"]}>
+Customize my docs site's CSS and layout. Fetch https://margin.manicule.com/docs/customize/css.md and follow it.
+</Prompt>
+
 ## Load a custom stylesheet
 
 Place `styles.css` in your docs root, beside `docs.json`. Margin discovers all admitted `.css` files, including files in subdirectories, not just files named `styles.css`.

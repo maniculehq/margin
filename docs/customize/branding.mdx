@@ -5,6 +5,10 @@ description: Configure brand assets and choose icons for navigation and page con
 
 Set `logo` and `favicon` in `docs.json` to control the site header and browser tab. Leave either field out to use Margin's asset detection, or set it to `null` to opt out of detection.
 
+<Prompt description="Do this with your agent" actions={["copy", "claude", "codex", "cursor"]}>
+Set my docs site's logo, favicon, and icons. Fetch https://margin.manicule.com/docs/customize/branding.md and follow it.
+</Prompt>
+
 ## Choose logo and favicon assets
 
 Keep brand images inside your docs directory and reference them from that directory's root. Repository image assets support SVG, PNG, JPEG (`.jpg` or `.jpeg`), WebP, GIF, and ICO. SVGs are sanitized during ingest; admitted local asset references become content-addressed URLs.

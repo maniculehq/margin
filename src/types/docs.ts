@@ -623,6 +623,7 @@ export const DIAGNOSTIC_CODES = [
     "unsupported_field",
     "freshness_partial",
     "ssr_fallback",
+    "agent_rendition_orphaned",
 ] as const
 export const diagnosticCodeSchema = z.enum(DIAGNOSTIC_CODES)
 export type DiagnosticCode = z.infer<typeof diagnosticCodeSchema>

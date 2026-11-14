@@ -279,6 +279,11 @@ export interface CompiledDocsPage {
     railHast: HastRoot | null
     processedMarkdown: string
     /**
+     * The page's `<page>.agent.md` sibling, verbatim: served by every agent
+     * read of the page in place of processedMarkdown. null when it has none.
+     */
+    agentMarkdown: string | null
+    /**
      * In-memory only (title/excerpt derivation, code-example extraction) —
      * NOT persisted; null for kind="openapi".
      */
@@ -1335,9 +1340,9 @@ export async function compileDocs(
         )
     }
 
-    // `.agent.md` siblings are exported agent renditions of an adjacent page,
-    // not authored pages — admitting them would mint phantom `<slug>.agent`
-    // pages on re-ingest of a repo we exported to. A root README.md is repo
+    // `.agent.md` siblings are agent renditions of the adjacent page, not
+    // pages: each is stored on its page (agentMarkdown) and never becomes a
+    // `<slug>.agent` page or a navigation entry. A root README.md is repo
     // documentation, not docs content.
     // Authored Agent Skills are served as skills, not pages — and so is
     // everything beside a SKILL.md (references/, assets/): a skill's access
@@ -1357,6 +1362,36 @@ export async function compileDocs(
                 file.path.startsWith(`${directory}/`),
             ),
     )
+    // Renditions keyed by the stem they belong to (`guide.agent.md` →
+    // `guide`); one beside no page is reported and dropped. Snippets and
+    // skill directories never publish pages, so nothing there is an orphan.
+    const agentRenditionByStem = new Map<string, string>()
+    for (const file of textFiles) {
+        if (
+            !/\.agent\.md$/i.test(file.path) ||
+            /^snippets\//i.test(file.path) ||
+            isSkillPath(file.path) ||
+            skillDirectories.some((directory) =>
+                file.path.startsWith(`${directory}/`),
+            )
+        )
+            continue
+        const stem = file.path.replace(/\.agent\.md$/i, "")
+        if (
+            authoredPageFiles.some(
+                (page) => page.path.replace(/\.(mdx|md)$/i, "") === stem,
+            )
+        ) {
+            agentRenditionByStem.set(stem, file.content)
+            continue
+        }
+        parsedConfig.diagnostics.push({
+            code: "agent_rendition_orphaned",
+            severity: "warn",
+            path: file.path,
+            message: `Agent rendition has no page beside it: add ${stem}.mdx or remove this file. It is not served.`,
+        })
+    }
     const pageFiles = authoredPageFiles.filter((file) => {
         const stem = file.path.replace(/\.(mdx|md)$/i, "")
         const containsDraftFolder = stem
@@ -3174,6 +3209,7 @@ export async function compileDocs(
             hast: preparedHast.ok ? preparedHast.hast : null,
             railHast: preparedHast.ok ? splitPageRail(preparedHast.hast) : null,
             processedMarkdown,
+            agentMarkdown: agentRenditionByStem.get(pageStem) ?? null,
             mdast: capturedMdast,
             codeExamples: extractCodeExamplesFromMdast(capturedMdast),
             updates: extractUpdatesFromMdast(capturedMdast),

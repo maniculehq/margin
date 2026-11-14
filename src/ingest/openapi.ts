@@ -1130,6 +1130,7 @@ export async function compileOpenapiDocs(
                 hast: null,
                 railHast: null,
                 processedMarkdown: markdown,
+                agentMarkdown: null,
                 mdast: null,
                 codeExamples: [],
                 updates: null,
