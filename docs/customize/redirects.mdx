@@ -5,6 +5,10 @@ description: Map exact paths or path patterns to new destinations, with ingest c
 
 Preserve existing links after moving a page by adding a redirect to `docs.json`. Publish the destination page and remove the old page before deploying the rule: Margin drops redirects that would replace a published page.
 
+<Prompt description="Do this with your agent" actions={["copy", "claude", "codex", "cursor"]}>
+Redirect moved pages on my docs site. Fetch https://margin.manicule.com/docs/customize/redirects.md and follow it.
+</Prompt>
+
 ## Add a redirect rule
 
 Add a `redirects` array at the top level of `docs.json`. Each rule requires string fields `source` and `destination`; the optional boolean `permanent` selects the redirect status.

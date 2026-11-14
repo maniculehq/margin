@@ -105,6 +105,38 @@ describe.skipIf(
         expect(statuses).toEqual(assets.map((url) => `200 ${url}`))
     })
 
+    // The fixture's quickstart has a `.agent.md` rendition; webhooks has
+    // none. Every way an agent asks for Markdown gets the same body.
+    it.each([
+        ["the .md twin", "/docs/quickstart.md", {}],
+        [
+            "Accept: text/markdown",
+            "/docs/quickstart",
+            { accept: "text/markdown" },
+        ],
+        ["?format=markdown", "/docs/quickstart?format=markdown", {}],
+    ])(
+        "serves a page's agent rendition from %s",
+        async (_how, path, headers) => {
+            const res = await fetch(`${origin}${path}`, { headers })
+            const body = await res.text()
+            expect(res.status).toBe(200)
+            expect(res.headers.get("content-type")).toContain("text/markdown")
+            expect(body).toContain("# Capture a test charge with Acme")
+            expect(body).toContain("> ## Documentation Index")
+        },
+    )
+
+    it("serves the derived Markdown for a page without a rendition", async () => {
+        const res = await fetch(`${origin}/docs/webhooks`, {
+            headers: { accept: "text/markdown" },
+        })
+        const body = await res.text()
+        expect(res.status).toBe(200)
+        expect(body).toContain("Acme sends a `POST` to your endpoint")
+        expect(body).not.toContain("## Do this")
+    })
+
     it("redirects a path outside the base path to the same path under it", async () => {
         const res = await fetch(`${origin}/quickstart?tab=1`, {
             redirect: "manual",

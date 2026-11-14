@@ -23,7 +23,7 @@ Choose a different component from the inventory when a note does not match the c
 - `RequestExample` and `ResponseExample` render inline as code groups.
 - `Panel` renders children inline.
 - `Image` supports click-to-zoom; image examples require an image at `images/preview.png` under the docs root.
-- `Prompt` displays a description and copy control, not the prompt body as page prose.
+- `Prompt` displays a description, a copy control, and any Claude Code, Codex, or Cursor actions, not the prompt body as page prose.
 - `GitHub.Repo` fetches public repository details in the visitor's browser and falls back to a repository link when details are unavailable.
 - `Visibility` recognizes `for="agents"` and `for="humans"`; missing or unrecognized `for` values address both audiences.
 - `Agent` aliases agent-only content; `Human` aliases human-only content.

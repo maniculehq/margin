@@ -205,16 +205,16 @@ Repository metadata is fetched from GitHub in the visitor's browser and cached f
 
 Use `Prompt` to offer text for copying into an AI tool. The visible card shows the description and actions; the prompt body is hidden, but the actions use its full text.
 
-This example adds an optional Cursor action alongside Copy prompt:
+This example adds actions that open the prompt in Claude Code, Codex and Cursor alongside Copy prompt:
 
 ```mdx
-<Prompt description="Review a retry policy" actions={["copy", "cursor"]}>
+<Prompt description="Review a retry policy" actions={["copy", "claude", "codex", "cursor"]}>
   Review the retry policy for this API client. Identify requests that
   cannot be retried safely and explain how to handle them.
 </Prompt>
 ```
 
-<Prompt description="Review a retry policy" actions={["copy", "cursor"]}>
+<Prompt description="Review a retry policy" actions={["copy", "claude", "codex", "cursor"]}>
   Review the retry policy for this API client. Identify requests that
   cannot be retried safely and explain how to handle them.
 </Prompt>
@@ -222,8 +222,8 @@ This example adds an optional Cursor action alongside Copy prompt:
 | Input | Value | Behavior |
 | :--- | :--- | :--- |
 | `description` | String | Visible label. Defaults to `Prompt`. |
-| `actions` | Array containing `copy` and/or `cursor` | Defaults to `["copy"]`. Copy is always visible; including `cursor` adds Open in Cursor. Invalid arrays fall back to `["copy"]`. |
-| Children | Prompt content | Text copied or sent to the Cursor deep link. |
+| `actions` | Array of `copy`, `claude`, `codex` and `cursor` | Defaults to `["copy"]`. Copy is always visible. `claude` adds Open in Claude Code, `codex` adds Open in Codex, and `cursor` adds Open in Cursor, in the order listed. Invalid arrays fall back to `["copy"]`. |
+| Children | Prompt content | Text copied, or sent to the chosen client's deep link. |
 
 `Prompt` does not run a model request or display a model response.
 

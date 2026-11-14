@@ -5,6 +5,10 @@ description: Select bundled fonts or load fonts from an external host.
 
 Change the site's typography with the `fonts` block in `docs.json`. Body text, headings, and code can use separate families; leaving a role unset keeps its inherited or bundled font.
 
+<Prompt description="Do this with your agent" actions={["copy", "claude", "codex", "cursor"]}>
+Set the fonts of my docs site. Fetch https://margin.manicule.com/docs/customize/fonts.md and follow it.
+</Prompt>
+
 ## Set fonts in docs.json
 
 Add `fonts` at the top level of the existing `docs.json`, not inside `x-margin`. The settings apply across the site.

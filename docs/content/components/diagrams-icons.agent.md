@@ -42,7 +42,7 @@ Paste this MDX into a documentation page body and open the rendered page in a br
   <GitHub.Repo repo="maniculehq/margin" variant="inset" />
 </GitHub>
 
-<Prompt description="Review a retry policy" actions={["copy", "cursor"]}>
+<Prompt description="Review a retry policy" actions={["copy", "claude", "codex", "cursor"]}>
   Review the retry policy for this API client. Identify requests that
   cannot be retried safely and explain how to handle them.
 </Prompt>
@@ -79,7 +79,7 @@ Paste this MDX into a documentation page body and open the rendered page in a br
 - `GitHub.Repo.variant="flat"` removes the border treatment. Omitted or other values use inset treatment. `GitHub.Repo.className` adds CSS classes to the repository link.
 - `GitHub.Repo` fetches public repository description, stars, and forks in the visitor's browser and caches metadata for the session. Loading or refused requests leave a repository-name link.
 - `Prompt.description` is the visible label and defaults to `Prompt`. Children supply the hidden prompt body used by actions.
-- `Prompt.actions` is an array of `copy` and/or `cursor`, default `["copy"]`. Invalid arrays fall back to `["copy"]`. Copy is always visible; including `cursor` adds Open in Cursor with the full prompt text.
+- `Prompt.actions` is an array of `copy`, `claude`, `codex`, and `cursor`, default `["copy"]`. Invalid arrays fall back to `["copy"]`. Copy is always visible. `claude` adds Open in Claude Code (`claude://code/new?q=`), `codex` adds Open in Codex (`codex://threads/new?prompt=`), and `cursor` adds Open in Cursor (`cursor://anysphere.cursor-deeplink/prompt?text=`), each with the full prompt text, in the order listed.
 - `Update` places release metadata beside the body on wider screens and above the body on narrow screens.
 - `Update.label` supplies the displayed label and anchor source. `Update.date` is the fallback when `label` is omitted. `Update.description` supplies the short release description; children supply the body.
 - `Update.tags` accepts an array of strings. Missing or invalid arrays use an empty array.

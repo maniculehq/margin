@@ -3,11 +3,11 @@ import { LRUCache } from "lru-cache"
 import { pageBreadcrumbs } from "./agent-content"
 import { basePath, withBase, withBaseInMarkdown } from "./base-path"
 import {
+    agentMarkdownForPages,
     type DocPage,
     type DocsContext,
     openapiDocument,
     openapiDocumentIndex,
-    processedMarkdownForPages,
     sourceForActiveVersion,
 } from "./source"
 
@@ -98,7 +98,7 @@ function corpusFor(
             start < pages.length && size < CORPUS_MAX_CHARS;
             start += 200
         ) {
-            const chunk = await processedMarkdownForPages(
+            const chunk = await agentMarkdownForPages(
                 versionId,
                 pages
                     .slice(start, start + 200)
@@ -119,7 +119,7 @@ function corpusFor(
 
 /**
  * Run one read-only shell command over a virtual filesystem of the docs:
- * every page at its `.md` URL path (title + breadcrumb + processed markdown),
+ * every page at its `.md` URL path (title + breadcrumb + agent markdown),
  * every OpenAPI document under `/_openapi/<docId>.json`, and any extra files
  * (skills) the caller supplies. just-bash is an in-process interpreter — no
  * VM, no host filesystem — and loads lazily so it never weighs on a cold

@@ -5,6 +5,10 @@ description: Retain your source files while reviewing configuration mappings, re
 
 Publish your existing Mintlify documentation with Margin without converting `docs.json` or rewriting your MDX first. Source acceptance does not guarantee identical presentation or support for every Mintlify feature. Review the rendered site and diagnostics before replacing your current deployment.
 
+<Prompt description="Do this with your agent" actions={["copy", "claude", "codex", "cursor"]}>
+Migrate my Mintlify docs to Margin. Fetch https://margin.manicule.com/docs/migrate-from-mintlify.md and follow it.
+</Prompt>
+
 ## Publish your existing documentation
 
 1. Retain the source layout. Keep `docs.json`, MDX pages, snippets, local images, and OpenAPI files together with their relative paths intact. Put `docs.json` at the documentation folder's root. Do not rename `docs.json` or add an `x-margin` block just to migrate. Margin also reads `mint.json` as a legacy fallback when `docs.json` is absent.

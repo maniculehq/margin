@@ -5,6 +5,10 @@ description: Use the bundled Postgres service and ingest watcher to preview docu
 
 Run Margin from a repository checkout to preview documentation edits at `http://localhost:3000` before pushing. The development command imports the documentation into Postgres and keeps watching for edits under `docs/`. Running locally does not publish your documentation.
 
+<Prompt description="Do this with your agent" actions={["copy", "claude", "codex", "cursor"]}>
+Set up a local preview of my Margin docs. Fetch https://margin.manicule.com/docs/local-development.md and follow it.
+</Prompt>
+
 To publish, use [Manicule hosting](/deploy/manicule), which is free, with no limits. It includes the database, runs the latest release, and requires no servers or environment variables to configure. Each push to your docs branch publishes your documentation, and pull requests get previews. For deployment on Vercel with Neon or on a Node.js 24+ server with your own Postgres database, use [self-hosting](/deploy/self-host).
 
 ## Check prerequisites

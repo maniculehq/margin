@@ -5,6 +5,10 @@ description: Choose the search interface and predict which versions and language
 
 Set `x-margin.search.mode` in `docs.json` to choose documentation search with an AI assistant, plain text search, or no search interface.
 
+<Prompt description="Do this with your agent" actions={["copy", "claude", "codex", "cursor"]}>
+Configure search on my docs site. Fetch https://margin.manicule.com/docs/customize/search.md and follow it.
+</Prompt>
+
 ## Choose a search mode
 
 Choose `static` when readers need matching pages without generated answers. Choose `ai` when readers should also be able to ask questions and receive answers with source links.

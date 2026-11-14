@@ -5,6 +5,10 @@ description: Add generated endpoint pages to navigation and diagnose specificati
 
 Margin generates endpoint pages and an interactive playground from a local OpenAPI specification. Add the specification to your docs folder, then connect its operations to `docs.json` navigation; no endpoint MDX file is required.
 
+<Prompt description="Do this with your agent" actions={["copy", "claude", "codex", "cursor"]}>
+Generate an API reference for my docs from my OpenAPI spec. Fetch https://margin.manicule.com/docs/organize/openapi.md and follow it.
+</Prompt>
+
 ## Add a discoverable specification
 
 Place the specification anywhere under the configured docs root, the folder containing `docs.json`. Discovery recognizes `openapi.json`, `openapi.yaml`, `openapi.yml`, and the equivalent `swagger` filenames, case-insensitively. Dot-prefixed names such as `payments.openapi.yaml` also qualify. A filename such as `api-public.yml` needs an explicit configuration or navigation reference rather than convention discovery.

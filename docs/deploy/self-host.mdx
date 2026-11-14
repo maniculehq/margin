@@ -5,6 +5,10 @@ description: Run the built Node 24 server against Postgres and prepare a repeata
 
 Self-host Margin to manage your own runtime, Postgres, releases, and analytics. If you just want a live documentation site, [deploy on Manicule](/deploy/manicule) free, with no limits, an included database, and the latest release, without servers or environment variables to configure.
 
+<Prompt description="Do this with your agent" actions={["copy", "claude", "codex", "cursor"]}>
+Self-host my Margin docs as a Node server with Postgres. Fetch https://margin.manicule.com/docs/deploy/self-host.md and follow it.
+</Prompt>
+
 Deploy Margin outside Vercel by building its Node server, loading your docs into Postgres, and routing your public domain to the running process. The release build runs migrations and ingestion before the new server receives traffic.
 
 ## Prepare Node 24 and Postgres

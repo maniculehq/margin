@@ -4,4 +4,4 @@
  * re-ingest. Kept outside compile.ts so scripts and tests avoid its
  * Shiki/rolldown dependencies.
  */
-export const DOCS_PIPELINE_VERSION = 36
+export const DOCS_PIPELINE_VERSION = 37
