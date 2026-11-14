@@ -22,10 +22,6 @@ export interface DocsPageDates {
     diagnostics: Diagnostic[]
 }
 
-/** A page's `.agent.md` sibling: editing it changes what agents read. */
-const renditionOf = (path: string) =>
-    /\.mdx?$/i.test(path) ? path.replace(/\.mdx?$/i, ".agent.md") : null
-
 /**
  * Last-commit date of each page path under `dir`, counting a commit to its
  * `.agent.md` sibling as a change to the page. With `previousSha` (the
@@ -91,13 +87,18 @@ export async function collectPageDates(input: {
                     .split("\n")
                     .filter(Boolean),
             )
-            wanted = wanted.filter((path) => {
-                const rendition = renditionOf(path)
-                return (
+            // Stems whose `.agent.md` changed, extension in any case, as
+            // compileDocs pairs a page with its rendition.
+            const renditionStems = new Set(
+                [...changed]
+                    .filter((path) => /\.agent\.md$/i.test(path))
+                    .map((path) => path.replace(/\.agent\.md$/i, "")),
+            )
+            wanted = wanted.filter(
+                (path) =>
                     changed.has(path) ||
-                    (rendition !== null && changed.has(rendition))
-                )
-            })
+                    renditionStems.has(path.replace(/\.mdx?$/i, "")),
+            )
         } catch {
             // The previous commit is not in this clone (shallow or rewritten
             // history): read every page instead — unless the budget ran out.
@@ -110,8 +111,10 @@ export async function collectPageDates(input: {
             for (let path = queue.shift(); path; path = queue.shift()) {
                 if (expired) return
                 try {
-                    const rendition = renditionOf(path)
-                    // The newest commit touching the page or its sibling.
+                    // The newest commit touching the page or its `.agent.md`
+                    // sibling, whose extension matches in any case (a glob
+                    // pathspec, the stem's glob characters escaped).
+                    const stem = path.replace(/\.mdx?$/i, "")
                     const iso = (
                         await git([
                             "log",
@@ -119,7 +122,7 @@ export async function collectPageDates(input: {
                             "--format=%cI",
                             "--",
                             path,
-                            ...(rendition ? [rendition] : []),
+                            `:(glob)${stem.replace(/[*?[\]\\]/g, "\\$&")}.[aA][gG][eE][nN][tT].[mM][dD]`,
                         ])
                     ).trim()
                     // Untracked files have no history: leave them to persist.

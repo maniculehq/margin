@@ -292,8 +292,11 @@ export async function persistDocsVersion(
                       // The compiled rendition changes when an imported
                       // snippet does even though the page source does not.
                       renditionMd5: sql<string>`md5(${schema.docsPage.processedMarkdown})`,
-                      // So does the agent rendition, edited on its own.
-                      agentMd5: sql<string>`md5(coalesce(${schema.docsPage.agentMarkdown}, ''))`,
+                      // So does the agent rendition, edited on its own. null
+                      // (no rendition) stays apart from an empty one.
+                      agentMd5: sql<
+                          string | null
+                      >`md5(${schema.docsPage.agentMarkdown})`,
                       lastModified: schema.docsPage.lastModified,
                   })
                   .from(schema.docsPage)
@@ -458,9 +461,11 @@ export async function persistDocsVersion(
                                     .update(page.processedMarkdown, "utf8")
                                     .digest("hex") &&
                             previous.agentMd5 ===
-                                createHash("md5")
-                                    .update(page.agentMarkdown ?? "", "utf8")
-                                    .digest("hex")
+                                (page.agentMarkdown === null
+                                    ? null
+                                    : createHash("md5")
+                                          .update(page.agentMarkdown, "utf8")
+                                          .digest("hex"))
                                 ? previous.lastModified
                                 : stampedAt),
                     }
