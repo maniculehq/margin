@@ -7,7 +7,7 @@
  */
 import { randomUUID } from "node:crypto"
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client"
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import { db, schema } from "@/db"
@@ -64,15 +64,6 @@ const files = [
     },
 ]
 
-const markdownOf = async (splat: string) => {
-    const response = await getDocsMarkdown({
-        request: requestFor(hostname, `/${splat}.md`),
-        params: { _splat: splat },
-    })
-    expect(response.status).toBe(200)
-    return response.text()
-}
-
 describe.skipIf(!hasDocsDb)("agent renditions", () => {
     let compiled: Extract<CompileDocsResult, { ok: true }>
 
@@ -128,7 +119,12 @@ describe.skipIf(!hasDocsDb)("agent renditions", () => {
     })
 
     it("serves the rendition from <page>.md under the frontmatter and index preamble", async () => {
-        const body = await markdownOf("guide")
+        const response = await getDocsMarkdown({
+            request: requestFor(hostname, "/guide.md"),
+            params: { _splat: "guide" },
+        })
+        expect(response.status).toBe(200)
+        const body = await response.text()
         expect(body).toContain(RENDITION)
         expect(body).not.toContain(DERIVED)
         expect(body.startsWith('---\ntitle: "Guide"\n')).toBe(true)
@@ -139,7 +135,12 @@ describe.skipIf(!hasDocsDb)("agent renditions", () => {
     })
 
     it("serves the derived Markdown from <page>.md for a page without a rendition", async () => {
-        const body = await markdownOf("plain")
+        const response = await getDocsMarkdown({
+            request: requestFor(hostname, "/plain.md"),
+            params: { _splat: "plain" },
+        })
+        expect(response.status).toBe(200)
+        const body = await response.text()
         expect(body).toContain(`${DERIVED} for plain.`)
         expect(body).not.toContain(RENDITION)
     })
@@ -248,4 +249,95 @@ describe("an agent rendition over the page size limit", () => {
             expect.objectContaining({ path: "guide.agent.md" }),
         ])
     })
+})
+
+// An empty `.agent.md` replaces the page's agent body with nothing, so adding
+// one is a change: the page's date must move, as for any other rendition.
+describe.skipIf(!hasDocsDb)("an empty agent rendition added later", () => {
+    const emptySiteId = randomUUID()
+    afterAll(async () => {
+        await db
+            .delete(schema.docsSite)
+            .where(eq(schema.docsSite.id, emptySiteId))
+    })
+
+    it("dates the page by the version that added it", async () => {
+        const { compileDocs } = await import("../src/ingest/compile")
+        const { persistDocsVersion } = await import("../src/ingest/persist")
+        const { buildSearchCorpus } = await import("../src/ingest/assets")
+        await db.insert(schema.docsSite).values({
+            id: emptySiteId,
+            slug: `rendition-empty-${emptySiteId}`,
+            name: "Empty Rendition",
+            analyticsMode: "off",
+            status: "active",
+        })
+        const page = {
+            path: "guide.mdx",
+            kind: "text" as const,
+            content: "---\ntitle: Guide\n---\n\nBody.\n",
+        }
+        const empty = {
+            path: "guide.agent.md",
+            kind: "text" as const,
+            content: "",
+        }
+        const added = new Date("2026-03-01T00:00:00.000Z")
+        for (const [seq, versionFiles, at] of [
+            [1, [page], new Date("2026-01-01T00:00:00.000Z")],
+            [2, [page, empty], added],
+        ] as const) {
+            const result = await compileDocs([...versionFiles])
+            if (!result.ok) throw new Error("empty fixture failed to compile")
+            const persisted = await persistDocsVersion({
+                siteId: emptySiteId,
+                commitSha: `empty-rendition-${seq}`,
+                kind: "production",
+                seq,
+                headCommittedAt: at,
+                pages: result.pages,
+                metas: result.metas,
+                openapiDocuments: result.openapiDocuments,
+                skills: result.skills,
+                assets: result.assets,
+                config: result.config,
+                diagnostics: result.diagnostics,
+                navSource: result.navSource,
+                themeTokens: result.themeTokens,
+                themeCss: result.themeCss,
+                fontCss: "",
+                fontInputs: result.fontInputs,
+                layoutPreset: result.layoutPreset,
+                versionsManifest: result.versionsManifest,
+                localesManifest: result.localesManifest,
+                redirects: result.redirects,
+                seo: result.seo,
+                integrations: result.integrations,
+                searchCorpus: buildSearchCorpus(result.pages).gzipped,
+                searchCorpusUrl: null,
+            })
+            if (persisted.outcome !== "flipped")
+                throw new Error(
+                    `version ${seq} not served: ${persisted.outcome}`,
+                )
+        }
+        const [row] = await db
+            .select({
+                agentMarkdown: schema.docsPage.agentMarkdown,
+                lastModified: schema.docsPage.lastModified,
+            })
+            .from(schema.docsPage)
+            .innerJoin(
+                schema.docsSite,
+                eq(schema.docsSite.currentVersionId, schema.docsPage.versionId),
+            )
+            .where(
+                and(
+                    eq(schema.docsSite.id, emptySiteId),
+                    eq(schema.docsPage.path, "guide.mdx"),
+                ),
+            )
+        expect(row?.agentMarkdown).toBe("")
+        expect(row?.lastModified.toISOString()).toBe(added.toISOString())
+    }, 120_000)
 })
