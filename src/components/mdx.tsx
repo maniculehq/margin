@@ -1301,13 +1301,13 @@ function Prompt({
             data-component-part="prompt"
         >
             <div
-                className="not-prose flex min-w-0 flex-1 items-start gap-2 text-sm"
+                className="not-prose flex min-w-0 flex-1 basis-56 items-start gap-2 text-sm"
                 data-component-part="prompt-description"
             >
                 {description ?? "Prompt"}
             </div>
             <div
-                className="ms-auto flex shrink-0 items-center gap-1.5 print:hidden"
+                className="ms-auto flex flex-wrap items-center gap-1.5 print:hidden"
                 data-component-part="prompt-actions-wrapper"
             >
                 <button

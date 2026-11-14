@@ -231,7 +231,7 @@ export interface DocsTocItem {
 }
 
 /** The agent body of a page row: its rendition, else the derived Markdown. */
-const agentBody = sql<string>`coalesce(${schema.docsPage.agentMarkdown}, ${schema.docsPage.processedMarkdown})`
+export const agentBody = sql<string>`coalesce(${schema.docsPage.agentMarkdown}, ${schema.docsPage.processedMarkdown})`
 
 /**
  * Agent markdown (agentBody) for an explicit page set — llms-full assembles

@@ -15,6 +15,7 @@ import {
 } from "@/lib/agent-content"
 import { siteUrlFromRequest } from "@/lib/base-path"
 import {
+    agentBody,
     resolveDocsContext,
     resolvePage,
     sourceForActiveVersion,
@@ -125,8 +126,7 @@ export async function getAgentContext(input: {
     // (codeExamplesFor stays for the MCP tool that needs only that field).
     const [row] = await db
         .select({
-            agentMarkdown: schema.docsPage.agentMarkdown,
-            processedMarkdown: schema.docsPage.processedMarkdown,
+            markdown: agentBody,
             structuredData: schema.docsPage.structuredData,
             codeExamples: schema.docsPage.codeExamples,
         })
@@ -134,11 +134,7 @@ export async function getAgentContext(input: {
         .where(pageRow)
         .limit(1)
     if (!row) throw new Error(`no docs_page row for ${page.data.sourcePath}`)
-    const markdown = await getLLMText(
-        ctx,
-        page,
-        row.agentMarkdown ?? row.processedMarkdown,
-    )
+    const markdown = await getLLMText(ctx, page, row.markdown)
     const bundle = {
         ...identityFields,
         headings: structuredDataSchema.parse(row.structuredData).headings,
