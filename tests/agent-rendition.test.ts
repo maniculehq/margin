@@ -225,3 +225,27 @@ describe.skipIf(!hasDocsDb)("agent renditions", () => {
         expect(body).not.toContain(`${DERIVED} for guide.`)
     })
 })
+
+describe("an agent rendition over the page size limit", () => {
+    it("fails the ingest like an oversized page", async () => {
+        const { compileDocs, MAX_PAGE_BYTES } = await import(
+            "../src/ingest/compile"
+        )
+        const result = await compileDocs([
+            {
+                path: "guide.mdx",
+                kind: "text",
+                content: "---\ntitle: Guide\n---\n\nBody.\n",
+            },
+            {
+                path: "guide.agent.md",
+                kind: "text",
+                content: `# Guide\n\n${"x".repeat(MAX_PAGE_BYTES)}\n`,
+            },
+        ])
+        expect(result.ok).toBe(false)
+        expect(result.ok ? [] : result.violations).toEqual([
+            expect.objectContaining({ path: "guide.agent.md" }),
+        ])
+    })
+})

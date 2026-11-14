@@ -1376,6 +1376,14 @@ export async function compileDocs(
             )
         )
             continue
+        // The page limit: a rendition is stored and inserted like a page.
+        if (Buffer.byteLength(file.content, "utf8") > MAX_PAGE_BYTES) {
+            violations.push({
+                path: file.path,
+                message: `agent rendition exceeds ${MAX_PAGE_BYTES / 1024}KB`,
+            })
+            continue
+        }
         const stem = file.path.replace(/\.agent\.md$/i, "")
         if (
             authoredPageFiles.some(
