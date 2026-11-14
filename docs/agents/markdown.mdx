@@ -37,7 +37,7 @@ quickstart.agent.md    # what agents read for /quickstart
 
 When a page has an agent rendition, every agent read of the page returns it in place of the derived Markdown: `/quickstart.md`, `Accept: text/markdown` and `?format=markdown` on `/quickstart`, `llms-full.txt`, the page menu's Copy page, and the MCP server's `read_page`. The title line, agent signals, frontmatter and index preamble still wrap it. A page without one keeps the derived Markdown.
 
-The file is plain Markdown and is served as written: snippets, `{{variables}}`, and components are not processed, and links are not rewritten for versions or locales, so write links to their published paths. An agent rendition never becomes a page or a navigation entry. One with no page beside it, such as `guide.agent.md` without `guide.mdx` or `guide.md`, is not served and raises an `agent_rendition_orphaned` warning at ingest.
+The file is plain Markdown and is served as written: snippets, `{{variables}}`, and components are not processed, and links are not rewritten for versions or locales. Write a link to another page as a root-relative path that includes any version or locale prefix but not the site's base path, such as `/quickstart` or `/v2/quickstart`; Margin adds the base path when it serves the Markdown, as it does for links in MDX pages. A rendition over 1,024 KB fails the ingest, as an oversized page does. An agent rendition never becomes a page or a navigation entry. One with no page beside it, such as `guide.agent.md` without `guide.mdx` or `guide.md`, is not served and raises an `agent_rendition_orphaned` warning at ingest.
 
 Keep the rendition current with its page. Agents read it instead of the page, so a stale rendition misleads them.
 

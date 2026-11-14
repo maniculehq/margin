@@ -28,6 +28,7 @@ Use `/index.md` and `/index.pdf` for the root page instead of appending suffixes
 - A page's agent rendition is the Markdown derived from its MDX, unless a sibling file named `<page>.agent.md` exists beside `<page>.mdx` or `<page>.md`; then that file is the rendition.
 - A `.agent.md` rendition is returned by every agent read of the page: the `.md` URL, `Accept: text/markdown`, `?format=markdown`, `llms-full.txt`, the page menu's Copy page, and MCP `read_page`. The title line, agent signals, frontmatter, and index preamble still wrap it.
 - A `.agent.md` file is plain Markdown served as written. Snippets, `{{variables}}`, and components are not processed; links are not rewritten for versions or locales.
+- Links from a `.agent.md` file to other pages are root-relative paths with any version or locale prefix and without the site's base path, such as `/quickstart` or `/v2/quickstart`. Margin prefixes root-relative links with the base path when serving Markdown, so `/docs/quickstart` on a site under `/docs` is served as `/docs/docs/quickstart`.
 - A `.agent.md` file never becomes a page or a navigation entry.
 - Successful PDF responses return `Content-Type: application/pdf` and `Content-Disposition: attachment` with a PDF filename.
 - PDF contains the human rendition with agent-only content removed.
@@ -81,6 +82,7 @@ Configure the Markdown wrapper by merging these optional boolean fields into the
 | --- | --- | --- | --- |
 | `Page not found` | 404 | Markdown page does not exist. | Read similar-page suggestions and the documentation-index link when available; retry an existing `.md` URL. |
 | `No documentation page matches` | 404 | PDF page does not exist. Response is plain text, not PDF. | Read closest-page suggestions and retry an existing `.pdf` URL. |
+| `agent rendition exceeds 1024KB` | Ingest failure | A `.agent.md` file is larger than 1,024 KB. | Shorten the rendition. |
 | `agent_rendition_orphaned` | Ingest warning | A `<page>.agent.md` file has no `<page>.mdx` or `<page>.md` beside it. | Add the page or remove the file. |
 | `This URL serves text/html, or text/markdown when the Accept header asks for it.` | 406 | An ordinary docs request accepts neither HTML nor Markdown, such as `Accept: application/json` alone. | Retry the absolute URL in the JSON `markdown` field or send `Accept: text/markdown`. The `Link` header also advertises the alternate Markdown URL. |
 
