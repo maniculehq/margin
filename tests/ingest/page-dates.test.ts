@@ -79,8 +79,15 @@ describe("collectPageDates", () => {
         }
         execFileSync("git", ["init", "-q"], { cwd: repo })
         commit("guide.mdx", "2026-01-01T00:00:00Z")
+        // Extensions pair in any case, as compileDocs pairs them.
+        commit("legacy.MDX", "2026-01-01T00:00:00Z")
         const pageCommit = commit("guide.agent.md", "2026-02-01T00:00:00Z")
         commit("guide.agent.md", "2026-03-01T00:00:00Z")
+        commit("legacy.Agent.MD", "2026-03-02T00:00:00Z")
+        const expected = {
+            "guide.mdx": "2026-03-01T00:00:00.000Z",
+            "legacy.MDX": "2026-03-02T00:00:00.000Z",
+        }
         afterAll(() => {
             rmSync(repo, { recursive: true, force: true })
         })
@@ -88,22 +95,32 @@ describe("collectPageDates", () => {
         it("dates the page by its newest commit to either file", async () => {
             const result = await collectPageDates({
                 dir: repo,
-                paths: ["guide.mdx"],
+                paths: Object.keys(expected),
             })
-            expect(result.dates.get("guide.mdx")?.toISOString()).toBe(
-                "2026-03-01T00:00:00.000Z",
-            )
+            expect(
+                Object.fromEntries(
+                    [...result.dates].map(([path, date]) => [
+                        path,
+                        date.toISOString(),
+                    ]),
+                ),
+            ).toEqual(expected)
         })
 
         it("rereads a page whose sibling alone changed since the served commit", async () => {
             const result = await collectPageDates({
                 dir: repo,
-                paths: ["guide.mdx"],
+                paths: Object.keys(expected),
                 previousSha: pageCommit,
             })
-            expect(result.dates.get("guide.mdx")?.toISOString()).toBe(
-                "2026-03-01T00:00:00.000Z",
-            )
+            expect(
+                Object.fromEntries(
+                    [...result.dates].map(([path, date]) => [
+                        path,
+                        date.toISOString(),
+                    ]),
+                ),
+            ).toEqual(expected)
         })
     })
 })
