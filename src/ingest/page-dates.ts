@@ -22,10 +22,16 @@ export interface DocsPageDates {
     diagnostics: Diagnostic[]
 }
 
+/** A page's `.agent.md` sibling: editing it changes what agents read. */
+const renditionOf = (path: string) =>
+    /\.mdx?$/i.test(path) ? path.replace(/\.mdx?$/i, ".agent.md") : null
+
 /**
- * Last-commit date of each page path under `dir`. With `previousSha` (the
- * commit the served version was built from) only paths changed since then
- * are looked up; persist carries every other page's date forward. Bounded
+ * Last-commit date of each page path under `dir`, counting a commit to its
+ * `.agent.md` sibling as a change to the page. With `previousSha` (the
+ * commit the served version was built from) only pages whose file or
+ * sibling changed since then are looked up; persist carries every other
+ * page's date forward. Bounded
  * by `budgetMs`; paths left unread fall back with a `freshness_partial`
  * info diagnostic.
  */
@@ -85,7 +91,13 @@ export async function collectPageDates(input: {
                     .split("\n")
                     .filter(Boolean),
             )
-            wanted = wanted.filter((path) => changed.has(path))
+            wanted = wanted.filter((path) => {
+                const rendition = renditionOf(path)
+                return (
+                    changed.has(path) ||
+                    (rendition !== null && changed.has(rendition))
+                )
+            })
         } catch {
             // The previous commit is not in this clone (shallow or rewritten
             // history): read every page instead — unless the budget ran out.
@@ -98,8 +110,17 @@ export async function collectPageDates(input: {
             for (let path = queue.shift(); path; path = queue.shift()) {
                 if (expired) return
                 try {
+                    const rendition = renditionOf(path)
+                    // The newest commit touching the page or its sibling.
                     const iso = (
-                        await git(["log", "-1", "--format=%cI", "--", path])
+                        await git([
+                            "log",
+                            "-1",
+                            "--format=%cI",
+                            "--",
+                            path,
+                            ...(rendition ? [rendition] : []),
+                        ])
                     ).trim()
                     // Untracked files have no history: leave them to persist.
                     if (iso) dates.set(path, new Date(iso))
