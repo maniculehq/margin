@@ -240,21 +240,20 @@ describe.skipIf(!runnable)("MDX Prompt block", () => {
         })
         try {
             const { first } = await open(context)
-            const link = async (name: string) => {
-                const anchor = first.getByRole("link", { name })
-                return {
-                    href: await anchor.getAttribute("href"),
-                    target: await anchor.getAttribute("target"),
-                }
-            }
-            expect(await link("Open in Claude (new tab)")).toEqual({
-                href: `https://claude.ai/new?q=${ENCODED}`,
-                target: "_blank",
+            const claude = first.getByRole("link", {
+                name: "Open in Claude (new tab)",
             })
-            expect(await link("Open in ChatGPT (new tab)")).toEqual({
-                href: `https://chatgpt.com/?q=${ENCODED}`,
-                target: "_blank",
+            expect(await claude.getAttribute("href")).toBe(
+                `https://claude.ai/new?q=${ENCODED}`,
+            )
+            expect(await claude.getAttribute("target")).toBe("_blank")
+            const chatgpt = first.getByRole("link", {
+                name: "Open in ChatGPT (new tab)",
             })
+            expect(await chatgpt.getAttribute("href")).toBe(
+                `https://chatgpt.com/?q=${ENCODED}`,
+            )
+            expect(await chatgpt.getAttribute("target")).toBe("_blank")
         } finally {
             await context.close()
         }
