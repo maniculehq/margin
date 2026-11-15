@@ -51,6 +51,10 @@ export const MCP_PROMPT_NAMES: readonly string[] = [
     "implement_with_docs",
 ]
 
+// A page URL an agent sends is bounded like the URL a browser can send:
+// lookups and not-found suggestions do work proportional to its length.
+const pageUrlInput = z.string().max(2_048)
+
 /** Every read tool's honest hints: nothing changes, repeat calls agree, and
  * nothing outside this site's docs is reached — clients may auto-approve. */
 const READ_ONLY = {
@@ -255,8 +259,8 @@ export async function buildMcpServer(request: Request): Promise<McpServer> {
             description:
                 'List documentation pages in navigation order (title, URL, markdown URL, description, section), optionally under a URL prefix. Pass url (e.g. "/v1" or "/es") to list another version or language; otherScopes names them. Paginated: pass the returned nextCursor as cursor to read the next page; nextCursor is null on the last page.',
             inputSchema: z.object({
-                url: z.string().optional(),
-                prefix: z.string().optional(),
+                url: pageUrlInput.optional(),
+                prefix: pageUrlInput.optional(),
                 limit: z.number().int().min(1).max(500).optional(),
                 cursor: z.number().int().min(0).optional(),
             }),
@@ -320,7 +324,7 @@ export async function buildMcpServer(request: Request): Promise<McpServer> {
             inputSchema: z.object({
                 query: z.string().trim().min(1),
                 limit: z.number().int().min(1).max(50).optional(),
-                url: z.string().optional(),
+                url: pageUrlInput.optional(),
                 locale: z.string().optional(),
                 version: z.string().optional(),
             }),
@@ -353,7 +357,7 @@ export async function buildMcpServer(request: Request): Promise<McpServer> {
             title: "Read a documentation page as markdown",
             description:
                 "Return the clean agent markdown for a page. Accepts a slug, a site-root path, or a trailing-.md URL (e.g. from llms.txt); follows the site's redirects.",
-            inputSchema: z.object({ url: z.string() }),
+            inputSchema: z.object({ url: pageUrlInput }),
             annotations: READ_ONLY,
         },
         traced(request, "read_page", async ({ url }) => {
@@ -392,7 +396,7 @@ export async function buildMcpServer(request: Request): Promise<McpServer> {
             description:
                 "Return structured code blocks (language, title, code, alternatives group) for a page. Accepts a slug or .md URL; optionally filter by language.",
             inputSchema: z.object({
-                url: z.string(),
+                url: pageUrlInput,
                 language: z.string().optional(),
             }),
             outputSchema: z.object({
@@ -423,7 +427,7 @@ export async function buildMcpServer(request: Request): Promise<McpServer> {
             title: "Get the documentation navigation tree",
             description:
                 'Return the documentation navigation as sections of pages (title, URL, markdown URL), in docs.json order. Pass url (e.g. "/v1" or "/es") for another version or language; otherScopes names them.',
-            inputSchema: z.object({ url: z.string().optional() }),
+            inputSchema: z.object({ url: pageUrlInput.optional() }),
             outputSchema: z.object({
                 site: z.string(),
                 sections: z.array(
@@ -494,7 +498,7 @@ export async function buildMcpServer(request: Request): Promise<McpServer> {
             ].join("\n\n"),
             inputSchema: z.object({
                 command: z.string().min(1).max(2_000),
-                url: z.string().optional(),
+                url: pageUrlInput.optional(),
                 locale: z.string().optional(),
                 version: z.string().optional(),
             }),
