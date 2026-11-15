@@ -36,6 +36,11 @@ const LONG_PROMPT = [
     "Finish with the three changes to make first.",
 ].join("\n\n")
 
+// The fixture's third prompt: a line wrapped in the source (one space on
+// the page), a hard break (one newline) and a paragraph break (two).
+const BROKEN_LINES =
+    "Check every link on this page and list the broken ones.\nGroup them by host.\n\nThen fix the first one."
+
 describe.skipIf(!runnable)("MDX Prompt block", () => {
     let browser: Browser
     let child: ChildProcess
@@ -81,7 +86,7 @@ describe.skipIf(!runnable)("MDX Prompt block", () => {
         child?.kill("SIGTERM")
     })
 
-    /** Opens the fixture page and hands back its two prompt blocks. */
+    /** Opens the fixture page and hands back its prompt blocks. */
     async function open(context: BrowserContext) {
         const page = await context.newPage()
         await page.goto(`${baseUrl}/`, { waitUntil: "networkidle" })
@@ -89,6 +94,7 @@ describe.skipIf(!runnable)("MDX Prompt block", () => {
             page,
             first: page.getByRole("group", { name: "Hand this to your agent" }),
             long: page.getByRole("group", { name: "Review the retry policy" }),
+            broken: page.getByRole("group", { name: "Check the links" }),
         }
     }
 
@@ -174,6 +180,55 @@ describe.skipIf(!runnable)("MDX Prompt block", () => {
             await expect
                 .poll(() => long.locator(body).evaluate((el) => el.scrollTop))
                 .toBeGreaterThan(0)
+        } finally {
+            await context.close()
+        }
+    }, 60_000)
+
+    it("a link carries the text Copy writes, line breaks included, before JavaScript runs", async () => {
+        const scripted = await browser.newContext({
+            viewport: { width: 1440, height: 900 },
+            permissions: ["clipboard-read", "clipboard-write"],
+        })
+        const unscripted = await browser.newContext({
+            viewport: { width: 1440, height: 900 },
+            javaScriptEnabled: false,
+        })
+        try {
+            const { page, broken } = await open(scripted)
+            await broken.getByRole("button", { name: "Copy prompt" }).click()
+            await broken.getByRole("status").getByText("Copied.").waitFor()
+            expect(
+                await page.evaluate(() => navigator.clipboard.readText()),
+            ).toBe(BROKEN_LINES)
+
+            // The server's own href: nothing has run to correct it.
+            const served = await open(unscripted)
+            const href = await served.broken
+                .getByRole("link", { name: "Open in ChatGPT (new tab)" })
+                .getAttribute("href")
+            expect(href).toBe(
+                `https://chatgpt.com/?q=${encodeURIComponent(BROKEN_LINES)}`,
+            )
+        } finally {
+            await scripted.close()
+            await unscripted.close()
+        }
+    }, 60_000)
+
+    it("a long prompt prints in full", async () => {
+        const context = await browser.newContext({
+            viewport: { width: 1440, height: 900 },
+        })
+        try {
+            const { page, long } = await open(context)
+            const body = long.locator('[data-component-part="prompt-body"]')
+            const hidden = () =>
+                body.evaluate((el) => el.scrollHeight - el.clientHeight)
+            // On screen the window cuts it, so print has something to lose.
+            expect(await hidden()).toBeGreaterThan(0)
+            await page.emulateMedia({ media: "print" })
+            expect(await hidden()).toBe(0)
         } finally {
             await context.close()
         }

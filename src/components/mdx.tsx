@@ -1282,6 +1282,65 @@ const PROMPT_OPEN_IN = {
     chatgpt: { label: "ChatGPT", href: "https://chatgpt.com/?q=", web: true },
 } as const
 
+/** Elements that start and end a line in a prompt body. */
+const PROMPT_LINE_ELEMENTS = new Set([
+    "div",
+    "li",
+    "ul",
+    "ol",
+    "blockquote",
+    "pre",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+])
+
+/**
+ * A prompt body's text as the browser's innerText gives it, read from the
+ * React tree so the server can build the links: whitespace runs collapse to
+ * one space, `<br>` is a newline, a block starts a new line and a paragraph
+ * is set off by a blank one.
+ */
+function promptText(body: ReactNode): string {
+    let text = ""
+    // Newlines owed before the next text: 1 after a block, 2 after a
+    // paragraph. Adjacent breaks collapse to the larger, as innerText's do.
+    let owed = 0
+    const walk = (node: ReactNode) => {
+        if (typeof node === "string" || typeof node === "number") {
+            const run = String(node).replace(/\s+/g, " ")
+            const lineStart = owed > 0 || text === "" || text.endsWith("\n")
+            const words = lineStart ? run.trimStart() : run
+            if (!words) return
+            if (text && owed) text = text.trimEnd() + "\n".repeat(owed)
+            owed = 0
+            text += words
+        } else if (Array.isArray(node)) {
+            for (const child of node) walk(child)
+        } else if (isValidElement<{ children?: ReactNode }>(node)) {
+            if (node.type === "br") {
+                text = `${text.trimEnd()}\n`
+                return
+            }
+            const breaks =
+                node.type === "p"
+                    ? 2
+                    : typeof node.type === "string" &&
+                        PROMPT_LINE_ELEMENTS.has(node.type)
+                      ? 1
+                      : 0
+            owed = Math.max(owed, breaks)
+            walk(node.props.children)
+            owed = Math.max(owed, breaks)
+        }
+    }
+    walk(body)
+    return text.trimEnd()
+}
+
 const CopyIcon = chromeIcon("copy")
 const NewTabIcon = chromeIcon("arrow-up-right")
 
@@ -1290,7 +1349,8 @@ const NewTabIcon = chromeIcon("arrow-up-right")
  * description as a quiet label, the prompt itself in mono with Copy joined
  * to it, and an "Open in" row for the `actions` entries (`"claude"`,
  * `"codex"`, `"cursor"`, `"claude-web"`, `"chatgpt"`), in the authored
- * order. A long prompt scrolls inside a ten-line window. Copy takes the
+ * order. A long prompt scrolls inside a ten-line window on screen and
+ * prints in full. Copy takes the
  * body's innerText, so the clipboard gets the text as displayed, paragraph
  * breaks included.
  */
@@ -1310,10 +1370,10 @@ function Prompt({
     // Unlike "Copied", the failure notice stays until the next attempt: it
     // tells the reader what to do with the selection.
     const [failed, setFailed] = useState(false)
-    // The links need the prompt at render. The server and the first client
-    // render read it from the children; after every render the effect takes
-    // the DOM's innerText, the same text Copy writes.
-    const [text, setText] = useState(() => codeText(children).trim())
+    // The links need the prompt at render, and must carry the text Copy
+    // writes. The server and the first client render derive it from the
+    // children; after every render the effect takes the DOM's innerText.
+    const [text, setText] = useState(() => promptText(children))
     useEffect(() => {
         const body = bodyRef.current
         if (body) setText(body.innerText)
@@ -1369,11 +1429,11 @@ function Prompt({
             >
                 {description ?? "Prompt"}
             </div>
-            <div className="flex @md:flex-row flex-col overflow-clip rounded-[10px] border border-fd-border bg-fd-card">
+            <div className="flex @md:flex-row flex-col overflow-clip rounded-[10px] border border-fd-border bg-fd-card print:overflow-visible">
                 <div
                     ref={bodyRef}
                     tabIndex={scrolls ? 0 : undefined}
-                    className="-outline-offset-2 wrap-anywhere max-h-61 min-w-0 flex-1 space-y-[22px] overflow-y-auto px-4 py-3 font-mono text-fd-foreground leading-[22px]"
+                    className="-outline-offset-2 wrap-anywhere max-h-61 min-w-0 flex-1 space-y-[22px] overflow-y-auto px-4 py-3 font-mono text-fd-foreground leading-[22px] print:max-h-none print:overflow-visible"
                     data-component-part="prompt-body"
                 >
                     <InsidePromptBody value={true}>{children}</InsidePromptBody>
