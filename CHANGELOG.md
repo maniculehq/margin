@@ -18,6 +18,8 @@ Semantic Versioning once a stable public API is published.
   commit.
 - `<Prompt>` takes `claude` and `codex` actions beside `copy` and `cursor`,
   which open the prompt in Claude Code and Codex.
+- `<Prompt>` takes `claude-web` and `chatgpt` actions, which open the prompt
+  on claude.ai and chatgpt.com in a new tab.
 - Site stylesheets can target page regions and components by the common
   `docs.json` hooks: `#navbar`, `#sidebar`, `#content-area`,
   `#table-of-contents`, `#pagination` and `#footer`; `.card`, `.callout`,
@@ -33,6 +35,12 @@ Semantic Versioning once a stable public API is published.
 
 ### Changed
 
+- `<Prompt>` shows its prompt: the text sits in the reading column in
+  monospace, selectable, with Copy joined to it and the other actions as an
+  Open in row of links. A prompt longer than ten lines scrolls inside the
+  block. A failed copy says so in the block and selects the prompt. Props
+  and the copied text are unchanged; the `data-component-part` hooks stay,
+  with `prompt-body` and `prompt-status` added.
 - The default theme and every layout preset now follow their Mintlify
   counterparts: white pages with near-black dark mode, a framework palette
   per `theme`, Mintlify's type scale, a 65–75 character reading measure, and

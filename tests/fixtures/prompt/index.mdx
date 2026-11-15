@@ -1,0 +1,38 @@
+---
+title: Prompts
+description: Prompt blocks for the browser suite.
+---
+
+<Prompt description="Hand this to your agent" actions={["copy", "claude", "codex", "cursor", "claude-web", "chatgpt"]}>
+Publish my docs & keep the links. Fetch https://docs.example.com/quickstart.md and follow it.
+</Prompt>
+
+<Prompt description="Review the retry policy">
+Review the retry policy for this API client.
+
+List every request that cannot be retried safely.
+
+For each one, say what the client should do instead.
+
+Check the backoff schedule against the rate limits.
+
+Flag any retry that could repeat a payment.
+
+Name the tests that cover each case.
+
+Point out the cases no test covers.
+
+Suggest one change that removes the most risk.
+
+Keep the report under one page.
+
+Finish with the three changes to make first.
+</Prompt>
+
+<Prompt description="Check the links" actions={["copy", "chatgpt"]}>
+Check every link on this page
+and list the broken ones.\
+Group them by host.
+
+Then fix the first one.
+</Prompt>

@@ -42,7 +42,7 @@ Paste this MDX into a documentation page body and open the rendered page in a br
   <GitHub.Repo repo="maniculehq/margin" variant="inset" />
 </GitHub>
 
-<Prompt description="Review a retry policy" actions={["copy", "claude", "codex", "cursor"]}>
+<Prompt description="Review a retry policy" actions={["copy", "claude", "codex", "cursor", "claude-web", "chatgpt"]}>
   Review the retry policy for this API client. Identify requests that
   cannot be retried safely and explain how to handle them.
 </Prompt>
@@ -78,8 +78,8 @@ Paste this MDX into a documentation page body and open the rendered page in a br
 - `GitHub.Repo.repo` accepts `owner/name` or a GitHub repository URL. Missing or invalid values render nothing.
 - `GitHub.Repo.variant="flat"` removes the border treatment. Omitted or other values use inset treatment. `GitHub.Repo.className` adds CSS classes to the repository link.
 - `GitHub.Repo` fetches public repository description, stars, and forks in the visitor's browser and caches metadata for the session. Loading or refused requests leave a repository-name link.
-- `Prompt.description` is the visible label and defaults to `Prompt`. Children supply the hidden prompt body used by actions.
-- `Prompt.actions` is an array of `copy`, `claude`, `codex`, and `cursor`, default `["copy"]`. Invalid arrays fall back to `["copy"]`. Copy is always visible. `claude` adds Open in Claude Code (`claude://code/new?q=`), `codex` adds Open in Codex (`codex://threads/new?prompt=`), and `cursor` adds Open in Cursor (`cursor://anysphere.cursor-deeplink/prompt?text=`), each with the full prompt text, in the order listed.
+- `Prompt.description` is the label above the prompt and defaults to `Prompt`. Children supply the prompt body, which is displayed in monospace, selectable, and scrolls past ten lines; a URL in it renders as plain text.
+- `Prompt.actions` is an array of `copy`, `claude`, `codex`, `cursor`, `claude-web`, and `chatgpt`, default `["copy"]`. Invalid arrays fall back to `["copy"]`. Copy is always visible. Each other entry adds a link to the Open in row, in the order listed, with the full prompt text URL-encoded: `claude` opens Claude Code (`claude://code/new?q=`), `codex` opens Codex (`codex://threads/new?prompt=`), `cursor` opens Cursor (`cursor://anysphere.cursor-deeplink/prompt?text=`), `claude-web` opens `https://claude.ai/new?q=` in a new tab, and `chatgpt` opens `https://chatgpt.com/?q=` in a new tab.
 - `Update` places release metadata beside the body on wider screens and above the body on narrow screens.
 - `Update.label` supplies the displayed label and anchor source. `Update.date` is the fallback when `label` is omitted. `Update.description` supplies the short release description; children supply the body.
 - `Update.tags` accepts an array of strings. Missing or invalid arrays use an empty array.
@@ -94,7 +94,7 @@ Paste this MDX into a documentation page body and open the rendered page in a br
 - `Color` does not style arbitrary text.
 - `Tree` and `FileTree` do not take a text `tree` prop or Markdown lists as entry syntax; use member components.
 - `GitHub` alone does not create a card. `GitHub.Repo` does not configure private-repository access.
-- `Prompt` does not display the prompt body, run model requests, or display model responses.
+- `Prompt` does not run model requests or display model responses. When the clipboard refuses a copy, it says so and selects the prompt text.
 
 ## Errors
 
@@ -104,7 +104,7 @@ Paste this MDX into a documentation page body and open the rendered page in a br
 
 ## Verify
 
-Open the rendered page in a browser with JavaScript enabled. Expect a Client to API to Worker diagram, a Preview badge, and an initially open `docs` folder. Focus Request ID to show its tooltip; click the Accent swatch to copy the active theme's value. Click Copy prompt to copy the full hidden prompt text. The Update entry is addressable at `#2026-01-15`.
+Open the rendered page in a browser with JavaScript enabled. Expect a Client to API to Worker diagram, a Preview badge, and an initially open `docs` folder. Focus Request ID to show its tooltip; click the Accent swatch to copy the active theme's value. Click Copy on the prompt to copy its full text. The Update entry is addressable at `#2026-01-15`.
 
 ## Related
 
