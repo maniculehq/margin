@@ -203,27 +203,29 @@ Repository metadata is fetched from GitHub in the visitor's browser and cached f
 
 ### Prompt
 
-Use `Prompt` to offer text for copying into an AI tool. The visible card shows the description and actions; the prompt body is hidden, but the actions use its full text.
+Use `Prompt` to offer text for copying into an AI tool. The block shows the description as a label and the prompt itself in monospace, with Copy beside it. Readers can select the text, and a prompt longer than ten lines scrolls inside the block.
 
-This example adds actions that open the prompt in Claude Code, Codex and Cursor alongside Copy prompt:
+This example adds an Open in row that sends the prompt to Claude Code, Codex, Cursor, Claude and ChatGPT:
 
 ```mdx
-<Prompt description="Review a retry policy" actions={["copy", "claude", "codex", "cursor"]}>
+<Prompt description="Review a retry policy" actions={["copy", "claude", "codex", "cursor", "claude-web", "chatgpt"]}>
   Review the retry policy for this API client. Identify requests that
   cannot be retried safely and explain how to handle them.
 </Prompt>
 ```
 
-<Prompt description="Review a retry policy" actions={["copy", "claude", "codex", "cursor"]}>
+<Prompt description="Review a retry policy" actions={["copy", "claude", "codex", "cursor", "claude-web", "chatgpt"]}>
   Review the retry policy for this API client. Identify requests that
   cannot be retried safely and explain how to handle them.
 </Prompt>
 
 | Input | Value | Behavior |
 | :--- | :--- | :--- |
-| `description` | String | Visible label. Defaults to `Prompt`. |
-| `actions` | Array of `copy`, `claude`, `codex` and `cursor` | Defaults to `["copy"]`. Copy is always visible. `claude` adds Open in Claude Code, `codex` adds Open in Codex, and `cursor` adds Open in Cursor, in the order listed. Invalid arrays fall back to `["copy"]`. |
-| Children | Prompt content | Text copied, or sent to the chosen client's deep link. |
+| `description` | String | Label above the prompt. Defaults to `Prompt`. |
+| `actions` | Array of `copy`, `claude`, `codex`, `cursor`, `claude-web` and `chatgpt` | Defaults to `["copy"]`. Copy is always visible. Each other entry adds a link to the Open in row, in the order listed: `claude` opens Claude Code, `codex` opens Codex and `cursor` opens Cursor through the app's deep link; `claude-web` opens claude.ai and `chatgpt` opens chatgpt.com in a new tab. Invalid arrays fall back to `["copy"]`. |
+| Children | Prompt content | Text shown, copied, and sent to the chosen link. A URL in it stays plain text. |
+
+If the browser refuses the clipboard, the block says so and selects the prompt so the reader can copy it from the keyboard.
 
 `Prompt` does not run a model request or display a model response.
 

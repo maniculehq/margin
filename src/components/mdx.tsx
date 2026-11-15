@@ -40,6 +40,8 @@ import {
     type ReactNode,
     use,
     useContext,
+    useEffect,
+    useId,
     useRef,
     useState,
 } from "react"
@@ -1028,8 +1030,14 @@ function Step({
     )
 }
 
+/** Set around a Prompt body, where an authored or auto-linked URL is part
+ * of the text to copy, not a link. */
+const InsidePromptBody = createContext(false)
+
 function SafeLink({ href, children, ...props }: ComponentProps<"a">) {
     const base = useBasePath()
+    const plainText = use(InsidePromptBody)
+    if (plainText) return <span id={props.id}>{children}</span>
     // No href: a fragment target (`<a id="details">`), harmless as is.
     if (!href) return <a {...props}>{children}</a>
     // Classify what the browser will resolve: it strips leading/trailing
@@ -1255,25 +1263,36 @@ function DocsIcon({
     )
 }
 
-/** Prompt's deep-link actions: label and URL prefix, the prompt appended
- * URL-encoded. */
-const PROMPT_DEEP_LINKS = {
+/** Prompt's "Open in" targets: label and URL prefix, the prompt appended
+ * URL-encoded. The client apps take a deep link; the two web apps open in a
+ * new tab. */
+const PROMPT_OPEN_IN = {
     cursor: {
-        label: "Open in Cursor",
+        label: "Cursor",
         href: "cursor://anysphere.cursor-deeplink/prompt?text=",
+        web: false,
     },
-    claude: { label: "Open in Claude Code", href: "claude://code/new?q=" },
-    codex: { label: "Open in Codex", href: "codex://threads/new?prompt=" },
+    claude: { label: "Claude Code", href: "claude://code/new?q=", web: false },
+    codex: { label: "Codex", href: "codex://threads/new?prompt=", web: false },
+    "claude-web": {
+        label: "Claude",
+        href: "https://claude.ai/new?q=",
+        web: true,
+    },
+    chatgpt: { label: "ChatGPT", href: "https://chatgpt.com/?q=", web: true },
 } as const
 
+const CopyIcon = chromeIcon("copy")
+const NewTabIcon = chromeIcon("arrow-up-right")
+
 /**
- * Prompt — a compact AI-prompt card (the mirror dumped
- * entire agent-setup prompts inline, 2.5× the official body length). The
- * body clamps to a preview with a fade + explicit expand control; Copy is
- * always present, and `actions` entries `"cursor"`, `"claude"` and
- * `"codex"` add each client's prompt deep link, in the authored order. The
- * full text stays in the (overflow-clipped) DOM, so Copy and the deep links
- * always carry the whole prompt.
+ * Prompt — text to hand to an AI tool, set in the reading column: the
+ * description as a quiet label, the prompt itself in mono with Copy joined
+ * to it, and an "Open in" row for the `actions` entries (`"claude"`,
+ * `"codex"`, `"cursor"`, `"claude-web"`, `"chatgpt"`), in the authored
+ * order. A long prompt scrolls inside a ten-line window. Copy takes the
+ * body's innerText, so the clipboard gets the text as displayed, paragraph
+ * breaks included.
  */
 function Prompt({
     description,
@@ -1284,80 +1303,163 @@ function Prompt({
     children?: ReactNode
     actions?: unknown
 }) {
+    const labelId = useId()
     const bodyRef = useRef<HTMLDivElement>(null)
     const clipboard = useCopyToClipboard(1_500)
     const copied = clipboard.state === "copied"
+    // Unlike "Copied", the failure notice stays until the next attempt: it
+    // tells the reader what to do with the selection.
+    const [failed, setFailed] = useState(false)
+    // The links need the prompt at render. The server and the first client
+    // render read it from the children; after every render the effect takes
+    // the DOM's innerText, the same text Copy writes.
+    const [text, setText] = useState(() => codeText(children).trim())
+    useEffect(() => {
+        const body = bodyRef.current
+        if (body) setText(body.innerText)
+    })
+    // A scrolling body must be reachable from the keyboard; one that fits
+    // gets no tab stop.
+    const [scrolls, setScrolls] = useState(false)
+    useEffect(() => {
+        const body = bodyRef.current
+        if (!body) return
+        const observer = new ResizeObserver(() => {
+            setScrolls(body.scrollHeight > body.clientHeight)
+            // A body first rendered hidden (a closed tab) has no line
+            // breaks in its innerText until it is shown.
+            setText(body.innerText)
+        })
+        observer.observe(body)
+        return () => observer.disconnect()
+    }, [])
     const parsedActions = zodCatch(
-        array(zodEnum(["copy", "cursor", "claude", "codex"])),
+        array(
+            zodEnum([
+                "copy",
+                "cursor",
+                "claude",
+                "codex",
+                "claude-web",
+                "chatgpt",
+            ]),
+        ),
         ["copy"],
     ).parse(actions ?? ["copy"])
-    // Prompt never shows the prompt text: one row with the
-    // description and the actions; the body stays in the DOM (hidden) so
-    // copy/deeplink read the authored text with its line structure.
-    const promptText = () => bodyRef.current?.innerText ?? ""
+    const targets = [...new Set(parsedActions)].filter(
+        (action) => action !== "copy",
+    )
+    const status = failed
+        ? "Copy failed. The prompt is selected; press Ctrl+C or ⌘C."
+        : copied
+          ? "Copied. Paste it into your agent."
+          : null
     return (
+        // biome-ignore lint/a11y/useSemanticElements: a labelled group of the prompt and its actions, not a form fieldset
         <div
-            className="prompt my-6 flex flex-wrap items-center gap-x-6 gap-y-4 rounded-2xl border border-fd-border p-4"
+            role="group"
+            aria-labelledby={labelId}
+            className="prompt not-prose @container my-6 flex flex-col gap-2.5 text-sm"
             data-component-part="prompt"
         >
             <div
-                className="not-prose flex min-w-0 flex-1 basis-56 items-start gap-2 text-sm"
+                id={labelId}
+                className="text-fd-muted-foreground"
                 data-component-part="prompt-description"
             >
                 {description ?? "Prompt"}
             </div>
-            <div
-                className="ms-auto flex flex-wrap items-center gap-1.5 print:hidden"
-                data-component-part="prompt-actions-wrapper"
-            >
+            <div className="flex @md:flex-row flex-col overflow-clip rounded-[10px] border border-fd-border bg-fd-card">
+                <div
+                    ref={bodyRef}
+                    tabIndex={scrolls ? 0 : undefined}
+                    className="-outline-offset-2 wrap-anywhere max-h-61 min-w-0 flex-1 space-y-[22px] overflow-y-auto px-4 py-3 font-mono text-fd-foreground leading-[22px]"
+                    data-component-part="prompt-body"
+                >
+                    <InsidePromptBody value={true}>{children}</InsidePromptBody>
+                </div>
                 <button
                     type="button"
                     data-component-part="prompt-action-copy-button"
                     aria-label="Copy prompt"
-                    className="inline-flex h-[26px] shrink-0 items-center gap-1 rounded-lg bg-margin-button px-2 font-medium text-margin-button-foreground text-xs transition-colors hover:bg-margin-button/90"
+                    className="-outline-offset-2 flex @md:w-24 shrink-0 items-center justify-center gap-2 border-fd-border border-t @md:border-s @md:border-t-0 bg-fd-background @md:py-0 py-3 text-fd-foreground transition-colors hover:bg-fd-accent print:hidden"
                     onClick={() => {
-                        const text = promptText()
-                        if (!text) return
-                        void clipboard.copy(text).then((ok) => {
-                            if (!ok) {
-                                toast.add({
-                                    title: <CopyFailedTitle />,
-                                    type: "error",
-                                })
-                            }
+                        const body = bodyRef.current
+                        const prompt = body?.innerText
+                        if (!body || !prompt) return
+                        void clipboard.copy(prompt).then((ok) => {
+                            setFailed(!ok)
+                            // The clipboard refused: leave the prompt
+                            // selected so the keyboard shortcut copies it.
+                            if (!ok)
+                                body.ownerDocument.defaultView
+                                    ?.getSelection()
+                                    ?.selectAllChildren(body)
                         })
                     }}
                 >
-                    {copied ? "Copied" : "Copy prompt"}
+                    {copied ? <CopiedIcon /> : <CopyIcon />}
+                    {copied ? "Copied" : "Copy"}
                 </button>
-                {[...new Set(parsedActions)].map((action) =>
-                    action === "copy" ? null : (
-                        <button
-                            key={action}
-                            type="button"
-                            data-component-part={`prompt-action-${action}-button`}
-                            className="inline-flex h-[26px] shrink-0 items-center gap-1 rounded-lg border border-fd-border px-2 font-medium text-fd-foreground text-xs transition-colors hover:bg-fd-accent"
-                            onClick={() => {
-                                const text = promptText()
-                                if (!text) return
-                                window.location.href = `${PROMPT_DEEP_LINKS[action].href}${encodeURIComponent(text)}`
-                            }}
-                        >
-                            {PROMPT_DEEP_LINKS[action].label}
-                        </button>
-                    ),
-                )}
             </div>
-            {/* innerText of a display:none subtree collapses to textContent
-                (no line breaks), so hide it off-canvas instead — inert, so
-                links or buttons inside the prompt never take focus. */}
             <div
-                ref={bodyRef}
-                aria-hidden
-                inert
-                className="-left-[9999px] absolute h-px w-px overflow-hidden text-sm"
+                className={cn(
+                    "-my-1 flex flex-wrap items-center gap-x-4 print:hidden",
+                    // Copy-only with nothing to say: the row holds just the
+                    // empty live region, so it takes no space.
+                    targets.length === 0 && !failed && "sr-only",
+                )}
+                data-component-part="prompt-actions-wrapper"
             >
-                {children}
+                {targets.length > 0 ? (
+                    <span className="text-fd-muted-foreground">Open in</span>
+                ) : null}
+                {targets.map((action) => {
+                    const target = PROMPT_OPEN_IN[action]
+                    return (
+                        <a
+                            key={action}
+                            href={
+                                text
+                                    ? `${target.href}${encodeURIComponent(text)}`
+                                    : undefined
+                            }
+                            {...(target.web
+                                ? {
+                                      target: "_blank",
+                                      rel: "noreferrer noopener",
+                                  }
+                                : {})}
+                            aria-label={`Open in ${target.label}${target.web ? " (new tab)" : ""}`}
+                            data-component-part={`prompt-action-${action}-button`}
+                            className="inline-flex items-center gap-0.5 py-1 text-fd-foreground underline decoration-1 decoration-fd-foreground/25 underline-offset-[0.3em] transition-colors hover:decoration-fd-primary"
+                        >
+                            {target.label}
+                            {target.web ? (
+                                <NewTabIcon className="size-3.5" />
+                            ) : null}
+                        </a>
+                    )
+                })}
+                {/* Always mounted, so a screen reader hears the change. A
+                    failure always shows, on a line of its own if need be.
+                    "Copied" is already on the button, so its sentence shows
+                    only where the row has room, and never moves the page:
+                    it takes the space left on the row, and when that is too
+                    narrow it wraps behind the 1px ::before onto a second
+                    line that the one-line height clips. */}
+                <span
+                    role="status"
+                    className={cn(
+                        "text-fd-foreground",
+                        failed
+                            ? "ms-auto text-balance text-end"
+                            : "flex h-[1lh] min-w-0 flex-1 flex-wrap justify-end overflow-hidden whitespace-nowrap before:h-full before:w-px before:content-['']",
+                    )}
+                    data-component-part="prompt-status"
+                >
+                    {status ? <span>{status}</span> : null}
+                </span>
             </div>
         </div>
     )
