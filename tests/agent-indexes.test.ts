@@ -434,6 +434,33 @@ describe.skipIf(!hasDocsDb)("agent indexes", () => {
         ])
     })
 
+    test("MCP read_page refuses a URL longer than a page address", async () => {
+        // A missing page of an allowed length reaches the lookup.
+        expect(
+            await callTool("read_page", { url: `/${"a".repeat(2_047)}` }),
+        ).toContain("not_found")
+        const refused = await callTool("read_page", {
+            url: `/${"a".repeat(2_048)}`,
+        })
+        expect(refused).not.toContain("not_found")
+        expect(refused).toMatch(/Input validation error/)
+    })
+
+    test("not-found suggestions score only a path's first 256 characters", async () => {
+        const closest = async (url: string) =>
+            z
+                .object({ candidates: z.array(z.object({ url: z.string() })) })
+                .parse(JSON.parse(await callTool("read_page", { url })))
+                .candidates.map((candidate) => candidate.url)
+        // Within the bound, a trailing segment naming a page ranks it first.
+        expect((await closest(`/${"q".repeat(200)}/notes`))[0]).toBe("/notes")
+        expect((await closest(`/${"q".repeat(200)}`))[0]).not.toBe("/notes")
+        // Past it, the same segment is never scored.
+        expect((await closest(`/${"q".repeat(256)}/notes`))[0]).not.toBe(
+            "/notes",
+        )
+    })
+
     test("MCP read_page follows a configured redirect", async () => {
         expect(await callTool("read_page", { url: "/start" })).toMatch(
             /^# Alpha second \(\/alpha\)/,

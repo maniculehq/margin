@@ -838,8 +838,11 @@ export function suggestClosestPages(
     slugs: string[],
     limit = 5,
 ): (PageRef & { description: string | undefined })[] {
-    const target = slugs.join("/").toLowerCase()
-    const targetSegments = slugs.map((slug) => slug.toLowerCase())
+    // Scoring costs the path's length times every page's, on the event loop,
+    // and the path is the caller's. No page's path is near this long, so the
+    // rest of a longer one cannot change which pages are closest.
+    const target = slugs.join("/").toLowerCase().slice(0, 256)
+    const targetSegments = target.split("/").filter(Boolean)
     const scored = target
         ? ctx.source
               .getPages()
