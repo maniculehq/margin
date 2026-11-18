@@ -462,6 +462,14 @@ interface VersionSource {
     tabSource: (tab: TabNode, key: string) => SiteSource | null
 }
 
+interface OwnedMeta {
+    path: string
+    /** The first version root (in manifest order) whose directory holds the
+     * row; undefined for a row outside every root. */
+    owner: VersionsManifest[number] | undefined
+    data: DocsMetaData
+}
+
 interface VersionPageRow {
     path: string
     kind: string
@@ -497,6 +505,9 @@ const versionContent = new LRUCache<
         byServedUrl: Map<string, VersionPageRow>
         /** lower(servedUrl) → the canonical spelling. */
         byLowerServedUrl: Map<string, string>
+        /** The meta rows parsed, each with its owning version root, filled
+         * by buildVersionSource per manifest. */
+        metasByManifest: WeakMap<VersionsManifest, OwnedMeta[]>
     },
     { siteId: string; versionId: string }
 >({
@@ -543,7 +554,13 @@ const versionContent = new LRUCache<
             if (!byLowerServedUrl.has(lower))
                 byLowerServedUrl.set(lower, row.servedUrl)
         }
-        return { pages, metas, byServedUrl, byLowerServedUrl }
+        return {
+            pages,
+            metas,
+            byServedUrl,
+            byLowerServedUrl,
+            metasByManifest: new WeakMap(),
+        }
     },
 })
 const EMPTY_SOURCE_KEY = "__empty__"
@@ -569,13 +586,10 @@ async function buildVersionSource(
      * pages its language's default tree serves (alternateTrees). */
     { labelledOnly = false }: { labelledOnly?: boolean } = {},
 ): Promise<VersionSource> {
-    const { pages, metas } = await versionContent.forceFetch(
-        `${siteId}:${versionId}`,
-        { context: { siteId, versionId } },
-    )
-    const versionRoots = versionsManifest.filter(
-        (entry) => entry.directory.length > 0,
-    )
+    const content = await versionContent.forceFetch(`${siteId}:${versionId}`, {
+        context: { siteId, versionId },
+    })
+    const { pages } = content
     const selectedPages = pages.filter(
         (row) =>
             (row.localeLabel ?? null) === localeLabel &&
@@ -597,44 +611,63 @@ async function buildVersionSource(
         return file
     })
     // A meta row belongs to the first root (in manifest order) whose
-    // directory holds it. Looked up by the row's ancestor directories, so a
-    // site with hundreds of versions does not scan every root per row.
-    const rootIndexByDirectory = new Map<string, number>()
-    versionRoots.forEach((entry, index) => {
-        if (!rootIndexByDirectory.has(entry.directory))
-            rootIndexByDirectory.set(entry.directory, index)
-    })
-    const metaFiles: VirtualDocsFile[] = metas.flatMap((row) => {
-        let owningIndex: number | undefined
-        for (
-            let slash = row.path.indexOf("/");
-            slash !== -1;
-            slash = row.path.indexOf("/", slash + 1)
-        ) {
-            const index = rootIndexByDirectory.get(row.path.slice(0, slash))
-            if (
-                index !== undefined &&
-                (owningIndex === undefined || index < owningIndex)
-            )
-                owningIndex = index
-        }
-        const owningRoot =
-            owningIndex === undefined ? undefined : versionRoots[owningIndex]
-        if (owningRoot && owningRoot.label !== versionLabel) return []
-        // Locale trees live under the locale-tag prefix (servedUrl space):
-        // a version root "es/v1" (label v1) rewrites to es/v1/… so meta
-        // rows line up with the virtual page paths.
-        const path = owningRoot
-            ? `${localeLabel ? `${localeLabel}/` : ""}${owningRoot.label}/${row.path.slice(owningRoot.directory.length + 1)}`
-            : row.path
-        return [
-            {
-                type: "meta" as const,
-                path,
+    // directory holds it. Resolved and parsed once per version and manifest,
+    // not per tree: alternateTrees builds a tree for every version, which
+    // would otherwise each look up every row's root and parse what it keeps.
+    let ownedMetas = content.metasByManifest.get(versionsManifest)
+    if (!ownedMetas) {
+        const versionRoots = versionsManifest.filter(
+            (entry) => entry.directory.length > 0,
+        )
+        // Looked up by the row's ancestor directories, so a site with
+        // hundreds of versions does not scan every root per row.
+        const rootIndexByDirectory = new Map<string, number>()
+        versionRoots.forEach((entry, index) => {
+            if (!rootIndexByDirectory.has(entry.directory))
+                rootIndexByDirectory.set(entry.directory, index)
+        })
+        ownedMetas = content.metas.map((row) => {
+            let owningIndex: number | undefined
+            for (
+                let slash = row.path.indexOf("/");
+                slash !== -1;
+                slash = row.path.indexOf("/", slash + 1)
+            ) {
+                const index = rootIndexByDirectory.get(row.path.slice(0, slash))
+                if (
+                    index !== undefined &&
+                    (owningIndex === undefined || index < owningIndex)
+                )
+                    owningIndex = index
+            }
+            return {
+                path: row.path,
+                owner:
+                    owningIndex === undefined
+                        ? undefined
+                        : versionRoots[owningIndex],
                 data: metaDataSchema.parse(row.data),
-            },
-        ]
-    })
+            }
+        })
+        content.metasByManifest.set(versionsManifest, ownedMetas)
+    }
+    const metaFiles: VirtualDocsFile[] = ownedMetas.flatMap(
+        ({ path, owner, data }) => {
+            if (owner && owner.label !== versionLabel) return []
+            // Locale trees live under the locale-tag prefix (servedUrl
+            // space): a version root "es/v1" (label v1) rewrites to es/v1/…
+            // so meta rows line up with the virtual page paths.
+            return [
+                {
+                    type: "meta" as const,
+                    path: owner
+                        ? `${localeLabel ? `${localeLabel}/` : ""}${owner.label}/${path.slice(owner.directory.length + 1)}`
+                        : path,
+                    data,
+                },
+            ]
+        },
+    )
 
     // Method badges for generated API pages, keyed by served URL — shared by
     // the merged, search, and tab-scoped trees (their nodes carry the same
@@ -1084,14 +1117,24 @@ export interface AlternateTree {
 
 /** Keyed by the request tree's loader, which `sources` memoizes per (site,
  * version, locale, label): the trees are a function of it, and an entry lives
- * as long as that loader does. */
-const alternateTreesMemo = new WeakMap<SiteSource, AlternateTree[]>()
+ * as long as that loader does. Holds the build in flight, so the sitemaps,
+ * llms.txt and MCP calls that arrive together after a deploy share one. */
+const alternateTreesMemo = new WeakMap<SiteSource, Promise<AlternateTree[]>>()
 
-export async function alternateTrees(
-    ctx: DocsContext,
-): Promise<AlternateTree[]> {
+export function alternateTrees(ctx: DocsContext): Promise<AlternateTree[]> {
     const memoized = alternateTreesMemo.get(ctx.source)
     if (memoized) return memoized
+    const built = buildAlternateTrees(ctx)
+    alternateTreesMemo.set(ctx.source, built)
+    // A failed build is dropped so the next call retries.
+    built.catch(() => {
+        if (alternateTreesMemo.get(ctx.source) === built)
+            alternateTreesMemo.delete(ctx.source)
+    })
+    return built
+}
+
+async function buildAlternateTrees(ctx: DocsContext): Promise<AlternateTree[]> {
     const { versionId } = ctx
     if (!versionId) return []
     const defaultLocale = ctx.localesManifest.find((entry) => entry.default)
@@ -1213,9 +1256,7 @@ export async function alternateTrees(
             }
         }),
     )
-    const result = trees.filter((tree) => tree.pages.length > 0)
-    alternateTreesMemo.set(ctx.source, result)
-    return result
+    return trees.filter((tree) => tree.pages.length > 0)
 }
 
 /** Which of `urls` exist as served routes in this version (language-selector

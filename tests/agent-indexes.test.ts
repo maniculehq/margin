@@ -743,6 +743,15 @@ describe.skipIf(!hasDocsDb)("agent indexes", () => {
 describe.skipIf(!hasDocsDb)("alternate trees of a many-version site", () => {
     // More directory versions than the 64 loaders the instance memoizes.
     const labels = Array.from({ length: 70 }, (_, index) => `v${index + 1}`)
+    const englishVersions = [
+        { label: "latest", directory: "", default: true, seq: 0 },
+        ...labels.map((label, index) => ({
+            label,
+            directory: `sdk/${label}`,
+            default: false,
+            seq: index + 1,
+        })),
+    ]
     const versioned = { siteId: randomUUID(), versionId: randomUUID() }
     const other = { siteId: randomUUID(), versionId: randomUUID() }
     const versionedHost = siteHost(`at-${versioned.siteId}`)
@@ -755,6 +764,7 @@ describe.skipIf(!hasDocsDb)("alternate trees of a many-version site", () => {
             servedUrl: string,
             title: string,
             versionLabel: string | null,
+            localeLabel: string | null = null,
         ) => {
             return {
                 id: randomUUID(),
@@ -765,6 +775,7 @@ describe.skipIf(!hasDocsDb)("alternate trees of a many-version site", () => {
                 servedUrl,
                 slugs: servedUrl.split("/").filter(Boolean),
                 versionLabel,
+                localeLabel,
                 title,
                 frontmatter: {},
                 source: `# ${title}\n`,
@@ -792,21 +803,40 @@ describe.skipIf(!hasDocsDb)("alternate trees of a many-version site", () => {
                     seq: 1,
                     status: "ready",
                     config: { name: "Alternate trees" },
-                    versionsManifest:
+                    versionsManifest: ids === versioned ? englishVersions : [],
+                    // Spanish has its own version, rooted in a directory no
+                    // English root holds: its meta row resolves only against
+                    // the Spanish roots.
+                    localesManifest:
                         ids === versioned
                             ? [
                                   {
-                                      label: "latest",
-                                      directory: "",
+                                      locale: "en",
                                       default: true,
-                                      seq: 0,
+                                      directory: "",
+                                      nav: emptyNav,
+                                      versionsManifest: englishVersions,
                                   },
-                                  ...labels.map((label, index) => ({
-                                      label,
-                                      directory: `sdk/${label}`,
+                                  {
+                                      locale: "es",
                                       default: false,
-                                      seq: index + 1,
-                                  })),
+                                      directory: "es",
+                                      nav: emptyNav,
+                                      versionsManifest: [
+                                          {
+                                              label: "latest",
+                                              directory: "",
+                                              default: true,
+                                              seq: 0,
+                                          },
+                                          {
+                                              label: "beta",
+                                              directory: "es/sdk/beta",
+                                              default: false,
+                                              seq: 1,
+                                          },
+                                      ],
+                                  },
                               ]
                             : [],
                     searchCorpusUrl,
@@ -833,16 +863,28 @@ describe.skipIf(!hasDocsDb)("alternate trees of a many-version site", () => {
                         label,
                     ),
                 ]),
+                ...["alpha", "zeta"].map((name) =>
+                    page(
+                        versioned,
+                        `es/sdk/beta/${name}.mdx`,
+                        `/es/beta/${name}`,
+                        name,
+                        "beta",
+                        "es",
+                    ),
+                ),
                 page(other, "index.mdx", "/", "Other home", null),
             ])
             // Each version orders its pages against the alphabet.
             await transaction.insert(schema.docsMeta).values(
-                labels.map((label) => ({
-                    id: randomUUID(),
-                    versionId: versioned.versionId,
-                    path: `sdk/${label}/meta.json`,
-                    data: { pages: ["zeta", "alpha"] },
-                })),
+                [...labels.map((label) => `sdk/${label}`), "es/sdk/beta"].map(
+                    (directory) => ({
+                        id: randomUUID(),
+                        versionId: versioned.versionId,
+                        path: `${directory}/meta.json`,
+                        data: { pages: ["zeta", "alpha"] },
+                    }),
+                ),
             )
             for (const ids of [versioned, other])
                 await transaction
@@ -859,7 +901,7 @@ describe.skipIf(!hasDocsDb)("alternate trees of a many-version site", () => {
                 .where(eq(schema.docsSite.id, siteId))
     })
 
-    test("each version's tree lists its own pages in sidebar order, without the shared pages", async () => {
+    test("each other version's tree, in either language, lists its own pages in sidebar order, without the shared pages", async () => {
         const ctx = await resolveDocsContext(requestFor(versionedHost, "/"))
         const trees = await alternateTrees(ctx)
         expect(
@@ -868,7 +910,7 @@ describe.skipIf(!hasDocsDb)("alternate trees of a many-version site", () => {
                 pages: tree.pages.map((page) => page.url),
             })),
         ).toEqual(
-            labels.map((label) => ({
+            [...labels, "es/beta"].map((label) => ({
                 url: `/${label}`,
                 pages: [`/${label}/zeta`, `/${label}/alpha`],
             })),
