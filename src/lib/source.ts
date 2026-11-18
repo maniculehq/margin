@@ -565,6 +565,9 @@ async function buildVersionSource(
     seo: StoredSeo,
     /** Active locale tag; null = the default locale's trees. */
     localeLabel: string | null = null,
+    /** Only the tree's own labelled rows, without the shared (unlabelled)
+     * pages its language's default tree serves (alternateTrees). */
+    { labelledOnly = false }: { labelledOnly?: boolean } = {},
 ): Promise<VersionSource> {
     const { pages, metas } = await versionContent.forceFetch(
         `${siteId}:${versionId}`,
@@ -576,7 +579,8 @@ async function buildVersionSource(
     const selectedPages = pages.filter(
         (row) =>
             (row.localeLabel ?? null) === localeLabel &&
-            (row.versionLabel === null || row.versionLabel === versionLabel),
+            (row.versionLabel === versionLabel ||
+                (!labelledOnly && row.versionLabel === null)),
     )
     // Keyed by the ingest source path (docs_page.path) — the namespace
     // __resolvedNav tab membership (resolvedPages) is expressed in.
@@ -592,12 +596,30 @@ async function buildVersionSource(
         fileByRowPath.set(row.path, file)
         return file
     })
+    // A meta row belongs to the first root (in manifest order) whose
+    // directory holds it. Looked up by the row's ancestor directories, so a
+    // site with hundreds of versions does not scan every root per row.
+    const rootIndexByDirectory = new Map<string, number>()
+    versionRoots.forEach((entry, index) => {
+        if (!rootIndexByDirectory.has(entry.directory))
+            rootIndexByDirectory.set(entry.directory, index)
+    })
     const metaFiles: VirtualDocsFile[] = metas.flatMap((row) => {
-        const owningRoot = versionRoots.find(
-            (entry) =>
-                row.path === `${entry.directory}/meta.json` ||
-                row.path.startsWith(`${entry.directory}/`),
-        )
+        let owningIndex: number | undefined
+        for (
+            let slash = row.path.indexOf("/");
+            slash !== -1;
+            slash = row.path.indexOf("/", slash + 1)
+        ) {
+            const index = rootIndexByDirectory.get(row.path.slice(0, slash))
+            if (
+                index !== undefined &&
+                (owningIndex === undefined || index < owningIndex)
+            )
+                owningIndex = index
+        }
+        const owningRoot =
+            owningIndex === undefined ? undefined : versionRoots[owningIndex]
         if (owningRoot && owningRoot.label !== versionLabel) return []
         // Locale trees live under the locale-tag prefix (servedUrl space):
         // a version root "es/v1" (label v1) rewrites to es/v1/… so meta
@@ -1060,9 +1082,18 @@ export interface AlternateTree {
     pages: DocPage[]
 }
 
+/** Keyed by the request tree's loader, which `sources` memoizes per (site,
+ * version, locale, label): the trees are a function of it, and an entry lives
+ * as long as that loader does. */
+const alternateTreesMemo = new WeakMap<SiteSource, AlternateTree[]>()
+
 export async function alternateTrees(
     ctx: DocsContext,
 ): Promise<AlternateTree[]> {
+    const memoized = alternateTreesMemo.get(ctx.source)
+    if (memoized) return memoized
+    const { versionId } = ctx
+    if (!versionId) return []
     const defaultLocale = ctx.localesManifest.find((entry) => entry.default)
     const ownTag = ctx.activeLocale ?? defaultLocale?.locale ?? null
     const languages = [
@@ -1131,29 +1162,48 @@ export async function alternateTrees(
     })
     const trees = await Promise.all(
         specs.map(async ({ versionLabel, base, ...tree }) => {
-            // sourceForVersion is memoized per tree, so a language's default
-            // tree is built once however many of its versions read it.
-            const [built, baseTree] = await Promise.all(
-                [versionLabel, base.defaultLabel].map((label) =>
-                    sourceForVersion(
-                        ctx.site.id,
-                        ctx.versionId,
-                        label,
-                        base.versionsManifest,
-                        ctx.seo,
-                        base.locale,
-                    ),
-                ),
-            )
-            if (!built || !baseTree) return { ...tree, pages: [] }
+            // A version tree is built from its own labelled rows, outside the
+            // `sources` memo: a site with more versions than that memo holds
+            // would otherwise rebuild every tree, shared pages included, on
+            // each call and evict every other site's loader on the way.
+            // sourceForVersion is memoized per tree, so another language's
+            // default tree is built once however many of its versions read it.
+            const [built, baseTree] = await Promise.all([
+                tree.kind === "locale"
+                    ? sourceForVersion(
+                          ctx.site.id,
+                          versionId,
+                          versionLabel,
+                          base.versionsManifest,
+                          ctx.seo,
+                          base.locale,
+                      )
+                    : buildVersionSource(
+                          ctx.site.id,
+                          versionId,
+                          versionLabel,
+                          base.versionsManifest,
+                          ctx.seo,
+                          base.locale,
+                          { labelledOnly: true },
+                      ),
+                tree.kind === "version" && !base.own
+                    ? sourceForVersion(
+                          ctx.site.id,
+                          versionId,
+                          base.defaultLabel,
+                          base.versionsManifest,
+                          ctx.seo,
+                          base.locale,
+                      )
+                    : ctx,
+            ])
             // A version tree drops what its language's default tree serves;
             // a language's default tree keeps all of its pages.
             const served = new Set(
                 tree.kind === "locale"
                     ? []
-                    : (base.own ? ctx.allPages : baseTree.allPages).map(
-                          (page) => page.url,
-                      ),
+                    : baseTree.allPages.map((page) => page.url),
             )
             return {
                 ...tree,
@@ -1163,7 +1213,9 @@ export async function alternateTrees(
             }
         }),
     )
-    return trees.filter((tree) => tree.pages.length > 0)
+    const result = trees.filter((tree) => tree.pages.length > 0)
+    alternateTreesMemo.set(ctx.source, result)
+    return result
 }
 
 /** Which of `urls` exist as served routes in this version (language-selector
