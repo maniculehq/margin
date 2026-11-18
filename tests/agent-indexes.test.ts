@@ -739,3 +739,199 @@ describe.skipIf(!hasDocsDb)("agent indexes", () => {
         ).not.toBe(htmlPageEtag(ctx, page, null, `http://${hostname}`))
     })
 })
+
+describe.skipIf(!hasDocsDb)("alternate trees of a many-version site", () => {
+    // More directory versions than the 64 loaders the instance memoizes.
+    const labels = Array.from({ length: 70 }, (_, index) => `v${index + 1}`)
+    const englishVersions = [
+        { label: "latest", directory: "", default: true, seq: 0 },
+        ...labels.map((label, index) => ({
+            label,
+            directory: `sdk/${label}`,
+            default: false,
+            seq: index + 1,
+        })),
+    ]
+    const versioned = { siteId: randomUUID(), versionId: randomUUID() }
+    const other = { siteId: randomUUID(), versionId: randomUUID() }
+    const versionedHost = siteHost(`at-${versioned.siteId}`)
+    const otherHost = siteHost(`at-${other.siteId}`)
+
+    beforeAll(async () => {
+        const page = (
+            ids: typeof versioned,
+            path: string,
+            servedUrl: string,
+            title: string,
+            versionLabel: string | null,
+            localeLabel: string | null = null,
+        ) => {
+            return {
+                id: randomUUID(),
+                versionId: ids.versionId,
+                siteId: ids.siteId,
+                path,
+                url: servedUrl,
+                servedUrl,
+                slugs: servedUrl.split("/").filter(Boolean),
+                versionLabel,
+                localeLabel,
+                title,
+                frontmatter: {},
+                source: `# ${title}\n`,
+                processedMarkdown: `# ${title}\n`,
+                hast: { type: "root", children: [] },
+                structuredData: { headings: [], contents: [] },
+                toc: [],
+                lastModified: new Date("2026-09-01T00:00:00.000Z"),
+            }
+        }
+        await db.transaction(async (transaction) => {
+            for (const ids of [versioned, other]) {
+                await transaction.insert(schema.docsSite).values({
+                    id: ids.siteId,
+                    slug: `at-${ids.siteId}`,
+                    name: "Alternate trees",
+                    analyticsMode: "off",
+                    status: "active",
+                })
+                await transaction.insert(schema.docsContentVersion).values({
+                    id: ids.versionId,
+                    siteId: ids.siteId,
+                    commitSha: "alternate-trees",
+                    kind: "production",
+                    seq: 1,
+                    status: "ready",
+                    config: { name: "Alternate trees" },
+                    versionsManifest: ids === versioned ? englishVersions : [],
+                    // Spanish has its own version, rooted in a directory no
+                    // English root holds: its meta row resolves only against
+                    // the Spanish roots.
+                    localesManifest:
+                        ids === versioned
+                            ? [
+                                  {
+                                      locale: "en",
+                                      default: true,
+                                      directory: "",
+                                      nav: emptyNav,
+                                      versionsManifest: englishVersions,
+                                  },
+                                  {
+                                      locale: "es",
+                                      default: false,
+                                      directory: "es",
+                                      nav: emptyNav,
+                                      versionsManifest: [
+                                          {
+                                              label: "latest",
+                                              directory: "",
+                                              default: true,
+                                              seq: 0,
+                                          },
+                                          {
+                                              label: "beta",
+                                              directory: "es/sdk/beta",
+                                              default: false,
+                                              seq: 1,
+                                          },
+                                      ],
+                                  },
+                              ]
+                            : [],
+                    searchCorpusUrl,
+                })
+            }
+            await transaction.insert(schema.docsPage).values([
+                page(versioned, "index.mdx", "/", "Home", null),
+                page(versioned, "guide.mdx", "/guide", "Guide", null),
+                // A version's directory is not its URL prefix (e2b nests
+                // sdk-reference/<sdk>/<version>).
+                ...labels.flatMap((label) => [
+                    page(
+                        versioned,
+                        `sdk/${label}/alpha.mdx`,
+                        `/${label}/alpha`,
+                        "Alpha",
+                        label,
+                    ),
+                    page(
+                        versioned,
+                        `sdk/${label}/zeta.mdx`,
+                        `/${label}/zeta`,
+                        "Zeta",
+                        label,
+                    ),
+                ]),
+                ...["alpha", "zeta"].map((name) =>
+                    page(
+                        versioned,
+                        `es/sdk/beta/${name}.mdx`,
+                        `/es/beta/${name}`,
+                        name,
+                        "beta",
+                        "es",
+                    ),
+                ),
+                page(other, "index.mdx", "/", "Other home", null),
+            ])
+            // Each version orders its pages against the alphabet.
+            await transaction.insert(schema.docsMeta).values(
+                [...labels.map((label) => `sdk/${label}`), "es/sdk/beta"].map(
+                    (directory) => ({
+                        id: randomUUID(),
+                        versionId: versioned.versionId,
+                        path: `${directory}/meta.json`,
+                        data: { pages: ["zeta", "alpha"] },
+                    }),
+                ),
+            )
+            for (const ids of [versioned, other])
+                await transaction
+                    .update(schema.docsSite)
+                    .set({ currentVersionId: ids.versionId })
+                    .where(eq(schema.docsSite.id, ids.siteId))
+        })
+    })
+
+    afterAll(async () => {
+        for (const { siteId } of [versioned, other])
+            await db
+                .delete(schema.docsSite)
+                .where(eq(schema.docsSite.id, siteId))
+    })
+
+    test("each other version's tree, in either language, lists its own pages in sidebar order, without the shared pages", async () => {
+        const ctx = await resolveDocsContext(requestFor(versionedHost, "/"))
+        const trees = await alternateTrees(ctx)
+        expect(
+            trees.map((tree) => ({
+                url: tree.url,
+                pages: tree.pages.map((page) => page.url),
+            })),
+        ).toEqual(
+            [...labels, "es/beta"].map((label) => ({
+                url: `/${label}`,
+                pages: [`/${label}/zeta`, `/${label}/alpha`],
+            })),
+        )
+    })
+
+    // Built from the Spanish root, whose trees no earlier test memoized: the
+    // build covers all 70 English version trees, more than the instance
+    // memoizes loaders for.
+    test("building them keeps another site's loader memoized", async () => {
+        const resolveOther = () =>
+            resolveDocsContext(requestFor(otherHost, "/"))
+        const before = await resolveOther()
+        const trees = await alternateTrees(
+            await resolveDocsContext(requestFor(versionedHost, "/es")),
+        )
+        expect(
+            trees
+                .filter((tree) => tree.kind === "version")
+                .map((tree) => tree.url),
+        ).toEqual(expect.arrayContaining(labels.map((label) => `/${label}`)))
+        expect((await resolveOther()).source).toBe(before.source)
+    })
+})
