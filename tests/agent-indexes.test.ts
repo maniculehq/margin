@@ -917,13 +917,21 @@ describe.skipIf(!hasDocsDb)("alternate trees of a many-version site", () => {
         )
     })
 
+    // Built from the Spanish root, whose trees no earlier test memoized: the
+    // build covers all 70 English version trees, more than the instance
+    // memoizes loaders for.
     test("building them keeps another site's loader memoized", async () => {
         const resolveOther = () =>
             resolveDocsContext(requestFor(otherHost, "/"))
         const before = await resolveOther()
-        await alternateTrees(
-            await resolveDocsContext(requestFor(versionedHost, "/")),
+        const trees = await alternateTrees(
+            await resolveDocsContext(requestFor(versionedHost, "/es")),
         )
+        expect(
+            trees
+                .filter((tree) => tree.kind === "version")
+                .map((tree) => tree.url),
+        ).toEqual(expect.arrayContaining(labels.map((label) => `/${label}`)))
         expect((await resolveOther()).source).toBe(before.source)
     })
 })
